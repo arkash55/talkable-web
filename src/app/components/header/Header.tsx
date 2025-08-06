@@ -16,6 +16,7 @@ import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ThemeToggle from './ThemeToggle';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/app/context/AuthContext';
 
 const routes = ['/', '/general', '/chat', '/settings'];
 const labels = ['Home', 'General', 'Chat', 'Settings'];
@@ -24,6 +25,7 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const theme = useTheme();
+  const { user } = useAuth();
 
   const currentTab = routes.findIndex((r) => pathname === r);
   const [value, setValue] = useState(currentTab === -1 ? 0 : currentTab);
@@ -79,7 +81,7 @@ export default function Header() {
           </Box>
 
           {/* Tabs */}
-          <Tabs
+          {user && (<Tabs
             value={value}
             onChange={handleTabChange}
             textColor="primary"
@@ -114,7 +116,7 @@ export default function Header() {
             {labels.map((label, index) => (
               <Tab key={label} label={label} disableRipple />
             ))}
-          </Tabs>
+          </Tabs>  )}
 
           {/* Theme Toggle */}
           <Box>
