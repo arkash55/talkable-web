@@ -1,9 +1,12 @@
 'use client';
+import ConversationSidebar from '../components/home/ConversationSideBar';
 import VoiceGrid from '../components/home/VoiceGrid';
 
 export default function HomePage() {
   return (
-<div style={{ height: '100%', width: '100%' }}>
+<div style={{ 
+height: '100%', width: '100%', display: 'flex', flexDirection: 'row'
+}}>
       <VoiceGrid
 
         blocks={[
@@ -15,6 +18,7 @@ export default function HomePage() {
           { label: 'Priority 6', onClick: () => {alert("clicked priority 6")} },
         ]}
       />
+        <ConversationSidebar />
     </div>
   );
 }
