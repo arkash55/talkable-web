@@ -24,7 +24,7 @@ const mockMessages = [
 export default function ConversationSidebar() {
   const theme = useTheme();
   const [open, setOpen] = useState(true);
-  const width = open ? '25%' : 56;
+  const width = open ? '25%' : '8%';
 
   return (
     <Box
@@ -49,9 +49,17 @@ export default function ConversationSidebar() {
           borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <IconButton onClick={() => setOpen(!open)} size="small">
-          {open ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-        </IconButton>
+            <IconButton
+            onClick={() => setOpen(!open)}
+            size="large"
+            sx={{
+                width: 80,
+                height: 80,
+                fontSize: 70, 
+            }}
+            >
+            {open ? <ChevronRightIcon fontSize="inherit" /> : <ChevronLeftIcon fontSize="inherit" />}
+            </IconButton>
       </Box>
 
       {/* Content */}
