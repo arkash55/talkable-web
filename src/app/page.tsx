@@ -1,15 +1,10 @@
-
 import { Typography } from '@mui/material';
-import ThemeToggle from './components/header/ThemeToggle';
 
 export default function HomePage() {
   return (
     <main style={{ padding: 24 }}>
-      <ThemeToggle />
-      <Typography variant="h4">Hello, MUI Theming!</Typography>
-      <Typography>
-        Toggle the theme using the icon above.
-      </Typography>
+      <Typography variant="h3">Inter + Roboto Font Test</Typography>
+      <p>This paragraph should render with Inter. If Inter is not available, it falls back to Roboto.</p>
     </main>
   );
 }

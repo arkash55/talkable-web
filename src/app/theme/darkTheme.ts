@@ -46,7 +46,7 @@ const darkTheme = createTheme({
     },
   },
   typography: {
-    fontFamily: 'Roboto, sans-serif',
+    fontFamily: 'var(--font-family)',
   },
 });
 export default darkTheme;
