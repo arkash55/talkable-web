@@ -2,25 +2,25 @@
 
 import { Box, Typography } from '@mui/material';
 
-interface VoiceGridProps {
-  topLeft: {
-    label: string;
-    onClick: () => void;
-  };
-  blocks: {
-    label: string;
-    onClick: () => void;
-  }[];
+interface VoiceGridBlock {
+  label: string;
+  onClick: () => void;
 }
 
-export default function VoiceGrid({ topLeft, blocks }: VoiceGridProps) {
-  // Predefined positions for 5 smaller blocks (high to low priority)
+interface VoiceGridProps {
+  blocks: VoiceGridBlock[]; // length = 6
+}
+
+export default function VoiceGrid({ blocks }: VoiceGridProps) {
   const positions = [
-    { col: 5, row: 1 }, // highest
-    { col: 5, row: 3 },
-    { col: 5, row: 5 },
-    { col: 3, row: 5 },
-    { col: 1, row: 5 }, // lowest
+    // Priority 1 (big top-left block)
+    { col: 1, row: 1, colSpan: 4, rowSpan: 4 },
+    // Priority 2–6 (smaller blocks)
+    { col: 5, row: 1, colSpan: 2, rowSpan: 2 },
+    { col: 5, row: 3, colSpan: 2, rowSpan: 2 },
+    { col: 1, row: 5, colSpan: 2, rowSpan: 2 },
+    { col: 3, row: 5, colSpan: 2, rowSpan: 2 },
+    { col: 5, row: 5, colSpan: 2, rowSpan: 2 },
   ];
 
   return (
@@ -34,38 +34,17 @@ export default function VoiceGrid({ topLeft, blocks }: VoiceGridProps) {
         gap: 0,
       }}
     >
-      {/* Top Left 4x4 response */}
-      <Box
-        sx={{
-          gridColumn: '1 / span 4',
-          gridRow: '1 / span 4',
-          backgroundColor: 'primary.main',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          border: '1px solid white',
-        }}
-        onClick={topLeft.onClick}
-      >
-        <Typography
-          variant="h4"
-          sx={{ color: 'primary.contrastText', p: 2, textAlign: 'center' }}
-        >
-          {topLeft.label}
-        </Typography>
-      </Box>
-
-      {/* Smaller 2x2 blocks */}
-      {blocks.slice(0, 5).map((block, index) => {
+      {blocks.slice(0, 6).map((block, index) => {
         const pos = positions[index];
+        const isPriority1 = index === 0;
+
         return (
           <Box
             key={index}
             sx={{
-              gridColumn: `${pos.col} / span 2`,
-              gridRow: `${pos.row} / span 2`,
-              backgroundColor: 'secondary.main',
+              gridColumn: `${pos.col} / span ${pos.colSpan}`,
+              gridRow: `${pos.row} / span ${pos.rowSpan}`,
+              backgroundColor: isPriority1 ? 'primary.main' : 'secondary.main',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -75,8 +54,12 @@ export default function VoiceGrid({ topLeft, blocks }: VoiceGridProps) {
             onClick={block.onClick}
           >
             <Typography
-              variant="h6"
-              sx={{ color: 'secondary.contrastText', p: 2, textAlign: 'center' }}
+              variant={isPriority1 ? 'h4' : 'h6'}
+              sx={{
+                color: isPriority1 ? 'primary.contrastText' : 'secondary.contrastText',
+                p: 2,
+                textAlign: 'center',
+              }}
             >
               {block.label}
             </Typography>

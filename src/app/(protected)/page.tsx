@@ -5,16 +5,14 @@ export default function HomePage() {
   return (
 <div style={{ height: '100%', width: '100%' }}>
       <VoiceGrid
-        topLeft={{
-          label: '🎤 Tap to Speak',
-          onClick: () => alert('Start voice input...'),
-        }}
+
         blocks={[
-          { label: 'Option 1', onClick: () => alert('Option 1 selected') },
-          { label: 'Option 2', onClick: () => alert('Option 2 selected') },
-          { label: 'Option 3', onClick: () => alert('Option 3 selected') },
-          { label: 'Option 4', onClick: () => alert('Option 4 selected') },
-          { label: 'Option 5', onClick: () => alert('Option 5 selected') },
+          { label: 'Priority 1: Most Likely Response', onClick: () => { alert('clicked priority 1')} },
+          { label: 'Priority 2', onClick: () => {alert("clicked priority 2")} },
+          { label: 'Priority 3', onClick: () => {alert("clicked priority 3")} },
+          { label: 'Priority 4', onClick: () => {alert("clicked priority 4")} },
+          { label: 'Priority 5', onClick: () => {alert("clicked priority 5")} },
+          { label: 'Priority 6', onClick: () => {alert("clicked priority 6")} },
         ]}
       />
     </div>

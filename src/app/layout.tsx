@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 overflow: 'hidden', // stop scrolling
               }}
             >
-              {/* Wrap children in a full-height container */}
+    
               <div
                 style={{
                   height: '100%',
