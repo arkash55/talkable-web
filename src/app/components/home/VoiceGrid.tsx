@@ -26,8 +26,8 @@ export default function VoiceGrid({ topLeft, blocks }: VoiceGridProps) {
   return (
     <Box
       sx={{
-        height: '100vh',
-        width: '100vw',
+        height: '100%',
+        width: '100%',
         display: 'grid',
         gridTemplateColumns: 'repeat(6, 1fr)',
         gridTemplateRows: 'repeat(6, 1fr)',
