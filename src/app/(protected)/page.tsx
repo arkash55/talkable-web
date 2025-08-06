@@ -1,10 +1,22 @@
-import { Typography } from '@mui/material';
+'use client';
+import VoiceGrid from '../components/home/VoiceGrid';
 
 export default function HomePage() {
   return (
-    <main style={{ padding: 24 }}>
-      <Typography variant="h3">Inter + Roboto Font Test</Typography>
-      <p>This paragraph should render with Inter. If Inter is not available, it falls back to Roboto.</p>
-    </main>
+<div style={{ height: '100vh', width: '100vw' }}>
+      <VoiceGrid
+        topLeft={{
+          label: '🎤 Tap to Speak',
+          onClick: () => alert('Start voice input...'),
+        }}
+        blocks={[
+          { label: 'Option 1', onClick: () => alert('Option 1 selected') },
+          { label: 'Option 2', onClick: () => alert('Option 2 selected') },
+          { label: 'Option 3', onClick: () => alert('Option 3 selected') },
+          { label: 'Option 4', onClick: () => alert('Option 4 selected') },
+          { label: 'Option 5', onClick: () => alert('Option 5 selected') },
+        ]}
+      />
+    </div>
   );
 }

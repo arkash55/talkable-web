@@ -29,7 +29,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
   <html lang="en" className={`${inter.variable} ${roboto.variable}`}>
-      <body>
+      <body style={{ height: '100vh', margin: 0 }}>
         <CustomThemeProvider>
           <AuthProvider>
             <Header />
