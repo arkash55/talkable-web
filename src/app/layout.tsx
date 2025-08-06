@@ -1,4 +1,5 @@
 import Header from './components/header/Header';
+import { AuthProvider } from './context/AuthContext';
 import { CustomThemeProvider } from './context/ThemeContext';
 import './globals.css';
 import { Inter, Roboto } from 'next/font/google';
@@ -30,8 +31,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   <html lang="en" className={`${inter.variable} ${roboto.variable}`}>
       <body>
         <CustomThemeProvider>
-          <Header />
-          {children}
+          <AuthProvider>
+            <Header />
+            {children}
+          </AuthProvider>
         </CustomThemeProvider>
       </body>
     </html>
