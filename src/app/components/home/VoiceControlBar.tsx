@@ -1,20 +1,19 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import {
   Box,
   Button,
   Typography,
   useTheme,
   Stack,
-  CircularProgress,
 } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import ReplayIcon from '@mui/icons-material/Replay';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { Message } from '@/app/types/types';
 import { getResponsesFromAI } from '@/app/actions/getResponseFromAI';
-
+import VoiceWaveform from '@/app/components/home/VoiceWaveform';
 
 interface VoiceControlBarProps {
   onResponses: (responses: string[]) => void;
@@ -23,15 +22,14 @@ interface VoiceControlBarProps {
 export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
   const theme = useTheme();
   const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const handleStartListening = () => {
     setListening(true);
 
-    // 🔊 Simulate speech transcription
     const mockTranscript = 'Do you want to go outside today?';
 
-    // 👇 Server action to get AI responses
     startTransition(async () => {
       const conversation: Message[] = [{ sender: 'other', text: mockTranscript }];
       const responses = await getResponsesFromAI(conversation);
@@ -39,6 +37,19 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
       setListening(false);
     });
   };
+
+  useEffect(() => {
+    const handleStart = () => setSpeaking(true);
+    const handleEnd = () => setSpeaking(false);
+
+    window.addEventListener('tts:start', handleStart);
+    window.addEventListener('tts:end', handleEnd);
+
+    return () => {
+      window.removeEventListener('tts:start', handleStart);
+      window.removeEventListener('tts:end', handleEnd);
+    };
+  }, []);
 
   return (
     <Box
@@ -55,7 +66,7 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         gap: 2,
       }}
     >
-      {/* Left side: Title or instructions */}
+      {/* Left side: Title */}
       <Typography
         variant="h6"
         sx={{ color: theme.palette.text.primary, fontWeight: 600 }}
@@ -63,7 +74,11 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         Voice Controls
       </Typography>
 
-      {/* Right side: Buttons */}
+              {/* Waveform shows if speaking or listening */}
+        {(listening || speaking) && <VoiceWaveform />}
+
+
+      {/* Right side: Controls */}
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
         {/* Start Listening */}
         <Button
@@ -81,8 +96,6 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
           {listening || isPending ? 'Listening...' : 'Start Listening'}
         </Button>
 
-        {/* Listening indicator */}
-        {(listening || isPending) && <CircularProgress size={28} thickness={4} />}
 
         {/* Regenerate Responses */}
         <Button
