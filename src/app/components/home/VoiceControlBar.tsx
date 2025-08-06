@@ -1,19 +1,43 @@
 'use client';
 
-import { Box, Button, Typography, useTheme, Stack, CircularProgress } from '@mui/material';
+import { useState, useTransition } from 'react';
+import {
+  Box,
+  Button,
+  Typography,
+  useTheme,
+  Stack,
+  CircularProgress,
+} from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import ReplayIcon from '@mui/icons-material/Replay';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { useState } from 'react';
+import { Message } from '@/app/types/types';
+import { getResponsesFromAI } from '@/app/actions/getResponseFromAI';
 
-export default function VoiceControlBar() {
+
+interface VoiceControlBarProps {
+  onResponses: (responses: string[]) => void;
+}
+
+export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
   const theme = useTheme();
   const [listening, setListening] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const handleStartListening = () => {
     setListening(true);
-    // TODO: Integrate with audio recording
-    setTimeout(() => setListening(false), 5000); // mock stop after 5 seconds
+
+    // 🔊 Simulate speech transcription
+    const mockTranscript = 'Do you want to go outside today?';
+
+    // 👇 Server action to get AI responses
+    startTransition(async () => {
+      const conversation: Message[] = [{ sender: 'other', text: mockTranscript }];
+      const responses = await getResponsesFromAI(conversation);
+      onResponses(responses);
+      setListening(false);
+    });
   };
 
   return (
@@ -27,8 +51,8 @@ export default function VoiceControlBar() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 2,
         flexWrap: 'wrap',
+        gap: 2,
       }}
     >
       {/* Left side: Title or instructions */}
@@ -40,31 +64,32 @@ export default function VoiceControlBar() {
       </Typography>
 
       {/* Right side: Buttons */}
-      <Stack direction="row" spacing={2} alignItems="center">
+      <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
         {/* Start Listening */}
         <Button
           variant="contained"
           startIcon={<MicIcon />}
           onClick={handleStartListening}
+          disabled={listening || isPending}
           sx={{
             fontWeight: 'bold',
             px: 3,
             py: 1.5,
-            minWidth: 160,
+            minWidth: 180,
           }}
         >
-          {listening ? 'Listening...' : 'Start Listening'}
+          {listening || isPending ? 'Listening...' : 'Start Listening'}
         </Button>
 
-        {/* Optional waveform indicator (mocked with spinner) */}
-        {listening && <CircularProgress size={28} thickness={4} />}
+        {/* Listening indicator */}
+        {(listening || isPending) && <CircularProgress size={28} thickness={4} />}
 
         {/* Regenerate Responses */}
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
-          sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 200 }}
           onClick={() => alert('Regenerating responses...')}
+          sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 200 }}
         >
           Regenerate Responses
         </Button>
@@ -73,8 +98,8 @@ export default function VoiceControlBar() {
         <Button
           variant="outlined"
           startIcon={<ReplayIcon />}
-          sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 180 }}
           onClick={() => alert('Repeating question...')}
+          sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 180 }}
         >
           Repeat Question
         </Button>
