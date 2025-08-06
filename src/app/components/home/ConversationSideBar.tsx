@@ -6,24 +6,25 @@ import {
   Typography,
   Divider,
   useTheme,
+  Paper,
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useState } from 'react';
 
 const mockMessages = [
-  'Hi, how can I help you today?',
-  'Can you repeat that?',
-  'Would you like me to call someone?',
-  'That sounds great!',
-  'Okay, I’ll remember that.',
-  'Goodbye!',
+  { text: 'Hi, how can I help you today?', sender: 'user' },
+  { text: 'Can you repeat that?', sender: 'ai' },
+  { text: 'Would you like me to call someone?', sender: 'user' },
+  { text: 'That sounds great!', sender: 'ai' },
+  { text: 'Okay, I’ll remember that.', sender: 'user' },
+  { text: 'Goodbye!', sender: 'ai' },
 ];
 
 export default function ConversationSidebar() {
   const theme = useTheme();
   const [open, setOpen] = useState(true);
-  const width = open ? 300 : 56;
+  const width = open ? '25%' : 56;
 
   return (
     <Box
@@ -59,18 +60,38 @@ export default function ConversationSidebar() {
           <Typography variant="h6" gutterBottom>
             Conversation History
           </Typography>
-          <Divider />
-          {mockMessages.map((msg, i) => (
-            <Box key={i} sx={{ my: 2 }}>
-              <Typography
-                variant="body2"
-                sx={{ color: theme.palette.text.secondary }}
+          <Divider sx={{ mb: 2 }} />
+          {mockMessages.map((msg, i) => {
+            const isUser = msg.sender === 'user';
+
+            return (
+              <Box
+                key={i}
+                sx={{
+                  display: 'flex',
+                  justifyContent: isUser ? 'flex-end' : 'flex-start',
+                  mb: 1.5,
+                }}
               >
-                {msg}
-              </Typography>
-              <Divider sx={{ my: 1 }} />
-            </Box>
-          ))}
+                <Paper
+                  elevation={3}
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    maxWidth: '75%',
+                    bgcolor: isUser
+                      ? theme.palette.primary.main
+                      : theme.palette.grey[300],
+                    color: isUser
+                      ? theme.palette.primary.contrastText
+                      : theme.palette.text.primary,
+                  }}
+                >
+                  <Typography variant="body2">{msg.text}</Typography>
+                </Paper>
+              </Box>
+            );
+          })}
         </Box>
       )}
     </Box>
