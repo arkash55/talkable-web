@@ -24,7 +24,7 @@ const mockMessages = [
 export default function ConversationSidebar() {
   const theme = useTheme();
   const [open, setOpen] = useState(true);
-  const width = open ? '25%' : '8%';
+  const width = open ? '25%' : '5%';
 
   return (
     <Box
