@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Button, TextField, Typography } from '@mui/material';
+import { Box, Button, TextField, Typography, CircularProgress } from '@mui/material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import Link from 'next/link';
@@ -9,9 +9,10 @@ interface LoginFormProps {
   error: string;
   setError: (msg: string) => void;
   handleSubmit: (email: string, password: string) => void;
+  isLoading: boolean;
 }
 
-const LoginForm = ({ error, setError, handleSubmit }: LoginFormProps) => {
+const LoginForm = ({ error, setError, handleSubmit, isLoading }: LoginFormProps) => {
   const initialValues = { email: '', password: '' };
 
   const validationSchema = Yup.object({
@@ -43,6 +44,7 @@ const LoginForm = ({ error, setError, handleSubmit }: LoginFormProps) => {
               margin="normal"
               error={touched.email && !!errors.email}
               helperText={touched.email && errors.email}
+              disabled={isLoading}
             />
 
             <Field
@@ -54,6 +56,7 @@ const LoginForm = ({ error, setError, handleSubmit }: LoginFormProps) => {
               margin="normal"
               error={touched.password && !!errors.password}
               helperText={touched.password && errors.password}
+              disabled={isLoading}
             />
 
             {error && (
@@ -62,8 +65,15 @@ const LoginForm = ({ error, setError, handleSubmit }: LoginFormProps) => {
               </Typography>
             )}
 
-            <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>
-              Log In
+            <Button
+              type="submit"
+              variant="contained"
+              fullWidth
+              sx={{ mt: 2 }}
+              disabled={isLoading}
+              startIcon={isLoading ? <CircularProgress size={20} /> : null}
+            >
+              {isLoading ? 'Logging in...' : 'Log In'}
             </Button>
 
             <Button
@@ -72,6 +82,7 @@ const LoginForm = ({ error, setError, handleSubmit }: LoginFormProps) => {
               variant="text"
               fullWidth
               sx={{ mt: 2 }}
+              disabled={isLoading}
             >
               Don’t have an account? Register
             </Button>

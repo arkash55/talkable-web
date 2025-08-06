@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Button, TextField, Typography } from '@mui/material';
+import { Box, Button, TextField, Typography, CircularProgress } from '@mui/material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import Link from 'next/link';
@@ -9,9 +9,10 @@ interface RegisterFormProps {
   error: string;
   setError: (msg: string) => void;
   handleSubmit: (email: string, password: string) => void;
+  isLoading: boolean;
 }
 
-const RegisterForm = ({ error, setError, handleSubmit }: RegisterFormProps) => {
+const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterFormProps) => {
   const initialValues = {
     firstName: '',
     lastName: '',
@@ -37,7 +38,7 @@ const RegisterForm = ({ error, setError, handleSubmit }: RegisterFormProps) => {
         validationSchema={validationSchema}
         onSubmit={async (values) => {
           setError('');
-          await handleSubmit(values.email, values.password); // only use email/password for now
+          await handleSubmit(values.email, values.password); // Only email/password for now
         }}
       >
         {({ errors, touched }) => (
@@ -50,6 +51,7 @@ const RegisterForm = ({ error, setError, handleSubmit }: RegisterFormProps) => {
               margin="normal"
               error={touched.firstName && !!errors.firstName}
               helperText={touched.firstName && errors.firstName}
+              disabled={isLoading}
             />
 
             <Field
@@ -60,6 +62,7 @@ const RegisterForm = ({ error, setError, handleSubmit }: RegisterFormProps) => {
               margin="normal"
               error={touched.lastName && !!errors.lastName}
               helperText={touched.lastName && errors.lastName}
+              disabled={isLoading}
             />
 
             <Field
@@ -70,6 +73,7 @@ const RegisterForm = ({ error, setError, handleSubmit }: RegisterFormProps) => {
               margin="normal"
               error={touched.email && !!errors.email}
               helperText={touched.email && errors.email}
+              disabled={isLoading}
             />
 
             <Field
@@ -81,6 +85,7 @@ const RegisterForm = ({ error, setError, handleSubmit }: RegisterFormProps) => {
               margin="normal"
               error={touched.password && !!errors.password}
               helperText={touched.password && errors.password}
+              disabled={isLoading}
             />
 
             {error && (
@@ -89,8 +94,15 @@ const RegisterForm = ({ error, setError, handleSubmit }: RegisterFormProps) => {
               </Typography>
             )}
 
-            <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>
-              Register
+            <Button
+              type="submit"
+              variant="contained"
+              fullWidth
+              sx={{ mt: 2 }}
+              disabled={isLoading}
+              startIcon={isLoading ? <CircularProgress size={20} /> : null}
+            >
+              {isLoading ? 'Registering...' : 'Register'}
             </Button>
 
             <Button
@@ -99,6 +111,7 @@ const RegisterForm = ({ error, setError, handleSubmit }: RegisterFormProps) => {
               variant="text"
               fullWidth
               sx={{ mt: 2 }}
+              disabled={isLoading}
             >
               Already have an account? Log in
             </Button>
