@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   Box,
   Button,
@@ -23,21 +23,15 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
   const theme = useTheme();
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [hasSound, setHasSound] = useState(false);
+  const [hasSoundLeeway, setHasSoundLeeway] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const leewayTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const handleStartListening = () => {
-    setListening(true);
-
-    const mockTranscript = 'Do you want to go outside today?';
-
-    startTransition(async () => {
-      const conversation: Message[] = [{ sender: 'other', text: mockTranscript }];
-      const responses = await getResponsesFromAI(conversation);
-      onResponses(responses);
-      setListening(false);
-    });
-  };
-
+  // Listen for TTS events
   useEffect(() => {
     const handleStart = () => setSpeaking(true);
     const handleEnd = () => setSpeaking(false);
@@ -50,6 +44,59 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
       window.removeEventListener('tts:end', handleEnd);
     };
   }, []);
+
+  // Whenever hasSound changes, update hasSoundLeeway with a delay
+  useEffect(() => {
+    if (hasSound) {
+      if (leewayTimeout.current) clearTimeout(leewayTimeout.current);
+      setHasSoundLeeway(true);
+    } else {
+      // Wait 1.5s before setting hasSoundLeeway to false
+      leewayTimeout.current = setTimeout(() => setHasSoundLeeway(false), 1000);
+    }
+    return () => {
+      if (leewayTimeout.current) clearTimeout(leewayTimeout.current);
+    };
+  }, [hasSound]);
+
+  const toggleListening = async () => {
+    if (!listening) {
+      setListening(true);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        audioContextRef.current = new AudioCtx();
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 256; // More bins for smoother bars
+        source.connect(analyserRef.current);
+
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+
+        const updateLevels = () => {
+          if (analyserRef.current) {
+            analyserRef.current.getByteFrequencyData(dataArray);
+
+            const avgVolume = dataArray.reduce((sum, v) => sum + v, 0) / dataArray.length;
+            setHasSound(avgVolume > 30); // Adjust threshold as needed
+          }
+          animationFrameRef.current = requestAnimationFrame(updateLevels);
+        };
+        updateLevels();
+      } catch (err) {
+        setListening(false);
+      }
+    } else {
+      setListening(false);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (audioContextRef.current) audioContextRef.current.close();
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      setHasSound(false);
+    }
+  };
 
   return (
     <Box
@@ -74,9 +121,14 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         Voice Controls
       </Typography>
 
-              {/* Waveform shows if speaking or listening */}
-        {(listening || speaking) && <VoiceWaveform />}
-
+      {/* Waveform shows if speaking or listening */}
+      {(listening || speaking) && (
+        <VoiceWaveform
+          listening={listening}
+          speaking={speaking}
+          hasSound={hasSoundLeeway}
+        />
+      )}
 
       {/* Right side: Controls */}
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
@@ -84,8 +136,7 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         <Button
           variant="contained"
           startIcon={<MicIcon />}
-          onClick={handleStartListening}
-          disabled={listening || isPending}
+          onClick={toggleListening}
           sx={{
             fontWeight: 'bold',
             px: 3,
@@ -93,7 +144,7 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
             minWidth: 180,
           }}
         >
-          {listening || isPending ? 'Listening...' : 'Start Listening'}
+          {listening ? 'Stop Listening' : 'Start Listening'}
         </Button>
 
 

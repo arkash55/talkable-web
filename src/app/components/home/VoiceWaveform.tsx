@@ -2,7 +2,18 @@
 
 import { Box } from '@mui/material';
 
-export default function VoiceWaveform() {
+interface VoiceWaveformProps {
+  listening: boolean;
+  speaking: boolean;
+  hasSound: boolean;
+}
+
+export default function VoiceWaveform({ listening, speaking, hasSound }: VoiceWaveformProps) {
+  if (!listening && !speaking) return null;
+
+  // Animate if TTS is speaking or there is mic input
+  const animate = speaking || (listening && hasSound);
+
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', height: 28 }}>
       {[...Array(5)].map((_, i) => (
@@ -10,26 +21,30 @@ export default function VoiceWaveform() {
           key={i}
           sx={{
             width: 4,
-            height: 16,
+            height: '16px',
             backgroundColor: 'primary.main',
             marginX: 0.5,
-            animation: 'wave 1.2s infinite ease-in-out',
-            animationDelay: `${i * 0.15}s`,
             borderRadius: 2,
+            animation: animate
+              ? 'wave 1.2s infinite ease-in-out'
+              : undefined,
+            animationDelay: animate ? `${i * 0.15}s` : undefined,
           }}
         />
       ))}
-
-      <style jsx global>{`
-        @keyframes wave {
-          0%, 100% {
-            transform: scaleY(0.4);
+      {animate && (
+        <style jsx global>{`
+          @keyframes wave {
+            0%,
+            100% {
+              transform: scaleY(0.4);
+            }
+            50% {
+              transform: scaleY(1.2);
+            }
           }
-          50% {
-            transform: scaleY(1.2);
-          }
-        }
-      `}</style>
+        `}</style>
+      )}
     </Box>
   );
 }
