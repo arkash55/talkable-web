@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -11,7 +11,10 @@ import {
 import MicIcon from '@mui/icons-material/Mic';
 import ReplayIcon from '@mui/icons-material/Replay';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { Message } from '@/app/types/types';
+import SpeechRecognition, {
+  useSpeechRecognition,
+} from 'react-speech-recognition';
+
 import { getResponsesFromAI } from '@/app/actions/getResponseFromAI';
 import VoiceWaveform from '@/app/components/home/VoiceWaveform';
 
@@ -30,6 +33,13 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
   const animationFrameRef = useRef<number | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const leewayTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const {
+    transcript,
+    listening: browserListening,
+    resetTranscript,
+    browserSupportsSpeechRecognition,
+  } = useSpeechRecognition();
 
   // Listen for TTS events
   useEffect(() => {
@@ -51,7 +61,6 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
       if (leewayTimeout.current) clearTimeout(leewayTimeout.current);
       setHasSoundLeeway(true);
     } else {
-      // Wait 1.5s before setting hasSoundLeeway to false
       leewayTimeout.current = setTimeout(() => setHasSoundLeeway(false), 1000);
     }
     return () => {
@@ -60,8 +69,17 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
   }, [hasSound]);
 
   const toggleListening = async () => {
+    if (!browserSupportsSpeechRecognition) {
+      alert('Your browser does not support speech recognition.');
+      return;
+    }
+
     if (!listening) {
       setListening(true);
+      resetTranscript();
+
+      SpeechRecognition.startListening({ continuous: true });
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaStreamRef.current = stream;
@@ -69,7 +87,7 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         audioContextRef.current = new AudioCtx();
         const source = audioContextRef.current.createMediaStreamSource(stream);
         analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 256; // More bins for smoother bars
+        analyserRef.current.fftSize = 256;
         source.connect(analyserRef.current);
 
         const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
@@ -77,24 +95,35 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         const updateLevels = () => {
           if (analyserRef.current) {
             analyserRef.current.getByteFrequencyData(dataArray);
-
             const avgVolume = dataArray.reduce((sum, v) => sum + v, 0) / dataArray.length;
-            setHasSound(avgVolume > 30); // Adjust threshold as needed
+            setHasSound(avgVolume > 30);
           }
           animationFrameRef.current = requestAnimationFrame(updateLevels);
         };
         updateLevels();
       } catch (err) {
+        console.error('Microphone error:', err);
         setListening(false);
       }
     } else {
       setListening(false);
+      SpeechRecognition.stopListening();
+
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (audioContextRef.current) audioContextRef.current.close();
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
       }
       setHasSound(false);
+
+      // Send transcript to AI
+      const finalTranscript = transcript.trim();
+      if (finalTranscript) {
+        const message = [{ role: 'user', content: finalTranscript }];
+        // const responses = await getResponsesFromAI(message);
+        console.log('Sending to AI:', message);
+        // onResponses(responses);
+      }
     }
   };
 
@@ -121,7 +150,7 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         Voice Controls
       </Typography>
 
-      {/* Waveform shows if speaking or listening */}
+      {/* Waveform */}
       {(listening || speaking) && (
         <VoiceWaveform
           listening={listening}
@@ -130,9 +159,8 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         />
       )}
 
-      {/* Right side: Controls */}
+      {/* Controls */}
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-        {/* Start Listening */}
         <Button
           variant="contained"
           startIcon={<MicIcon />}
@@ -147,8 +175,6 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
           {listening ? 'Stop Listening' : 'Start Listening'}
         </Button>
 
-
-        {/* Regenerate Responses */}
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
@@ -158,7 +184,6 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
           Regenerate Responses
         </Button>
 
-        {/* Repeat Question */}
         <Button
           variant="outlined"
           startIcon={<ReplayIcon />}
@@ -168,6 +193,22 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
           Repeat Question
         </Button>
       </Stack>
+
+      {/* Live Transcript */}
+      {transcript && (
+        <Typography
+          variant="body1"
+          sx={{
+            width: '100%',
+            mt: 2,
+            fontStyle: 'italic',
+            color: theme.palette.text.secondary,
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {transcript}
+        </Typography>
+      )}
     </Box>
   );
 }
