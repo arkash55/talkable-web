@@ -1,4 +1,3 @@
-// src/app/hooks/useVoiceControl.ts
 import { getIBMResponses } from '@/services/ibmService';
 import { useState, useEffect, useRef } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
@@ -7,7 +6,7 @@ export function useVoiceControl(
   onResponses: (responses: string[]) => void,
   onLoadingChange?: (loading: boolean) => void
 ) {
-  // States
+  // State
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [hasSoundLeeway, setHasSoundLeeway] = useState(false);
@@ -16,15 +15,27 @@ export function useVoiceControl(
   // Refs
   const silenceTimer = useRef<NodeJS.Timeout | null>(null);
   const processingTranscript = useRef<boolean>(false);
+  const pendingTranscript = useRef<string>(''); // store transcript until TTS ends
+  const stableOnResponses = useRef(onResponses);
+  const safeOnLoadingChange = useRef(onLoadingChange ?? (() => {}));
 
-  // STT (react-speech-recognition)
+  // STT
   const {
     transcript,
     resetTranscript,
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
 
-  // Start/stop conversation
+  // Update refs if callbacks change
+  useEffect(() => {
+    stableOnResponses.current = onResponses;
+  }, [onResponses]);
+
+  useEffect(() => {
+    safeOnLoadingChange.current = onLoadingChange ?? (() => {});
+  }, [onLoadingChange]);
+
+  // Start
   const startConversation = () => {
     if (!browserSupportsSpeechRecognition) {
       alert('Your browser does not support speech recognition.');
@@ -35,10 +46,11 @@ export function useVoiceControl(
     setIsConversationActive(true);
     SpeechRecognition.startListening({ continuous: true });
     setListening(true);
-    resetTranscript(); // ✅ this is fine here, only at start
+    resetTranscript();
     setHasSoundLeeway(true);
   };
 
+  // Stop
   const stopConversation = () => {
     if (!isConversationActive) return;
 
@@ -52,10 +64,13 @@ export function useVoiceControl(
       silenceTimer.current = null;
     }
 
+    resetTranscript();
     processingTranscript.current = false;
-    onLoadingChange?.(false);
+    pendingTranscript.current = '';
+    safeOnLoadingChange.current(false);
   };
 
+  // Toggle
   const toggleConversation = () => {
     if (isConversationActive) {
       stopConversation();
@@ -64,14 +79,18 @@ export function useVoiceControl(
     }
   };
 
-  // TTS event handling
+  // Resume listening after TTS ends, then clear transcript
   useEffect(() => {
     const handleTtsStart = () => setSpeaking(true);
 
     const handleTtsEnd = () => {
       setSpeaking(false);
-      resetTranscript(); // ✅ NOW we reset transcript only after TTS finishes
 
+      // Clear transcript after TTS ends
+      resetTranscript();
+      pendingTranscript.current = '';
+
+      // Resume listening
       if (isConversationActive) {
         setTimeout(() => {
           SpeechRecognition.startListening({ continuous: true });
@@ -90,7 +109,7 @@ export function useVoiceControl(
     };
   }, [isConversationActive, resetTranscript]);
 
-  // Silence detection
+  // Detect 2s of silence to trigger response
   useEffect(() => {
     if (!isConversationActive || !listening || speaking) return;
 
@@ -102,22 +121,22 @@ export function useVoiceControl(
       silenceTimer.current = setTimeout(async () => {
         if (!processingTranscript.current && transcript.trim()) {
           processingTranscript.current = true;
+          pendingTranscript.current = transcript.trim();
 
           SpeechRecognition.stopListening();
           setListening(false);
           setHasSoundLeeway(false);
-          onLoadingChange?.(true);
+          safeOnLoadingChange.current(true);
 
           try {
-            const responses = await getIBMResponses(transcript.trim());
-            onResponses(responses);
+            const responses = await getIBMResponses(pendingTranscript.current);
+            stableOnResponses.current(responses);
           } catch (err) {
             console.error('Error getting responses:', err);
           } finally {
-            // ❌ DO NOT resetTranscript() here
+            // Don’t reset transcript here — we wait until TTS ends
             processingTranscript.current = false;
-            onLoadingChange?.(false);
-            // resume STT will be handled in tts:end
+            safeOnLoadingChange.current(false);
           }
         }
       }, 2000);
@@ -129,16 +148,16 @@ export function useVoiceControl(
         silenceTimer.current = null;
       }
     };
-  }, [transcript, listening, speaking, isConversationActive, onResponses, onLoadingChange]);
+  }, [transcript, listening, speaking, isConversationActive]);
 
-  // Cleanup
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
       SpeechRecognition.stopListening();
-      onLoadingChange?.(false);
+      safeOnLoadingChange.current(false);
     };
-  }, [onLoadingChange]);
+  }, []);
 
   return {
     transcript,
