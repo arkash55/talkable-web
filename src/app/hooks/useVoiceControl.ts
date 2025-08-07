@@ -3,7 +3,6 @@ import { getIBMResponses } from '@/services/ibmService';
 import { useState, useEffect, useRef } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
-
 export function useVoiceControl(
   onResponses: (responses: string[]) => void,
   onLoadingChange?: (loading: boolean) => void
@@ -36,8 +35,8 @@ export function useVoiceControl(
     setIsConversationActive(true);
     SpeechRecognition.startListening({ continuous: true });
     setListening(true);
-    resetTranscript();
-    setHasSoundLeeway(true); // animate waveform while listening
+    resetTranscript(); // ✅ this is fine here, only at start
+    setHasSoundLeeway(true);
   };
 
   const stopConversation = () => {
@@ -52,8 +51,8 @@ export function useVoiceControl(
       clearTimeout(silenceTimer.current);
       silenceTimer.current = null;
     }
+
     processingTranscript.current = false;
-    resetTranscript();
     onLoadingChange?.(false);
   };
 
@@ -65,19 +64,20 @@ export function useVoiceControl(
     }
   };
 
-  // TTS event handling (resume listening after playback ends)
+  // TTS event handling
   useEffect(() => {
     const handleTtsStart = () => setSpeaking(true);
+
     const handleTtsEnd = () => {
       setSpeaking(false);
-      // Resume listening after TTS finishes if conversation is active
+      resetTranscript(); // ✅ NOW we reset transcript only after TTS finishes
+
       if (isConversationActive) {
         setTimeout(() => {
           SpeechRecognition.startListening({ continuous: true });
           setListening(true);
-          resetTranscript();
           setHasSoundLeeway(true);
-        }, 300); // small delay to avoid clipping the first word
+        }, 300);
       }
     };
 
@@ -90,22 +90,19 @@ export function useVoiceControl(
     };
   }, [isConversationActive, resetTranscript]);
 
-  // Detect 2s of "silence" by lack of transcript changes
+  // Silence detection
   useEffect(() => {
     if (!isConversationActive || !listening || speaking) return;
 
-    // Clear any existing timer
     if (silenceTimer.current) {
       clearTimeout(silenceTimer.current);
     }
 
-    // If there's text, start a 2s timer; if timer fires, treat it as end-of-utterance
     if (transcript.trim()) {
       silenceTimer.current = setTimeout(async () => {
         if (!processingTranscript.current && transcript.trim()) {
           processingTranscript.current = true;
 
-          // Pause STT while generating responses
           SpeechRecognition.stopListening();
           setListening(false);
           setHasSoundLeeway(false);
@@ -113,15 +110,14 @@ export function useVoiceControl(
 
           try {
             const responses = await getIBMResponses(transcript.trim());
-            onResponses(responses); // send to parent (HomeClient)
+            onResponses(responses);
           } catch (err) {
             console.error('Error getting responses:', err);
           } finally {
-            resetTranscript();
+            // ❌ DO NOT resetTranscript() here
             processingTranscript.current = false;
             onLoadingChange?.(false);
-            // DO NOT restart listening here; we wait for TTS selection/click to play,
-            // and then the TTS 'end' event resumes listening automatically.
+            // resume STT will be handled in tts:end
           }
         }
       }, 2000);
@@ -133,9 +129,9 @@ export function useVoiceControl(
         silenceTimer.current = null;
       }
     };
-  }, [transcript, listening, speaking, isConversationActive, onResponses, resetTranscript, onLoadingChange]);
+  }, [transcript, listening, speaking, isConversationActive, onResponses, onLoadingChange]);
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
