@@ -1,102 +1,40 @@
+// src/app/components/home/VoiceControlBar.tsx
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
-import {
-  Box,
-  Button,
-  Typography,
-  useTheme,
-  Stack,
-} from '@mui/material';
+import { Box, Button, Typography, useTheme, Stack } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
-import ReplayIcon from '@mui/icons-material/Replay';
+import StopIcon from '@mui/icons-material/Stop';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { Message } from '@/app/types/types';
-import { getResponsesFromAI } from '@/app/actions/getResponseFromAI';
-import VoiceWaveform from '@/app/components/home/VoiceWaveform';
+import VoiceWaveform from './VoiceWaveform';
+import { useVoiceControl } from '@/app/hooks/useVoiceControl';
 
 interface VoiceControlBarProps {
   onResponses: (responses: string[]) => void;
+  onLoadingChange?: (loading: boolean) => void; // NEW
 }
 
-export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
+export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceControlBarProps) {
   const theme = useTheme();
-  const [listening, setListening] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const [hasSound, setHasSound] = useState(false);
-  const [hasSoundLeeway, setHasSoundLeeway] = useState(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const leewayTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Listen for TTS events
-  useEffect(() => {
-    const handleStart = () => setSpeaking(true);
-    const handleEnd = () => setSpeaking(false);
+  const {
+    transcript,
+    listening,
+    speaking,
+    hasSoundLeeway,
+    isConversationActive,
+    toggleConversation,
+    browserSupportsSpeechRecognition,
+  } = useVoiceControl(onResponses, onLoadingChange); // pass loading callback down
 
-    window.addEventListener('tts:start', handleStart);
-    window.addEventListener('tts:end', handleEnd);
-
-    return () => {
-      window.removeEventListener('tts:start', handleStart);
-      window.removeEventListener('tts:end', handleEnd);
-    };
-  }, []);
-
-  // Whenever hasSound changes, update hasSoundLeeway with a delay
-  useEffect(() => {
-    if (hasSound) {
-      if (leewayTimeout.current) clearTimeout(leewayTimeout.current);
-      setHasSoundLeeway(true);
-    } else {
-      // Wait 1.5s before setting hasSoundLeeway to false
-      leewayTimeout.current = setTimeout(() => setHasSoundLeeway(false), 1000);
-    }
-    return () => {
-      if (leewayTimeout.current) clearTimeout(leewayTimeout.current);
-    };
-  }, [hasSound]);
-
-  const toggleListening = async () => {
-    if (!listening) {
-      setListening(true);
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        audioContextRef.current = new AudioCtx();
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 256; // More bins for smoother bars
-        source.connect(analyserRef.current);
-
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-
-        const updateLevels = () => {
-          if (analyserRef.current) {
-            analyserRef.current.getByteFrequencyData(dataArray);
-
-            const avgVolume = dataArray.reduce((sum, v) => sum + v, 0) / dataArray.length;
-            setHasSound(avgVolume > 30); // Adjust threshold as needed
-          }
-          animationFrameRef.current = requestAnimationFrame(updateLevels);
-        };
-        updateLevels();
-      } catch (err) {
-        setListening(false);
-      }
-    } else {
-      setListening(false);
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      if (audioContextRef.current) audioContextRef.current.close();
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      }
-      setHasSound(false);
-    }
-  };
+  if (!browserSupportsSpeechRecognition) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography color="error">
+          Your browser doesn't support speech recognition. Please try Chrome, Edge, or Safari.
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -113,15 +51,10 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         gap: 2,
       }}
     >
-      {/* Left side: Title */}
-      <Typography
-        variant="h6"
-        sx={{ color: theme.palette.text.primary, fontWeight: 600 }}
-      >
+      <Typography variant="h6" sx={{ fontWeight: 600 }}>
         Voice Controls
       </Typography>
 
-      {/* Waveform shows if speaking or listening */}
       {(listening || speaking) && (
         <VoiceWaveform
           listening={listening}
@@ -130,44 +63,56 @@ export default function VoiceControlBar({ onResponses }: VoiceControlBarProps) {
         />
       )}
 
-      {/* Right side: Controls */}
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-        {/* Start Listening */}
         <Button
           variant="contained"
-          startIcon={<MicIcon />}
-          onClick={toggleListening}
-          sx={{
-            fontWeight: 'bold',
-            px: 3,
-            py: 1.5,
-            minWidth: 180,
-          }}
+          startIcon={isConversationActive ? <StopIcon /> : <MicIcon />}
+          onClick={toggleConversation}
+          sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 200 }}
+          color={isConversationActive ? 'error' : 'primary'}
         >
-          {listening ? 'Stop Listening' : 'Start Listening'}
+          {isConversationActive
+            ? (listening ? 'Listening…' : speaking ? 'Speaking…' : 'Stop Conversation')
+            : 'Start Conversation'}
         </Button>
 
-
-        {/* Regenerate Responses */}
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
-          onClick={() => alert('Regenerating responses...')}
+          onClick={() => {
+            if (transcript) {
+              onResponses([
+                'Could you repeat that?',
+                "I didn't catch that",
+                'Let me think about that',
+                "That's interesting",
+                'Tell me more',
+                "Let's change the subject",
+              ]);
+            }
+          }}
+          disabled={!transcript && !isConversationActive}
           sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 200 }}
         >
           Regenerate Responses
         </Button>
-
-        {/* Repeat Question */}
-        <Button
-          variant="outlined"
-          startIcon={<ReplayIcon />}
-          onClick={() => alert('Repeating question...')}
-          sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 180 }}
-        >
-          Repeat Question
-        </Button>
       </Stack>
+
+      {transcript && (
+        <Typography
+          variant="body1"
+          sx={{
+            width: '100%',
+            mt: 2,
+            fontStyle: 'italic',
+            color: theme.palette.text.secondary,
+            whiteSpace: 'pre-wrap',
+            fontFamily: 'monospace',
+          }}
+        >
+          {transcript}
+        </Typography>
+      )}
     </Box>
   );
 }
