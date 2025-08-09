@@ -61,12 +61,11 @@ export default function HomeClient() {
   useEffect(() => {
     const onStart = () => {
       setIsPlaying(true);
-      logAction({ type: 'tts_start', label: 'Recipient is talking…' });
     };
     const onEnd = () => {
       setIsPlaying(false);
       setActiveIndex(null);
-      logAction({ type: 'tts_end', label: 'Recipient finished talking.' });
+      logAction({ type: 'tts_end', label: 'User finished talking.' });
     };
     window.addEventListener('tts:start', onStart);
     window.addEventListener('tts:end', onEnd);
@@ -100,10 +99,13 @@ export default function HomeClient() {
     // mark selected visually
     setActiveIndex(index);
 
+
+    logAction({ type: 'tts_start', label: 'User is talking…' });
+    
     // Log this specific AI line as a clickable action (rewind target)
     logAction({
       type: 'ai_message',
-      label: `AI: ${text}`,
+      label: `User: ${text}`,
       clickable: true,
       payload: { index, text },
     });
