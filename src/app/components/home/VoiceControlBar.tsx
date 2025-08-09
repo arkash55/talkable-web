@@ -1,16 +1,14 @@
-// src/app/components/home/VoiceControlBar.tsx
 'use client';
 
 import { Box, Button, Typography, useTheme, Stack } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
-import StopIcon from '@mui/icons-material/Stop';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VoiceWaveform from './VoiceWaveform';
 import { useVoiceControl } from '@/app/hooks/useVoiceControl';
 
 interface VoiceControlBarProps {
   onResponses: (responses: string[]) => void;
-  onLoadingChange?: (loading: boolean) => void; // NEW
+  onLoadingChange?: (loading: boolean) => void;
 }
 
 export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceControlBarProps) {
@@ -24,7 +22,7 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
     isConversationActive,
     toggleConversation,
     browserSupportsSpeechRecognition,
-  } = useVoiceControl(onResponses, onLoadingChange); // pass loading callback down
+  } = useVoiceControl(onResponses, onLoadingChange);
 
   if (!browserSupportsSpeechRecognition) {
     return (
@@ -35,6 +33,20 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
       </Box>
     );
   }
+
+  const handleToggle = () => {
+    // Proactively dispatch conversation start/end so the panel definitely logs it.
+    if (typeof window !== 'undefined') {
+      if (isConversationActive) {
+        // we are about to stop
+        window.dispatchEvent(new CustomEvent('conversation:end'));
+      } else {
+        // we are about to start
+        window.dispatchEvent(new CustomEvent('conversation:start'));
+      }
+    }
+    toggleConversation();
+  };
 
   return (
     <Box
@@ -66,13 +78,16 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
         <Button
           variant="contained"
-          startIcon={isConversationActive ? <StopIcon /> : <MicIcon />}
-          onClick={toggleConversation}
+          startIcon={<MicIcon />}
+          onClick={handleToggle}
           sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 200 }}
-          color={isConversationActive ? 'error' : 'primary'}
         >
           {isConversationActive
-            ? (listening ? 'Listening…' : speaking ? 'Speaking…' : 'Stop Conversation')
+            ? listening
+              ? 'Listening…'
+              : speaking
+              ? 'Speaking…'
+              : 'Stop Conversation'
             : 'Start Conversation'}
         </Button>
 
@@ -83,15 +98,15 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
             if (transcript) {
               onResponses([
                 'Could you repeat that?',
-                "I didn't catch that",
+                "I didn’t catch that",
                 'Let me think about that',
-                "That's interesting",
+                "That’s interesting",
                 'Tell me more',
-                "Let's change the subject",
+                "Let’s change the subject",
               ]);
             }
           }}
-          disabled={!transcript && !isConversationActive}
+          disabled={!transcript}
           sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 200 }}
         >
           Regenerate Responses

@@ -5,19 +5,17 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 import ConversationSidebar from '@/app/components/home/ConversationSideBar';
 import VoiceControlBar from '@/app/components/home/VoiceControlBar';
 import VoiceGrid from '@/app/components/home/VoiceGrid';
-;
+import ControlPanel, { ActionLogEntry } from '@/app/components/home/ControlPanel';
 import { speakWithGoogleTTSClient } from '@/services/ttsClient';
 import { getIBMResponses } from '@/services/ibmService';
-import ControlPanel, { ActionLogEntry } from '@/app/components/home/ControlPanel';
 
 export default function HomeClient() {
   const [aiResponses, setAiResponses] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false); // disable grid during TTS
+  const [activeIndex, setActiveIndex] = useState<number | null>(null); // highlight selected cell
   const [actions, setActions] = useState<ActionLogEntry[]>([]);
 
-  // Speakers just label the grid; the clicked text is the user's chosen reply
   const speakers = useMemo(
     () => [
       { name: 'Maya',  tone: 'friendly',     voice: 'en-US-Wavenet-F' },
@@ -30,13 +28,36 @@ export default function HomeClient() {
     []
   );
 
-  // Helper: push an action entry to the panel
+  // Helper: push an action entry to the panel (with simple de-dupe for conv start/end)
   const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
-    const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-    setActions(prev => [...prev, { id, ts: Date.now(), ...entry }]);
+    setActions(prev => {
+      const last = prev[prev.length - 1];
+      if (
+        last &&
+        (entry.type === 'conv_start' || entry.type === 'conv_end') &&
+        last.type === entry.type
+      ) {
+        // ignore consecutive identical conv_start/conv_end
+        return prev;
+      }
+      const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+      return [...prev, { id, ts: Date.now(), ...entry }];
+    });
   };
 
-  // Drive UI from TTS lifecycle
+  // Conversation lifecycle via window events
+  useEffect(() => {
+    const onConvStart = () => logAction({ type: 'conv_start', label: 'Conversation started.' });
+    const onConvEnd = () => logAction({ type: 'conv_end', label: 'Conversation ended.' });
+    window.addEventListener('conversation:start', onConvStart);
+    window.addEventListener('conversation:end', onConvEnd);
+    return () => {
+      window.removeEventListener('conversation:start', onConvStart);
+      window.removeEventListener('conversation:end', onConvEnd);
+    };
+  }, []);
+
+  // TTS lifecycle -> disable/enable grid + action log
   useEffect(() => {
     const onStart = () => {
       setIsPlaying(true);
@@ -89,10 +110,8 @@ export default function HomeClient() {
 
     try {
       await speakWithGoogleTTSClient(text, speaker.tone, speaker.voice, speaker.name);
-      // tts:start / tts:end are dispatched by the TTS client itself
     } catch (err) {
       console.error('TTS error:', err);
-      // Ensure UI unlocks if an error
       window.dispatchEvent(new Event('tts:end'));
     }
   };
@@ -130,7 +149,6 @@ export default function HomeClient() {
           onLoadingChange={handleLoadingChange}
         />
 
-        {/* While generating, show a spinner instead of VoiceGrid */}
         {isLoading ? (
           <Box
             sx={{
@@ -159,7 +177,6 @@ export default function HomeClient() {
         )}
       </div>
 
-      {/* RIGHT: your existing sidebar (kept) */}
       <ConversationSidebar />
     </div>
   );

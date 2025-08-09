@@ -1,4 +1,3 @@
-// src/app/hooks/useVoiceControl.ts
 import { getIBMResponses } from '@/services/ibmService';
 import { useState, useEffect, useRef } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
@@ -27,28 +26,29 @@ export function useVoiceControl(
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
 
-  // Update refs if callbacks change (keeps deps stable)
+  // Update refs
   useEffect(() => {
     stableOnResponses.current = onResponses;
     safeOnLoadingChange.current = onLoadingChange ?? (() => {});
   }, [onResponses, onLoadingChange]);
 
-  // Start conversation
+  // Start conversation (+ dispatch event)
   const startConversation = () => {
-    if (!browserSupportsSpeechRecognition) {
-      alert('Your browser does not support speech recognition.');
-      return;
-    }
+    if (!browserSupportsSpeechRecognition) return;
     if (isConversationActive) return;
 
     setIsConversationActive(true);
     SpeechRecognition.startListening({ continuous: true });
     setListening(true);
-    resetTranscript(); // OK only on start
+    resetTranscript();
     setHasSoundLeeway(true);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('conversation:start'));
+    }
   };
 
-  // Stop conversation
+  // Stop conversation (+ dispatch event)
   const stopConversation = () => {
     if (!isConversationActive) return;
 
@@ -65,6 +65,10 @@ export function useVoiceControl(
     processingTranscript.current = false;
     pendingTranscript.current = '';
     safeOnLoadingChange.current(false);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('conversation:end'));
+    }
   };
 
   // Toggle conversation
@@ -73,23 +77,23 @@ export function useVoiceControl(
     else startConversation();
   };
 
-  // Resume listening after TTS ends, then clear transcript
+  // Resume listening after TTS
+  const resumeListening = () => {
+    if (isConversationActive && !listening) {
+      SpeechRecognition.startListening({ continuous: true });
+      setListening(true);
+      resetTranscript();
+      setHasSoundLeeway(true);
+    }
+  };
+
+  // Listen for TTS events
   useEffect(() => {
     const handleTtsStart = () => setSpeaking(true);
     const handleTtsEnd = () => {
       setSpeaking(false);
-
-      // Clear transcript AFTER TTS finishes
-      resetTranscript();
-      pendingTranscript.current = '';
-
-      // Resume listening if conversation is active
       if (isConversationActive) {
-        setTimeout(() => {
-          SpeechRecognition.startListening({ continuous: true });
-          setListening(true);
-          setHasSoundLeeway(true);
-        }, 300);
+        setTimeout(resumeListening, 300);
       }
     };
 
@@ -100,9 +104,9 @@ export function useVoiceControl(
       window.removeEventListener('tts:start', handleTtsStart);
       window.removeEventListener('tts:end', handleTtsEnd);
     };
-  }, [isConversationActive, resetTranscript]);
+  }, [isConversationActive, listening]);
 
-  // Detect 2s of silence → send to IBM mock
+  // Silence → finalize (kept your existing behavior)
   useEffect(() => {
     if (!isConversationActive || !listening || speaking) return;
 
@@ -127,7 +131,6 @@ export function useVoiceControl(
           } catch (err) {
             console.error('Error getting responses:', err);
           } finally {
-            // Do NOT reset transcript here — we wait for TTS to end
             processingTranscript.current = false;
             safeOnLoadingChange.current(false);
           }
@@ -143,7 +146,7 @@ export function useVoiceControl(
     };
   }, [transcript, listening, speaking, isConversationActive]);
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
       if (silenceTimer.current) clearTimeout(silenceTimer.current);

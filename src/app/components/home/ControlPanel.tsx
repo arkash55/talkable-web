@@ -8,20 +8,25 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
+import { useEffect, useRef } from 'react';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import HearingIcon from '@mui/icons-material/Hearing';
 import TimerIcon from '@mui/icons-material/Timer';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import UndoIcon from '@mui/icons-material/Undo';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
+import PowerOffIcon from '@mui/icons-material/PowerOff';
 
 export type ActionType =
-  | 'user_final'      // (optional, if you later log user transcript)
+  | 'conv_start'       // NEW
+  | 'conv_end'         // NEW
+  | 'user_final'
   | 'generating'
   | 'responses_ready'
   | 'tts_start'
   | 'tts_end'
-  | 'ai_message'      // CLICKABLE
+  | 'ai_message'       // CLICKABLE
   | 'rewind';
 
 export type ActionLogEntry = {
@@ -35,6 +40,8 @@ export type ActionLogEntry = {
 
 function iconFor(type: ActionType) {
   switch (type) {
+    case 'conv_start': return <PowerSettingsNewIcon fontSize="small" />;
+    case 'conv_end': return <PowerOffIcon fontSize="small" />;
     case 'user_final': return <HearingIcon fontSize="small" />;
     case 'generating': return <TimerIcon fontSize="small" />;
     case 'responses_ready': return <CheckCircleOutlineIcon fontSize="small" />;
@@ -52,6 +59,16 @@ interface ControlPanelProps {
 }
 
 export default function ControlPanel({ actions, onRewind }: ControlPanelProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll to bottom on updates (chat-like behavior)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Smooth scroll to bottom
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [actions]);
+
   return (
     <Box
       sx={{
@@ -63,7 +80,7 @@ export default function ControlPanel({ actions, onRewind }: ControlPanelProps) {
         display: 'flex',
         flexDirection: 'column',
         gap: 1.5,
-        overflowY: 'auto',
+        overflow: 'hidden',
       }}
     >
       <Typography variant="subtitle1" fontWeight={700}>
@@ -71,13 +88,28 @@ export default function ControlPanel({ actions, onRewind }: ControlPanelProps) {
       </Typography>
       <Divider />
 
-      {actions.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No actions yet. Start a conversation to populate this panel.
-        </Typography>
-      ) : (
-        <Stack gap={1.25}>
-          {actions.map((a) => {
+      <Box
+        ref={scrollRef}
+        sx={{
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1.25,
+          pr: 0.5,
+          // keep scrollbar visible but subtle
+          '&::-webkit-scrollbar': { width: 8 },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: 'rgba(0,0,0,0.2)',
+            borderRadius: 4,
+          },
+        }}
+      >
+        {actions.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No actions yet. Start a conversation to populate this panel.
+          </Typography>
+        ) : (
+          actions.map((a) => {
             const isClickable = a.type === 'ai_message' && a.clickable;
             const card = (
               <Box
@@ -121,9 +153,9 @@ export default function ControlPanel({ actions, onRewind }: ControlPanelProps) {
             ) : (
               card
             );
-          })}
-        </Stack>
-      )}
+          })
+        )}
+      </Box>
     </Box>
   );
 }
