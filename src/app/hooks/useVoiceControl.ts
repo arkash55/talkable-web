@@ -131,7 +131,6 @@ export function useVoiceControl(
           SpeechRecognition.stopListening();
 
           if (typeof window !== 'undefined') {;
-            window.dispatchEvent(new CustomEvent('stt:endListening'));
             window.dispatchEvent(new CustomEvent('stt:finalTranscript', {
               detail: pendingTranscript.current
             }));

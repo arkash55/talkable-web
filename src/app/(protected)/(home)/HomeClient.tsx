@@ -90,14 +90,14 @@ export default function HomeClient() {
     const onEndListening = (event: Event) => {
       const finalTranscript = (event as CustomEvent).detail;
       logAction({ type: 'ended listening', label: 'Recipient has stopped speaking.' });
-      logAction({ type: 'final transcript', label: 'Final transcript received.', payload: { transcript: finalTranscript } });
+      logAction({ type: 'final transcript', label: `Recipient: ${finalTranscript}`, payload: { transcript: finalTranscript } });
     };
 
     window.addEventListener('stt:startListening', onStartListening);
-    window.addEventListener('stt:endListening', onEndListening);
+    window.addEventListener('stt:finalTranscript', onEndListening);
     return () => {
       window.removeEventListener('stt:startListening', onStartListening);
-      window.removeEventListener('stt:endListening', onEndListening);
+      window.removeEventListener('stt:finalTranscript', onEndListening);
     };
   }, []);
 
@@ -126,7 +126,7 @@ export default function HomeClient() {
     setActiveIndex(index);
 
 
-    logAction({ type: 'tts_start', label: 'User is talking…' });
+    logAction({ type: 'TTS Start', label: 'User is speaking…' });
     
     // Log this specific AI line as a clickable action (rewind target)
     logAction({

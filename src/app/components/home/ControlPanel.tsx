@@ -28,8 +28,8 @@ export type ActionType =
   | 'user_final'
   | 'generating'
   | 'responses_ready'
-  | 'tts_start'
-  | 'tts_end'
+  | 'TTS Start'      // NEW
+  | 'TTS End'        // NEW
   | 'ai_message'       // CLICKABLE
   | 'rewind'
   | 'begun listening'
@@ -52,8 +52,8 @@ function iconFor(type: ActionType) {
     case 'user_final': return <HearingIcon fontSize="small" />;
     case 'generating': return <TimerIcon fontSize="small" />;
     case 'responses_ready': return <CheckCircleOutlineIcon fontSize="small" />;
-    case 'tts_start': return <VolumeUpIcon fontSize="small" />;
-    case 'tts_end': return <VolumeUpIcon fontSize="small" />;
+    case 'TTS Start': return <VolumeUpIcon fontSize="small" />;
+    case 'TTS End': return <VolumeUpIcon fontSize="small" />;
     case 'ai_message': return <PlayArrowIcon fontSize="small" />;
     case 'rewind': return <UndoIcon fontSize="small" />;
     case 'begun listening': return <MicIcon fontSize="small" />;
