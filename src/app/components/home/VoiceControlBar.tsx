@@ -1,7 +1,8 @@
 'use client';
 
-import { Box, Button, Typography, useTheme, Stack } from '@mui/material';
+import { Box, Button, Typography, useTheme, Stack, IconButton } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
+import MicOffIcon from '@mui/icons-material/MicOff';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VoiceWaveform from './VoiceWaveform';
 import { useVoiceControl } from '@/app/hooks/useVoiceControl';
@@ -76,20 +77,57 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
       )}
 
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-        <Button
-          variant="contained"
-          startIcon={<MicIcon />}
-          onClick={handleToggle}
-          sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 200 }}
+        {/* Rectangular listening control with pulse animation */}
+        <Box
+          sx={{
+            position: 'relative',
+            height: 56,
+            borderRadius: 1.5, // 12px
+            // Pulse glow behind the button when active
+            ...(isConversationActive && hasSoundLeeway
+              ? {
+                  animation: 'pulseRect 2s infinite',
+                  '@keyframes pulseRect': {
+                    '0%': {
+                      boxShadow: '0 0 0 0 rgba(211, 47, 47, 0.35)',
+                    },
+                    '100%': {
+                      boxShadow: '0 0 0 18px rgba(211, 47, 47, 0)',
+                    },
+                  },
+                }
+              : {}),
+          }}
         >
-          {isConversationActive
-            ? listening
-              ? 'Listening…'
-              : speaking
-              ? 'Speaking…'
-              : 'Stop Conversation'
-            : 'Start Conversation'}
-        </Button>
+          <Button
+            variant={isConversationActive ? 'contained' : 'outlined'}
+            color={isConversationActive ? 'error' : 'inherit'}
+            disabled={!browserSupportsSpeechRecognition}
+            onClick={toggleConversation}
+            startIcon={isConversationActive ? <MicIcon /> : <MicOffIcon />}
+            sx={{
+              height: 56,
+              borderRadius: 1.5, // keep same radius as wrapper
+              px: 2.5,
+              fontWeight: 700,
+              textTransform: 'none',
+              bgcolor: theme =>
+                isConversationActive ? theme.palette.error.main : undefined,
+              borderColor: theme =>
+                isConversationActive ? theme.palette.error.main : theme.palette.divider,
+              color: theme =>
+                isConversationActive ? theme.palette.error.contrastText : theme.palette.text.primary,
+              '&:hover': {
+                bgcolor: theme =>
+                  isConversationActive ? theme.palette.error.dark : undefined,
+                borderColor: theme =>
+                  isConversationActive ? theme.palette.error.dark : theme.palette.text.secondary,
+              },
+            }}
+          >
+            {isConversationActive ? 'STOP CONVERSATION' : 'START CONVERSATION'}
+          </Button>
+        </Box>
 
         <Button
           variant="outlined"
