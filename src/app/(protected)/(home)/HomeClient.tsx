@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Box, CircularProgress, Typography, useTheme } from '@mui/material';
+import { alpha, Box, CircularProgress, Typography, useTheme } from '@mui/material';
 import ConversationSidebar from '@/app/components/home/ConversationSideBar';
 import VoiceControlBar from '@/app/components/home/VoiceControlBar';
 import VoiceGrid from '@/app/components/home/VoiceGrid';
@@ -95,7 +95,9 @@ export default function HomeClient() {
         type: 'final transcript',
         label: `Recipient: ${finalTranscript}`,
         payload: { transcript: finalTranscript },
-        backgroundColor: theme.palette.grey[300]
+        backgroundColor: (theme.palette.mode === 'dark'
+                          ? alpha(theme.palette.success.main, 0.65)
+                          : alpha(theme.palette.success.main, 0.85))
        });
     };
 
