@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, CircularProgress, Typography, useTheme } from '@mui/material';
 import ConversationSidebar from '@/app/components/home/ConversationSideBar';
 import VoiceControlBar from '@/app/components/home/VoiceControlBar';
 import VoiceGrid from '@/app/components/home/VoiceGrid';
@@ -15,6 +15,7 @@ export default function HomeClient() {
   const [isPlaying, setIsPlaying] = useState<boolean>(false); // disable grid during TTS
   const [activeIndex, setActiveIndex] = useState<number | null>(null); // highlight selected cell
   const [actions, setActions] = useState<ActionLogEntry[]>([]);
+  const theme = useTheme();
 
   const speakers = useMemo(
     () => [
@@ -70,7 +71,7 @@ export default function HomeClient() {
     const onEnd = () => {
       setIsPlaying(false);
       setActiveIndex(null);
-      logAction({ type: 'tts_end', label: 'User finished talking.' });
+      logAction({ type: 'TTS End', label: 'User finished talking.'});
     };
     
     window.addEventListener('tts:start', onStart);
@@ -90,9 +91,15 @@ export default function HomeClient() {
     const onEndListening = (event: Event) => {
       const finalTranscript = (event as CustomEvent).detail;
       logAction({ type: 'ended listening', label: 'Recipient has stopped speaking.' });
-      logAction({ type: 'final transcript', label: `Recipient: ${finalTranscript}`, payload: { transcript: finalTranscript } });
+      logAction({
+        type: 'final transcript',
+        label: `Recipient: ${finalTranscript}`,
+        payload: { transcript: finalTranscript },
+        backgroundColor: theme.palette.grey[300]
+       });
     };
 
+    
     window.addEventListener('stt:startListening', onStartListening);
     window.addEventListener('stt:finalTranscript', onEndListening);
     return () => {
@@ -134,7 +141,11 @@ export default function HomeClient() {
       label: `User: ${text}`,
       clickable: true,
       payload: { index, text },
+      backgroundColor: theme.palette.primary.main,
+      textColor: theme.palette.primary.contrastText,
     });
+
+ 
 
     try {
       await speakWithGoogleTTSClient(text, speaker.tone, speaker.voice, speaker.name);

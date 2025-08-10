@@ -43,6 +43,8 @@ export type ActionLogEntry = {
   label: string;
   clickable?: boolean;
   payload?: unknown; // e.g., { index, text }
+  backgroundColor?: string; 
+  textColor?: string; // 
 };
 
 function iconFor(type: ActionType) {
@@ -132,6 +134,8 @@ export default function ControlPanel({ actions, onRewind }: ControlPanelProps) {
                   flexDirection: 'column',
                   gap: 0.5,
                   cursor: isClickable ? 'pointer' : 'default',
+                  backgroundColor: a.backgroundColor || 'transparent',
+                  color: a.textColor || 'inherit',
                   transition: 'background-color 0.15s ease',
                   '&:hover': isClickable ? { backgroundColor: theme => theme.palette.action.hover } : undefined,
                 }}
