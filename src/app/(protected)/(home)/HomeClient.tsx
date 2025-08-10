@@ -144,7 +144,7 @@ export default function HomeClient() {
       label: `User: ${text}`,
       payload: { index, text },
       backgroundColor: theme.palette.primary.main,
-      textColor: theme.palette.primary.contrastText,
+      textColor: 'white',
     });
 
  
