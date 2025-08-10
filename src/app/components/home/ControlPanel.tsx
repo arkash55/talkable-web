@@ -27,7 +27,10 @@ export type ActionType =
   | 'tts_start'
   | 'tts_end'
   | 'ai_message'       // CLICKABLE
-  | 'rewind';
+  | 'rewind'
+  | 'begun listening'
+  | 'ended listening'
+  | 'final transcript';
 
 export type ActionLogEntry = {
   id: string;

@@ -39,13 +39,18 @@ export function useVoiceControl(
 
     setIsConversationActive(true);
     SpeechRecognition.startListening({ continuous: true });
+
     setListening(true);
     resetTranscript();
     setHasSoundLeeway(true);
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('conversation:start'));
+      console.log('Starting STT listening');
+      window.dispatchEvent(new CustomEvent('stt:startListening'));
     }
+
+
   };
 
   // Stop conversation (+ dispatch event)
@@ -81,6 +86,9 @@ export function useVoiceControl(
   const resumeListening = () => {
     if (isConversationActive && !listening) {
       SpeechRecognition.startListening({ continuous: true });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('stt:startListening'));
+      }
       setListening(true);
       resetTranscript();
       setHasSoundLeeway(true);
@@ -121,6 +129,13 @@ export function useVoiceControl(
           pendingTranscript.current = transcript.trim();
 
           SpeechRecognition.stopListening();
+
+          if (typeof window !== 'undefined') {;
+            window.dispatchEvent(new CustomEvent('stt:endListening'));
+            window.dispatchEvent(new CustomEvent('stt:finalTranscript', {
+              detail: pendingTranscript.current
+            }));
+          }
           setListening(false);
           setHasSoundLeeway(false);
           safeOnLoadingChange.current(true);

@@ -47,7 +47,10 @@ export default function HomeClient() {
 
   // Conversation lifecycle via window events
   useEffect(() => {
-    const onConvStart = () => logAction({ type: 'conv_start', label: 'Conversation started.' });
+    const onConvStart = () => {
+      logAction({ type: 'conv_start', label: 'Conversation started.' })
+      // logAction({ type: 'begun listening', label: 'Listening for recipient speech...' });
+    };
     const onConvEnd = () => logAction({ type: 'conv_end', label: 'Conversation ended.' });
     window.addEventListener('conversation:start', onConvStart);
     window.addEventListener('conversation:end', onConvEnd);
@@ -57,21 +60,44 @@ export default function HomeClient() {
     };
   }, []);
 
+
+  
+
   // TTS lifecycle -> disable/enable grid + action log
   useEffect(() => {
-    const onStart = () => {
-      setIsPlaying(true);
-    };
+    const onStart = () => {setIsPlaying(true);};
+
     const onEnd = () => {
       setIsPlaying(false);
       setActiveIndex(null);
       logAction({ type: 'tts_end', label: 'User finished talking.' });
     };
+    
     window.addEventListener('tts:start', onStart);
     window.addEventListener('tts:end', onEnd);
     return () => {
       window.removeEventListener('tts:start', onStart);
       window.removeEventListener('tts:end', onEnd);
+    };
+  }, []);
+
+  //STT lifecycle -> handle listening state (separate useEffect)
+  useEffect(() => {
+    const onStartListening = () => {
+      logAction({ type: 'begun listening', label: 'Listening for recipient speech...' });
+    };
+
+    const onEndListening = (event: Event) => {
+      const finalTranscript = (event as CustomEvent).detail;
+      logAction({ type: 'ended listening', label: 'Recipient has stopped speaking.' });
+      logAction({ type: 'final transcript', label: 'Final transcript received.', payload: { transcript: finalTranscript } });
+    };
+
+    window.addEventListener('stt:startListening', onStartListening);
+    window.addEventListener('stt:endListening', onEndListening);
+    return () => {
+      window.removeEventListener('stt:startListening', onStartListening);
+      window.removeEventListener('stt:endListening', onEndListening);
     };
   }, []);
 
