@@ -49,8 +49,10 @@ export default function HomeClient() {
   // Conversation lifecycle via window events
   useEffect(() => {
     const onConvStart = () => {
-      logAction({ type: 'conv_start', label: 'Conversation started.' })
-      // logAction({ type: 'begun listening', label: 'Listening for recipient speech...' });
+      // Flush previous logs
+      setActions([]);
+      // Seed with the new start entry
+      logAction({ type: 'conv_start', label: 'Conversation started.' });
     };
     const onConvEnd = () => logAction({ type: 'conv_end', label: 'Conversation ended.' });
     window.addEventListener('conversation:start', onConvStart);

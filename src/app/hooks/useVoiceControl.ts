@@ -45,9 +45,11 @@ export function useVoiceControl(
     setHasSoundLeeway(true);
 
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('conversation:start'));
-      console.log('Starting STT listening');
-      window.dispatchEvent(new CustomEvent('stt:startListening'));
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('conversation:start'));
+        console.log('Starting STT listening');
+        window.dispatchEvent(new CustomEvent('stt:startListening'));
+      }, 100);
     }
 
 
