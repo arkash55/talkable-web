@@ -95,9 +95,7 @@ export default function HomeClient() {
         type: 'final transcript',
         label: `Recipient: ${finalTranscript}`,
         payload: { transcript: finalTranscript },
-        backgroundColor: (theme.palette.mode === 'dark'
-                          ? alpha(theme.palette.success.main, 0.65)
-                          : alpha(theme.palette.success.main, 0.85))
+        backgroundColor: '#32CD32'
        });
     };
 
@@ -141,7 +139,6 @@ export default function HomeClient() {
     logAction({
       type: 'ai_message',
       label: `User: ${text}`,
-      clickable: true,
       payload: { index, text },
       backgroundColor: theme.palette.primary.main,
       textColor: theme.palette.primary.contrastText,

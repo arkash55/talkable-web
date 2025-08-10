@@ -145,14 +145,14 @@ export default function ControlPanel({ actions, onRewind }: ControlPanelProps) {
               >
                 <Stack direction="row" alignItems="center" gap={1}>
                   {iconFor(a.type)}
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color={a.textColor || 'text.secondary'}>
                     {new Date(a.ts).toLocaleTimeString()}
                   </Typography>
                   <Chip
                     size="small"
                     label={a.type.replace('_', ' ')}
                     variant="outlined"
-                    sx={{ ml: 'auto', textTransform: 'capitalize' }}
+                    sx={{ ml: 'auto', textTransform: 'capitalize', color: a.textColor || 'text.secondary' }}
                   />
                 </Stack>
                 <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
