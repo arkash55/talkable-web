@@ -1,57 +1,64 @@
-// services/googleTTS.ts
-
-export async function callGoogleTTS(
+// src/services/ttsClient.ts
+export async function speakWithGoogleTTSClient(
   text: string,
-  tone: string = 'calm',
-  voiceName: string = 'en-US-Wavenet-D',
-  name?: string
-): Promise<string> {
-  const toneMap: Record<string, { rate: string; pitch: string }> = {
-    calm: { rate: 'slow', pitch: '-2st' },
-    excited: { rate: 'fast', pitch: '+4st' },
-    slow: { rate: 'x-slow', pitch: 'default' },
-    fast: { rate: 'x-fast', pitch: 'default' },
-  };
+  tone: string,
+  voice: string,
+  speakerName: string
+): Promise<void> {
+  // Web Speech Synthesis fallback (client-side). Replace with your real Google TTS if needed.
+  return new Promise<void>((resolve, reject) => {
+    try {
+      // Cancel any ongoing speech
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
 
-  const { rate, pitch } = toneMap[tone] || toneMap.calm;
+      const utter = new SpeechSynthesisUtterance(text);
 
-  // If a name is provided, prepend it to the message
-  const speakerText = name ? `${name} says: ${text}` : text;
+      // Map your "voice" string to an available voice if possible (best-effort)
+      const voices = window.speechSynthesis.getVoices();
+      const match = voices.find(v => v.name.includes(voice)) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+      if (match) utter.voice = match;
 
-  const ssml = `
-    <speak>
-      <prosody rate="${rate}" pitch="${pitch}">
-        ${speakerText}
-      </prosody>
-    </speak>
-  `.trim();
+      // Optional: adjust based on "tone"
+      // You can fine-tune pitch/rate to approximate tone.
+      switch (tone) {
+        case 'friendly':
+          utter.rate = 1.0; utter.pitch = 1.2; break;
+        case 'confident':
+          utter.rate = 0.95; utter.pitch = 1.0; break;
+        case 'cheerful':
+          utter.rate = 1.05; utter.pitch = 1.3; break;
+        case 'calm':
+          utter.rate = 0.9; utter.pitch = 0.95; break;
+        case 'enthusiastic':
+          utter.rate = 1.1; utter.pitch = 1.35; break;
+        case 'serious':
+          utter.rate = 0.95; utter.pitch = 0.9; break;
+        default:
+          utter.rate = 1.0; utter.pitch = 1.0; break;
+      }
 
-  const languageCode = voiceName.split('-').slice(0, 2).join('-'); // e.g., 'en-US'
+      utter.onstart = () => {
+        window.dispatchEvent(new Event('tts:start'));
+      };
 
-  const response = await fetch(
-    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_TTS_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        input: { ssml },
-        voice: {
-          languageCode,
-          name: voiceName,
-        },
-        audioConfig: {
-          audioEncoding: 'MP3',
-        },
-      }),
+      utter.onend = () => {
+        window.dispatchEvent(new Event('tts:end'));
+        resolve();
+      };
+
+      utter.onerror = (e) => {
+        console.error('Speech synthesis error:', e);
+        // still dispatch end to unblock UI
+        window.dispatchEvent(new Event('tts:end'));
+        reject(e);
+      };
+
+      window.speechSynthesis.speak(utter);
+    } catch (e) {
+      window.dispatchEvent(new Event('tts:end'));
+      reject(e);
     }
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    console.error('Google TTS API error:', error);
-    throw new Error('TTS API call failed');
-  }
-
-  const data = await response.json();
-  return data.audioContent;
+  });
 }

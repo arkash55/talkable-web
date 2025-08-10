@@ -48,5 +48,6 @@ const lightTheme = createTheme({
   typography: {
     fontFamily: 'var(--font-family)',
   },
+  
 });
 export default lightTheme;
