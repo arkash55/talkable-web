@@ -7,6 +7,7 @@ import {
   Typography,
   Chip,
   Tooltip,
+  IconButton,
 } from '@mui/material';
 import { useEffect, useRef } from 'react';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -21,15 +22,18 @@ import PowerOffIcon from '@mui/icons-material/PowerOff';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import SubtitlesIcon from '@mui/icons-material/Subtitles';
+import HistoryIcon from '@mui/icons-material/History';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 export type ActionType =
-  | 'conv_start'       // NEW
-  | 'conv_end'         // NEW
+  | 'conv_start'
+  | 'conv_end'
   | 'user_final'
   | 'generating'
   | 'responses_ready'
-  | 'TTS Start'      // NEW
-  | 'TTS End'        // NEW
+  | 'TTS Start'
+  | 'TTS End'
   | 'ai_message'       // CLICKABLE
   | 'rewind'
   | 'begun listening'
@@ -43,8 +47,8 @@ export type ActionLogEntry = {
   label: string;
   clickable?: boolean;
   payload?: unknown; // e.g., { index, text }
-  backgroundColor?: string; 
-  textColor?: string; // 
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 function iconFor(type: ActionType) {
@@ -68,19 +72,56 @@ function iconFor(type: ActionType) {
 interface ControlPanelProps {
   actions: ActionLogEntry[];
   onRewind: (actionId: string) => void; // Only reacts to ai_message
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
-export default function ControlPanel({ actions, onRewind }: ControlPanelProps) {
+export default function ControlPanel({ actions, onRewind, collapsed = false, onToggle }: ControlPanelProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll to bottom on updates (chat-like behavior)
   useEffect(() => {
+    if (collapsed) return;
     const el = scrollRef.current;
     if (!el) return;
-    // Smooth scroll to bottom
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [actions]);
+  }, [actions, collapsed]);
 
+  // Collapsed rail content (compact)
+  if (collapsed) {
+    return (
+      <Box
+        sx={{
+          width: 90,
+          height: '100%',
+          borderRight: theme => `1px solid ${theme.palette.divider}`,
+          backgroundColor: 'background.paper',
+          p: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 1,
+        }}
+      >
+        <Tooltip title="Expand Control Panel">
+          <IconButton onClick={onToggle} size="large" >
+            <ChevronRightIcon            sx={{
+                width: 70,
+                height: 70,
+                fontSize: 70, 
+            }}/>
+          </IconButton>
+        </Tooltip>
+        <Chip
+          size="small"
+          label={actions.length}
+          sx={{ mt: 'auto' }}
+        />
+      </Box>
+    );
+  }
+
+  // Expanded full panel
   return (
     <Box
       sx={{
@@ -95,9 +136,20 @@ export default function ControlPanel({ actions, onRewind }: ControlPanelProps) {
         overflow: 'hidden',
       }}
     >
-      <Typography variant="subtitle1" fontWeight={700}>
-        Control Panel · History
-      </Typography>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
+          Control Panel · History
+        </Typography>
+        <Tooltip title="Collapse">
+          <IconButton onClick={onToggle} size="small">
+            <ChevronLeftIcon            sx={{
+                width: 70,
+                height: 70,
+                fontSize: 70, 
+            }}/>
+          </IconButton>
+        </Tooltip>
+      </Stack>
       <Divider />
 
       <Box
@@ -108,7 +160,6 @@ export default function ControlPanel({ actions, onRewind }: ControlPanelProps) {
           flexDirection: 'column',
           gap: 1.25,
           pr: 0.5,
-          // keep scrollbar visible but subtle
           '&::-webkit-scrollbar': { width: 8 },
           '&::-webkit-scrollbar-thumb': {
             backgroundColor: 'rgba(0,0,0,0.2)',

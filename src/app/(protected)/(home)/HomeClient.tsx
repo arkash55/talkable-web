@@ -14,6 +14,7 @@ export default function HomeClient() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false); // disable grid during TTS
   const [activeIndex, setActiveIndex] = useState<number | null>(null); // highlight selected cell
+   const [panelCollapsed, setPanelCollapsed] = useState<boolean>(false);
   const [actions, setActions] = useState<ActionLogEntry[]>([]);
   const theme = useTheme();
 
@@ -180,7 +181,11 @@ export default function HomeClient() {
   return (
     <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'row' }}>
       {/* LEFT: Control Panel with action log + time-travel (AI-only click) */}
-      <ControlPanel actions={actions} onRewind={handleRewind} />
+      <ControlPanel 
+        actions={actions}
+        onRewind={handleRewind}
+        collapsed={panelCollapsed}
+        onToggle={() => setPanelCollapsed(p => !p)} />
 
       {/* CENTER: Voice control + grid */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
