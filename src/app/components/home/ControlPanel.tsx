@@ -17,6 +17,10 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import UndoIcon from '@mui/icons-material/Undo';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import PowerOffIcon from '@mui/icons-material/PowerOff';
+// NEW ICONS
+import MicIcon from '@mui/icons-material/Mic';
+import MicOffIcon from '@mui/icons-material/MicOff';
+import SubtitlesIcon from '@mui/icons-material/Subtitles';
 
 export type ActionType =
   | 'conv_start'       // NEW
@@ -52,6 +56,9 @@ function iconFor(type: ActionType) {
     case 'tts_end': return <VolumeUpIcon fontSize="small" />;
     case 'ai_message': return <PlayArrowIcon fontSize="small" />;
     case 'rewind': return <UndoIcon fontSize="small" />;
+    case 'begun listening': return <MicIcon fontSize="small" />;
+    case 'ended listening': return <MicOffIcon fontSize="small" />;
+    case 'final transcript': return <SubtitlesIcon fontSize="small" />;
     default: return null;
   }
 }
