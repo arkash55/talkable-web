@@ -71,12 +71,11 @@ function iconFor(type: ActionType) {
 
 interface ControlPanelProps {
   actions: ActionLogEntry[];
-  onRewind: (actionId: string) => void; // Only reacts to ai_message
   collapsed?: boolean;
   onToggle?: () => void;
 }
 
-export default function ControlPanel({ actions, onRewind, collapsed = false, onToggle }: ControlPanelProps) {
+export default function ControlPanel({ actions, collapsed = false, onToggle }: ControlPanelProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll to bottom on updates (chat-like behavior)
@@ -191,7 +190,7 @@ export default function ControlPanel({ actions, onRewind, collapsed = false, onT
                   '&:hover': isClickable ? { backgroundColor: theme => theme.palette.action.hover } : undefined,
                 }}
                 onClick={() => {
-                  if (isClickable) onRewind(a.id);
+                  
                 }}
               >
                 <Stack direction="row" alignItems="center" gap={1}>

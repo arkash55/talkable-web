@@ -157,33 +157,13 @@ export default function HomeClient() {
     }
   };
 
-  // Rewind to a clicked AI message (in ControlPanel)
-  const handleRewind = async (actionId: string) => {
-    const a = actions.find(x => x.id === actionId);
-    if (!a || a.type !== 'ai_message' || !a.clickable) return;
 
-    // Stop any current TTS and unlock UI
-    window.dispatchEvent(new Event('tts:end'));
-
-    // Trim action log up to & including the clicked message
-    const idx = actions.findIndex(x => x.id === actionId);
-    setActions(prev => prev.slice(0, idx + 1));
-    logAction({ type: 'rewind', label: 'Rewound to selected AI message.' });
-
-    // Generate new responses from that AI line (mocked)
-    const sourceText: string = (a.payload as any)?.text ?? 'Continue';
-    logAction({ type: 'generating', label: 'Generating responses from rewind…' });
-    const newCandidates = await getIBMResponses(sourceText);
-    setAiResponses(newCandidates);
-    logAction({ type: 'responses_ready', label: 'Responses ready (after rewind).' });
-  };
 
   return (
     <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'row' }}>
       {/* LEFT: Control Panel with action log + time-travel (AI-only click) */}
       <ControlPanel 
         actions={actions}
-        onRewind={handleRewind}
         collapsed={panelCollapsed}
         onToggle={() => setPanelCollapsed(p => !p)} />
 
