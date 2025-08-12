@@ -40,7 +40,8 @@ export type UserProfile = {
   firstName: string;
   lastName: string;
   pronouns: string;
-  mood: string;
+  tone: string;
+  voice: string;
   description: string;
   createdAt: Timestamp | ReturnType<typeof serverTimestamp>;
 };

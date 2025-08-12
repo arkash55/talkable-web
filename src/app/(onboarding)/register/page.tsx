@@ -20,9 +20,10 @@ export default function RegisterPage() {
 
       await addUser(uid, {
         firstName: payload.firstName.trim(),
-        lastName: payload.lastName.trim(),
-        pronouns: '', // optional; capture later
-        mood: payload.mood.trim(),
+        lastName : payload.lastName.trim(),
+        pronouns : '', // optional
+        tone     : payload.tone.trim(),
+        voice    : payload.voice.trim(),
         description: payload.description.trim(),
       });
 
