@@ -27,6 +27,8 @@ export type RegisterPayload = {
   description: string;
 };
 
+
+
 interface RegisterFormProps {
   error: string;
   setError: (msg: string) => void;
@@ -55,6 +57,15 @@ const VOICES: { id: string; label: string; hint?: string }[] = [
   { id: 'en-GB-Neural2-A',  label: 'Neural2 A',  hint: 'Female (neural)' },
   { id: 'en-GB-Neural2-B',  label: 'Neural2 B',  hint: 'Male (neural)' },
 ];
+
+const BIG_BUTTON_SX = {
+  py: { xs: 1.75, sm: 2 },            // taller tap target
+  px: { xs: 2.75, sm: 3.25 },         // wider surface
+  minHeight: { xs: 56, sm: 64 },      // >= 48px is recommended; 56–64 feels big
+  fontSize: { xs: '1rem', sm: '1.1rem' },
+  borderRadius: 2.5,
+  letterSpacing: 0.2,
+};
 
 const step1Schema = Yup.object({
   email: Yup.string().email('Invalid email').required('Email is required'),
@@ -113,7 +124,7 @@ function SelectCard({
   );
 }
 
-const BIG_BUTTON_SX = { py: 1.25, fontSize: '1rem' }; // bigger buttons
+
 
 const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterFormProps) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -301,75 +312,74 @@ const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterForm
           </Box>
         </Stack>
       )}
-            {/* STEP 2 --------------------------------------------------- */}
-            {step === 2 && (
-              <Stack spacing={2}>
-                {/* Equal-length name fields */}
-                <Grid container spacing={2} alignItems="stretch">
-                  <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
-                    <Field
-                      as={TextField}
-                      label="First Name"
-                      name="firstName"
-                      fullWidth
-                      error={touched.firstName && !!errors.firstName}
-                      helperText={touched.firstName && errors.firstName}
-                      disabled={isLoading}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
-                    <Field
-                      as={TextField}
-                      label="Last Name"
-                      name="lastName"
-                      fullWidth
-                      error={touched.lastName && !!errors.lastName}
-                      helperText={touched.lastName && errors.lastName}
-                      disabled={isLoading}
-                    />
-                  </Grid>
-                </Grid>
+      {/* STEP 2 --------------------------------------------------- */}
+      {step === 2 && (
+        <Stack spacing={2} alignItems="center">
+          {/* Keep the whole step the same width as Description (full width of the form) */}
+          <Box sx={{ width: '100%' }}>
+            <Stack spacing={2}>
+              <Field
+                as={TextField}
+                label="First Name"
+                name="firstName"
+                fullWidth
+                error={touched.firstName && !!errors.firstName}
+                helperText={touched.firstName && errors.firstName}
+                disabled={isLoading}
+              />
+              <Field
+                as={TextField}
+                label="Last Name"
+                name="lastName"
+                fullWidth
+                error={touched.lastName && !!errors.lastName}
+                helperText={touched.lastName && errors.lastName}
+                disabled={isLoading}
+              />
 
-                <Field
-                  as={TextField}
-                  label="Self Description"
-                  name="description"
-                  fullWidth
-                  multiline
-                  minRows={4}
-                  error={touched.description && !!errors.description}
-                  helperText={touched.description && errors.description}
-                  disabled={isLoading}
-                />
+              <Field
+                as={TextField}
+                label="Self Description"
+                name="description"
+                fullWidth
+                multiline
+                minRows={4}
+                error={touched.description && !!errors.description}
+                helperText={touched.description && errors.description}
+                disabled={isLoading}
+              />
+            </Stack>
+          </Box>
 
-                {error && <Typography color="error">{error}</Typography>}
+          {error && <Typography color="error">{error}</Typography>}
 
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ pt: 1 }}>
-                  <Button
-                    type="button"
-                    variant="outlined"
-                    fullWidth
-                    size="large"
-                    sx={BIG_BUTTON_SX}
-                    onClick={() => setStep(1)}
-                    disabled={isLoading}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    sx={BIG_BUTTON_SX}
-                    disabled={isLoading}
-                    onClick={() => onNext2(values, { setErrors, setTouched } as any)}
-                  >
-                    Continue
-                  </Button>
-                </Stack>
-              </Stack>
-            )}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ pt: 1, width: '100%' }}>
+            <Button
+              type="button"
+              variant="outlined"
+              fullWidth
+              size="large"
+              sx={BIG_BUTTON_SX}
+              onClick={() => setStep(1)}
+              disabled={isLoading}
+            >
+              Back
+            </Button>
+            <Button
+              type="button"
+              variant="contained"
+              fullWidth
+              size="large"
+              sx={BIG_BUTTON_SX}
+              disabled={isLoading}
+              onClick={() => onNext2(values, { setErrors, setTouched } as any)}
+            >
+              Continue
+            </Button>
+          </Stack>
+        </Stack>
+      )}
+
 
             {/* STEP 3 --------------------------------------------------- */}
             {step === 3 && (
