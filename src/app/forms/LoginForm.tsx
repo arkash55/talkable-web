@@ -71,7 +71,7 @@ const LoginForm = ({ error, setError, handleSubmit, isLoading }: LoginFormProps)
               variant="contained"
               fullWidth
               size="large"
-              sx={BIG_BUTTON_SX}
+              sx={{ ...BIG_BUTTON_SX, ...{ mt: 2 } }}
               disabled={isLoading}
               startIcon={isLoading ? <CircularProgress size={22} /> : null}
             >
