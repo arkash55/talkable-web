@@ -8,10 +8,9 @@ import {
   CircularProgress,
   Stack,
   Paper,
-  IconButton,
 } from '@mui/material';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import Grid from '@mui/material/Grid'; // MUI v6 Grid (v2 API)
+import Grid from '@mui/material/Grid'; // classic Grid (v1) -> use container/item
 import { Formik, Form, Field, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import Link from 'next/link';
@@ -90,28 +89,31 @@ function SelectCard({
   return (
     <Paper
       onClick={onClick}
-      elevation={selected ? 4 : 1}
+      elevation={selected ? 6 : 1}
       sx={{
-        p: 1.5,                // reduced padding
-        borderRadius: 1.5,
+        p: 2,
+        borderRadius: 2,
         cursor: 'pointer',
         border: theme => `2px solid ${selected ? theme.palette.primary.main : 'transparent'}`,
-        minHeight: 80,         // reduced height
+        minHeight: 120,
         height: '100%',
+        width: '100%',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        alignItems: 'center',
-        gap: 0.25,             // reduced gap
-        transition: 'all .15s ease',
-        '&:hover': { elevation: 3 },
+        gap: 0.5,
+        transition: 'box-shadow .15s ease, transform .05s ease',
+        '&:hover': { boxShadow: 6 },
+        userSelect: 'none',
       }}
     >
-      <Typography fontWeight={600} fontSize={14} textAlign="center">{title}</Typography>
-      {subtitle && <Typography variant="caption" color="text.secondary" textAlign="center">{subtitle}</Typography>}
+      <Typography fontWeight={700} fontSize={16}>{title}</Typography>
+      {subtitle && <Typography variant="body2" color="text.secondary">{subtitle}</Typography>}
     </Paper>
   );
 }
+
+const BIG_BUTTON_SX = { py: 1.25, fontSize: '1rem' }; // bigger buttons
 
 const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterFormProps) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -194,7 +196,7 @@ const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterForm
     }
   };
 
-  // Combined TTS preview (tone + voice)
+  // Combined preview (tone + voice)
   const previewSelection = (vals: { tone?: string; voice?: string; firstName?: string }) => {
     const tone = vals.tone || 'calm';
     const voice = vals.voice || 'en-GB-Standard-A';
@@ -202,217 +204,284 @@ const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterForm
   };
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', mt: 2, p: 3, height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="h5" gutterBottom>Register</Typography>
-        <Typography variant="body2" color="text.secondary">Step {step} of 3</Typography>
-      </Box>
+    <Box
+      sx={{
+        maxWidth: 900,
+        mx: 'auto',
+        my: { xs: 2, md: 6 },
+        px: { xs: 2, md: 4 },
+        py: { xs: 2, md: 4 },
+        minHeight: '80vh',
+      }}
+    >
+<Box sx={{ textAlign: 'center', mb: 2 }}>
+  <Typography variant="h5" gutterBottom>
+    Register
+  </Typography>
+  <Typography variant="body2" color="text.secondary">
+    Step {step} of 3
+  </Typography>
+</Box>
 
-      <Box sx={{ flex: 1, overflow: 'hidden' }}>
-        <Formik initialValues={initialValues} onSubmit={() => {}}>
-          {({ errors, touched, values, setFieldValue, setErrors, setTouched }) => (
-            <Form style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {/* STEP 1 - unchanged */}
-              {step === 1 && (
-                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Field
-                    as={TextField}
-                    label="Email"
-                    name="email"
-                    fullWidth
-                    size="small"
-                    error={touched.email && !!errors.email}
-                    helperText={touched.email && errors.email}
-                    disabled={isLoading}
-                  />
-                  <Field
-                    as={TextField}
-                    label="Password"
-                    name="password"
-                    type="password"
-                    fullWidth
-                    size="small"
-                    error={touched.password && !!errors.password}
-                    helperText={touched.password && errors.password}
-                    disabled={isLoading}
-                  />
-                  <Field
-                    as={TextField}
-                    label="Repeat Password"
-                    name="confirmPassword"
-                    type="password"
-                    fullWidth
-                    size="small"
-                    error={touched.confirmPassword && !!errors.confirmPassword}
-                    helperText={touched.confirmPassword && errors.confirmPassword}
-                    disabled={isLoading}
-                  />
+      <Formik initialValues={initialValues} onSubmit={() => {}}>
+        {({ errors, touched, values, setFieldValue, setErrors, setTouched }) => (
+          <Form>
+      
+      {/* STEP 1 --------------------------------------------------- */}
+      {step === 1 && (
+        // Center children horizontally
+        <Stack spacing={2} alignItems="center">
+          {/* Capped-width column */}
+          <Box sx={{ width: '100%', maxWidth: 440 }}>
+            <Field
+              as={TextField}
+              label="Email"
+              name="email"
+              fullWidth
+              error={touched.email && !!errors.email}
+              helperText={touched.email && errors.email}
+              disabled={isLoading}
+              margin="normal"
+            />
+            <Field
+              as={TextField}
+              label="Password"
+              name="password"
+              type="password"
+              fullWidth
+              error={touched.password && !!errors.password}
+              helperText={touched.password && errors.password}
+              disabled={isLoading}
+              margin="normal"
+            />
+            <Field
+              as={TextField}
+              label="Repeat Password"
+              name="confirmPassword"
+              type="password"
+              fullWidth
+              error={touched.confirmPassword && !!errors.confirmPassword}
+              helperText={touched.confirmPassword && errors.confirmPassword}
+              disabled={isLoading}
+              margin="normal"
+            />
 
-                  {error && <Typography color="error" variant="body2">{error}</Typography>}
+            {error && (
+              <Typography color="error" sx={{ mt: 1 }}>
+                {error}
+              </Typography>
+            )}
 
-                  <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Button
-                      type="button"
-                      variant="contained"
+            {/* Buttons stacked: Continue on top, Login below */}
+            <Stack spacing={1.5} sx={{ pt: 2 }}>
+              <Button
+                type="button"
+                variant="contained"
+                fullWidth
+                size="large"
+                sx={BIG_BUTTON_SX}
+                disabled={isLoading}
+                onClick={() => onNext1(values, { setErrors, setTouched } as any)}
+              >
+                {isLoading ? <CircularProgress size={22} /> : 'Continue'}
+              </Button>
+
+              <Button
+                component={Link}
+                href="/login"
+                variant="text"
+                fullWidth
+                size="large"
+                sx={BIG_BUTTON_SX}
+                disabled={isLoading}
+              >
+                Already have an account? Log in
+              </Button>
+            </Stack>
+          </Box>
+        </Stack>
+      )}
+            {/* STEP 2 --------------------------------------------------- */}
+            {step === 2 && (
+              <Stack spacing={2}>
+                {/* Equal-length name fields */}
+                <Grid container spacing={2} alignItems="stretch">
+                  <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
+                    <Field
+                      as={TextField}
+                      label="First Name"
+                      name="firstName"
+                      fullWidth
+                      error={touched.firstName && !!errors.firstName}
+                      helperText={touched.firstName && errors.firstName}
+                      disabled={isLoading}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
+                    <Field
+                      as={TextField}
+                      label="Last Name"
+                      name="lastName"
+                      fullWidth
+                      error={touched.lastName && !!errors.lastName}
+                      helperText={touched.lastName && errors.lastName}
+                      disabled={isLoading}
+                    />
+                  </Grid>
+                </Grid>
+
+                <Field
+                  as={TextField}
+                  label="Self Description"
+                  name="description"
+                  fullWidth
+                  multiline
+                  minRows={4}
+                  error={touched.description && !!errors.description}
+                  helperText={touched.description && errors.description}
+                  disabled={isLoading}
+                />
+
+                {error && <Typography color="error">{error}</Typography>}
+
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ pt: 1 }}>
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    fullWidth
+                    size="large"
+                    sx={BIG_BUTTON_SX}
+                    onClick={() => setStep(1)}
+                    disabled={isLoading}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="contained"
+                    fullWidth
+                    size="large"
+                    sx={BIG_BUTTON_SX}
+                    disabled={isLoading}
+                    onClick={() => onNext2(values, { setErrors, setTouched } as any)}
+                  >
+                    Continue
+                  </Button>
+                </Stack>
+              </Stack>
+            )}
+
+            {/* STEP 3 --------------------------------------------------- */}
+            {step === 3 && (
+              <Stack spacing={3}>
+                {/* Tone selection */}
+                <Box>
+                  <Typography variant="subtitle1" gutterBottom>Preferred tone</Typography>
+                  <Grid container spacing={2} alignItems="stretch">
+                    {TONES.map((t) => (
+                      <Grid item xs={6} sm={4} md={3} key={t.key} sx={{ display: 'flex' }}>
+                        <SelectCard
+                          title={t.label}
+                          subtitle={t.hint}
+                          selected={values.tone === t.key}
+                          onClick={() => {
+                            setFieldValue('tone', t.key);
+                            if (values.voice) previewSelection({ tone: t.key, voice: values.voice, firstName: values.firstName });
+                          }}
+                        />
+                      </Grid>
+                    ))}
+                  </Grid>
+                  {touched.tone && errors.tone && (
+                    <Typography color="error" variant="caption">{errors.tone}</Typography>
+                  )}
+                </Box>
+
+                {/* Voice selection */}
+                <Box>
+                  <Typography variant="subtitle1" gutterBottom>Voice (Google TTS)</Typography>
+
+                  <Stack
+                    direction={{ xs: 'column', md: 'row' }}
+                    spacing={2}
+                    alignItems={{ xs: 'stretch', md: 'center' }}
+                    sx={{ mb: 1 }}
+                  >
+                    <TextField
+                      size="medium"
+                      value={previewText}
+                      onChange={(e) => setPreviewText(e.target.value)}
+                      placeholder="Preview phrase"
                       fullWidth
                       disabled={isLoading}
-                      onClick={() => onNext1(values, { setErrors, setTouched } as any)}
-                    >
-                      Continue
-                    </Button>
+                    />
                     <Button
-                      component={Link}
-                      href="/login"
-                      variant="text"
-                      fullWidth
-                      sx={{ mt: 1 }}
+                      size="large"
+                      variant="outlined"
+                      startIcon={<VolumeUpIcon />}
+                      onClick={() => previewSelection({
+                        tone: values.tone,
+                        voice: values.voice,
+                        firstName: values.firstName,
+                      })}
+                      disabled={!values.voice || !values.tone || isLoading}
+                      sx={{ ...BIG_BUTTON_SX, whiteSpace: 'nowrap' }}
                     >
-                      Already have an account? Log in
+                      Listen
                     </Button>
-                  </Box>
-                </Box>
-              )}
+                  </Stack>
 
-              {/* STEP 2 - compact */}
-              {step === 2 && (
-                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, md: 6 }}>
-                      <Field
-                        as={TextField}
-                        label="First Name"
-                        name="firstName"
-                        fullWidth
-                        size="small"
-                        error={touched.firstName && !!errors.firstName}
-                        helperText={touched.firstName && errors.firstName}
-                        disabled={isLoading}
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 6 }}>
-                      <Field
-                        as={TextField}
-                        label="Last Name"
-                        name="lastName"
-                        fullWidth
-                        size="small"
-                        error={touched.lastName && !!errors.lastName}
-                        helperText={touched.lastName && errors.lastName}
-                        disabled={isLoading}
-                      />
-                    </Grid>
+                  <Grid container spacing={2} alignItems="stretch">
+                    {VOICES.map((v) => (
+                      <Grid item xs={12} sm={6} md={4} key={v.id} sx={{ display: 'flex' }}>
+                        <SelectCard
+                          title={v.label}
+                          subtitle={v.hint || v.id}
+                          selected={values.voice === v.id}
+                          onClick={() => {
+                            setFieldValue('voice', v.id);
+                            if (values.tone) previewSelection({ tone: values.tone, voice: v.id, firstName: values.firstName });
+                          }}
+                        />
+                      </Grid>
+                    ))}
                   </Grid>
+                  {touched.voice && errors.voice && (
+                    <Typography color="error" variant="caption">{errors.voice}</Typography>
+                  )}
+                </Box>
 
-                  <Field
-                    as={TextField}
-                    label="Self Description"
-                    name="description"
+                {error && <Typography color="error">{error}</Typography>}
+
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <Button
+                    type="button"
+                    variant="outlined"
                     fullWidth
-                    multiline
-                    rows={3}          // reduced from minRows={4}
-                    size="small"
-                    error={touched.description && !!errors.description}
-                    helperText={touched.description && errors.description}
+                    size="large"
+                    sx={BIG_BUTTON_SX}
+                    onClick={() => setStep(2)}
                     disabled={isLoading}
-                  />
-
-                  {error && <Typography color="error" variant="body2">{error}</Typography>}
-
-                  <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Stack direction="row" spacing={2}>
-                      <Button variant="outlined" fullWidth onClick={() => setStep(1)}>Back</Button>
-                      <Button variant="contained" fullWidth onClick={() => onNext2(values, { setErrors, setTouched } as any)}>Continue</Button>
-                    </Stack>
-                  </Box>
-                </Box>
-              )}
-
-              {/* STEP 3 - most compact */}
-              {step === 3 && (
-                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {/* Tone selection - compact */}
-                  <Box>
-                    <Typography variant="subtitle2" gutterBottom>Preferred tone</Typography>
-                    <Grid container spacing={1}>
-                      {TONES.map((t) => (
-                        <Grid size={{ xs: 3, sm: 3, md: 3 }} key={t.key}>
-                          <SelectCard
-                            title={t.label}
-                            subtitle={t.hint}
-                            selected={values.tone === t.key}
-                            onClick={() => setFieldValue('tone', t.key)}
-                          />
-                        </Grid>
-                      ))}
-                    </Grid>
-                    {touched.tone && errors.tone && (
-                      <Typography color="error" variant="caption">{errors.tone}</Typography>
-                    )}
-                  </Box>
-
-                  {/* Voice selection - compact */}
-                  <Box>
-                    <Typography variant="subtitle2" gutterBottom>Voice</Typography>
-                    <Grid container spacing={1}>
-                      {VOICES.map((v) => (
-                        <Grid size={{ xs: 4, sm: 4, md: 4 }} key={v.id}>
-                          <SelectCard
-                            title={v.label}
-                            subtitle={v.hint}
-                            selected={values.voice === v.id}
-                            onClick={() => setFieldValue('voice', v.id)}
-                          />
-                        </Grid>
-                      ))}
-                    </Grid>
-                    {touched.voice && errors.voice && (
-                      <Typography color="error" variant="caption">{errors.voice}</Typography>
-                    )}
-                  </Box>
-
-                  {/* Preview - inline and compact */}
-                  <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <TextField
-                        size="small"
-                        value={previewText}
-                        onChange={(e) => setPreviewText(e.target.value)}
-                        placeholder="Preview text..."
-                        sx={{ flex: 1 }}
-                      />
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<VolumeUpIcon />}
-                        onClick={() => previewSelection({ tone: values.tone, voice: values.voice, firstName: values.firstName })}
-                        disabled={!values.voice || !values.tone}
-                      >
-                        Listen
-                      </Button>
-                    </Stack>
-                  </Box>
-
-                  {error && <Typography color="error" variant="body2">{error}</Typography>}
-
-                  <Box sx={{ mt: 'auto', pt: 1 }}>
-                    <Stack direction="row" spacing={2}>
-                      <Button variant="outlined" fullWidth onClick={() => setStep(2)}>Back</Button>
-                      <Button 
-                        variant="contained" 
-                        fullWidth 
-                        onClick={() => onFinish(values, setErrors, setTouched)}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? 'Creating…' : 'Create account'}
-                      </Button>
-                    </Stack>
-                  </Box>
-                </Box>
-              )}
-            </Form>
-          )}
-        </Formik>
-      </Box>
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="contained"
+                    fullWidth
+                    size="large"
+                    sx={BIG_BUTTON_SX}
+                    onClick={() => onFinish(values, setErrors, setTouched)}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? <CircularProgress size={22} /> : 'Create account'}
+                  </Button>
+                </Stack>
+              </Stack>
+            )}
+          </Form>
+        )}
+      </Formik>
     </Box>
   );
 };
