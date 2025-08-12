@@ -15,6 +15,8 @@ function formatConversation(messages: Message[]) {
     .join('\n');
 }
 
+
+
 export async function generateAIResponses(conversation: Message[]): Promise<string[]> {
   const userContext = `
 The user:

@@ -1,9 +1,11 @@
+import { getCandidates } from '@/services/graniteClient';
+import { Candidate, GenerateResponse } from '@/services/graniteService';
 import { getIBMResponses } from '@/services/ibmService';
 import { useState, useEffect, useRef } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 export function useVoiceControl(
-  onResponses: (responses: string[]) => void,
+  onResponses: (responses: GenerateResponse) => void,
   onLoadingChange?: (loading: boolean) => void
 ) {
   // State
@@ -142,7 +144,15 @@ export function useVoiceControl(
           safeOnLoadingChange.current(true);
 
           try {
-            const responses = await getIBMResponses(pendingTranscript.current);
+            const responses: GenerateResponse = await getCandidates(
+
+              pendingTranscript.current,
+              {
+                system: "You are pretending to be a human. You are having a conversation with a person, and will reply to their prompt. You will be reasonably concise, but may use your own discretion. Only output the response text.",
+                context: ["My name is John.", "I am hungry and i like eating fish", "I'm so busy today.", "My schedule is packed."],
+              }
+            );
+            
             stableOnResponses.current(responses);
           } catch (err) {
             console.error('Error getting responses:', err);

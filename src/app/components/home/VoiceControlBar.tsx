@@ -6,9 +6,10 @@ import MicOffIcon from '@mui/icons-material/MicOff';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VoiceWaveform from './VoiceWaveform';
 import { useVoiceControl } from '@/app/hooks/useVoiceControl';
+import { GenerateResponse } from '@/services/graniteClient';
 
 interface VoiceControlBarProps {
-  onResponses: (responses: string[]) => void;
+  onResponses: (responses: GenerateResponse) => void;
   onLoadingChange?: (loading: boolean) => void;
 }
 
@@ -134,14 +135,14 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
           startIcon={<RefreshIcon />}
           onClick={() => {
             if (transcript) {
-              onResponses([
-                'Could you repeat that?',
-                "I didn’t catch that",
-                'Let me think about that',
-                "That’s interesting",
-                'Tell me more',
-                "Let’s change the subject",
-              ]);
+              // onResponses([
+              //   'Could you repeat that?',
+              //   "I didn’t catch that",
+              //   'Let me think about that',
+              //   "That’s interesting",
+              //   'Tell me more',
+              //   "Let’s change the subject",
+              // ]);
             }
           }}
           disabled={!transcript}
