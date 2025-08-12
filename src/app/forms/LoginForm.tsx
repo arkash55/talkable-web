@@ -4,6 +4,7 @@ import { Box, Button, TextField, Typography, CircularProgress } from '@mui/mater
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import Link from 'next/link';
+import { BIG_BUTTON_SX } from '@/app/styles/buttonStyles';
 
 interface LoginFormProps {
   error: string;
@@ -69,11 +70,12 @@ const LoginForm = ({ error, setError, handleSubmit, isLoading }: LoginFormProps)
               type="submit"
               variant="contained"
               fullWidth
-              sx={{ mt: 2 }}
+              size="large"
+              sx={BIG_BUTTON_SX}
               disabled={isLoading}
-              startIcon={isLoading ? <CircularProgress size={20} /> : null}
+              startIcon={isLoading ? <CircularProgress size={22} /> : null}
             >
-              {isLoading ? 'Logging in...' : 'Log In'}
+              {isLoading ? <CircularProgress size={22} /> : 'Log In'}
             </Button>
 
             <Button

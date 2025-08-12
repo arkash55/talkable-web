@@ -16,6 +16,7 @@ import * as Yup from 'yup';
 import Link from 'next/link';
 import { useState } from 'react';
 import { speakWithGoogleTTSClient } from '@/services/ttsClient';
+import { BIG_BUTTON_SX } from '@/app/styles/buttonStyles';
 
 export type RegisterPayload = {
   firstName: string;
@@ -57,15 +58,6 @@ const VOICES: { id: string; label: string; hint?: string }[] = [
   { id: 'en-GB-Neural2-A',  label: 'Neural2 A',  hint: 'Female (neural)' },
   { id: 'en-GB-Neural2-B',  label: 'Neural2 B',  hint: 'Male (neural)' },
 ];
-
-const BIG_BUTTON_SX = {
-  py: { xs: 1.75, sm: 2 },            // taller tap target
-  px: { xs: 2.75, sm: 3.25 },         // wider surface
-  minHeight: { xs: 56, sm: 64 },      // >= 48px is recommended; 56–64 feels big
-  fontSize: { xs: '1rem', sm: '1.1rem' },
-  borderRadius: 2.5,
-  letterSpacing: 0.2,
-};
 
 const step1Schema = Yup.object({
   email: Yup.string().email('Invalid email').required('Email is required'),
