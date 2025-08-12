@@ -8,13 +8,14 @@ import VoiceGrid from '@/app/components/home/VoiceGrid';
 import ControlPanel, { ActionLogEntry } from '@/app/components/home/ControlPanel';
 import { speakWithGoogleTTSClient } from '@/services/ttsClient';
 import { getIBMResponses } from '@/services/ibmService';
+import { Candidate, GenerateResponse } from '@/services/graniteClient';
 
 export default function HomeClient() {
-  const [aiResponses, setAiResponses] = useState<string[]>([]);
+  const [aiResponses, setAiResponses] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false); // disable grid during TTS
   const [activeIndex, setActiveIndex] = useState<number | null>(null); // highlight selected cell
-   const [panelCollapsed, setPanelCollapsed] = useState<boolean>(false);
+  const [panelCollapsed, setPanelCollapsed] = useState<boolean>(false);
   const [actions, setActions] = useState<ActionLogEntry[]>([]);
   const theme = useTheme();
 
@@ -120,8 +121,9 @@ export default function HomeClient() {
   };
 
   // Called by VoiceControlBar when it has responses (from IBM/Granite/etc.)
-  const handleResponsesReady = (responses: string[]) => {
-    setAiResponses(responses);
+  const handleResponsesReady = (responses: GenerateResponse) => {
+    setAiResponses(responses.candidates);
+    console.log('AI responses ready:', responses.candidates);
     logAction({ type: 'responses_ready', label: 'Responses ready.' });
   };
 
@@ -130,7 +132,7 @@ export default function HomeClient() {
     if (isPlaying) return;
 
     const speaker = speakers[index];
-    const text = (aiResponses?.[index] ?? '').trim() || `Fallback message from ${speaker.name}`;
+    const text = (aiResponses?.[index].text ?? '').trim() || `Fallback message from ${speaker.name}`;
 
     // mark selected visually
     setActiveIndex(index);
@@ -193,7 +195,7 @@ export default function HomeClient() {
         ) : (
           <VoiceGrid
             blocks={speakers.map((speaker, index) => ({
-              label: (aiResponses?.[index] ?? '').trim() || `Priority ${index + 1}`,
+              label: (aiResponses?.[index]?.text ?? '').trim() || `Priority ${index + 1}`,
               onClick: () => handleBlockClick(index),
             }))}
             disabled={isPlaying}

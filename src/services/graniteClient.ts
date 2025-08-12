@@ -51,8 +51,7 @@ export async function getCandidates(
     system = "You are Talkable. Reply in one short, polite sentence.",
     context = [],
     k = 6,
-    // sensible defaults for AAC-style short replies
-    params = { temperature: 0.5, top_p: 0.9, top_k: 50, max_new_tokens: 35, stop: ["\n\n"] },
+    params = { temperature: 0.5, top_p: 0.9, top_k: 50, max_new_tokens: 50 },
     route = "/api/granite/generate",
     signal,
   } = opts;
@@ -64,20 +63,27 @@ export async function getCandidates(
     signal,
   });
 
-  // Handle non-2xx with a readable error
   if (!res.ok) {
-    let msg = `Granite route error: ${res.status}`;
+    // Try to read JSON error, fall back to text
+    let body = "";
+    const ct = res.headers.get("content-type") || "";
     try {
-      const maybe = await res.json();
-      if (maybe?.error) msg = maybe.error;
+      if (ct.includes("application/json")) {
+        const j = await res.json();
+        body = JSON.stringify(j);
+      } else {
+        body = await res.text();
+      }
     } catch {
-      // ignore JSON parse errors
+      // ignore parse errors
     }
+    const msg = `Granite route error: ${res.status} ${res.statusText}${
+      body ? ` — ${body.slice(0, 800)}` : ""
+    }`;
     throw new Error(msg);
   }
 
   const data = (await res.json()) as GenerateResponse;
-  // Basic sanity: ensure candidates is an array
   if (!data || !Array.isArray(data.candidates)) {
     throw new Error("Malformed Granite response");
   }
