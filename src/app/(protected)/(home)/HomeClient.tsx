@@ -204,7 +204,7 @@ export default function HomeClient() {
         )}
       </div>
 
-      <ConversationSidebar />
+      {/* <ConversationSidebar /> */}
     </div>
   );
 }
