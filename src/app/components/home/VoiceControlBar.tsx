@@ -104,7 +104,7 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
             variant={isConversationActive ? 'contained' : 'outlined'}
             color={isConversationActive ? 'error' : 'inherit'}
             disabled={!browserSupportsSpeechRecognition}
-            onClick={toggleConversation}
+            onClick={handleToggle}
             startIcon={isConversationActive ? <MicIcon /> : <MicOffIcon />}
             sx={{
               height: 56,

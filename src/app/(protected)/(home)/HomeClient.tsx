@@ -9,6 +9,7 @@ import ControlPanel, { ActionLogEntry } from '@/app/components/home/ControlPanel
 import { speakWithGoogleTTSClient } from '@/services/ttsClient';
 import { getIBMResponses } from '@/services/ibmService';
 import { Candidate, GenerateResponse } from '@/services/graniteClient';
+import { useLiveConversationSync } from '@/app/hooks/useLiveConversation';
 
 export default function HomeClient() {
   const [aiResponses, setAiResponses] = useState<Candidate[]>([]);
@@ -17,6 +18,7 @@ export default function HomeClient() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null); // highlight selected cell
   const [panelCollapsed, setPanelCollapsed] = useState<boolean>(false);
   const [actions, setActions] = useState<ActionLogEntry[]>([]);
+   const { cid } = useLiveConversationSync();
   const theme = useTheme();
 
   const speakers = useMemo(

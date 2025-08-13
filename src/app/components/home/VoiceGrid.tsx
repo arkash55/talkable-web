@@ -52,7 +52,16 @@ export default function VoiceGrid({
         return (
           <Box
             key={index}
-            onClick={!disabled ? block.onClick : undefined} // block clicks while disabled
+            onClick={ !disabled ? () => {
+              block.onClick();
+              window.dispatchEvent(
+                new CustomEvent('ui:voicegrid:click', {
+                  detail: { index, label: block.label },
+                })
+              );
+            }
+          : undefined
+}
             sx={{
               gridColumn: `${pos.col} / span ${pos.colSpan}`,
               gridRow: `${pos.row} / span ${pos.rowSpan}`,
