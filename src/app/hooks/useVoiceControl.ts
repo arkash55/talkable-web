@@ -144,11 +144,18 @@ export function useVoiceControl(
           safeOnLoadingChange.current(true);
 
           try {
+
+              const HUMAN_STYLE = `
+          You are too speak like a real person in first person.
+          Rules:
+          - Be concise (10–16words), natural, and context appropriate.
+          - Do not claim a name or identity. Output only the final reply text.
+          `.trim();
             const responses: GenerateResponse = await getCandidates(
 
               pendingTranscript.current,
               {
-                system: "You are pretending to be a human. You are having a conversation with a person, and will reply to their prompt. You will be reasonably concise, but may use your own discretion. Only output the response text.",
+                system: HUMAN_STYLE,
                 context: ["My name is John.", "I am hungry and i like eating fish", "I'm so busy today.", "My schedule is packed."],
               }
             );
