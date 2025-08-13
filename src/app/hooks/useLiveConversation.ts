@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-
 import { onAuthStateChanged } from 'firebase/auth';
 import { createLiveConversation, sendMessage } from '@/services/firestoreService';
 import { auth } from '../../../lib/fireBaseConfig';
@@ -35,7 +34,7 @@ export function useLiveConversationSync() {
       const newCid = await createLiveConversation({ ownerUid: uid });
       setCid(newCid);
 
-      // Let others know which conversation we’re on (optional)
+      // Optional broadcast
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('conversation:created', { detail: newCid }));
       }
@@ -46,18 +45,18 @@ export function useLiveConversationSync() {
   };
 
   useEffect(() => {
-    // START
+    // START -> make a fresh live conversation
     const onStart = async () => {
       setCid(null);
       await ensureConversation();
     };
 
-  
+    // END -> clear current conversation id
     const onEnd = () => {
-      setCid(null); 
+      setCid(null);
     };
 
-    // Guest transcript
+    // Guest transcript sends message as "guest"
     const onFinalTranscript = async (e: Event) => {
       const anyEvent = e as CustomEvent<string>;
       const text = typeof anyEvent.detail === 'string' ? anyEvent.detail.trim() : '';
@@ -73,7 +72,7 @@ export function useLiveConversationSync() {
       }
     };
 
-    // User clicked a voice-grid block
+    // Voice grid click sends message as current user
     const onVoiceGridClick = async (e: Event) => {
       const anyEvent = e as CustomEvent<{ index: number; label: string }>;
       const label = anyEvent.detail?.label?.trim();

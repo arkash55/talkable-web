@@ -74,6 +74,7 @@ export type InboxItem = {
   lastMessagePreview: string;
   lastMessageAt: Timestamp | ReturnType<typeof serverTimestamp>;
   lastReadAt: Timestamp | null | ReturnType<typeof serverTimestamp>;
+  lastMessageSenderId: string | null; // <-- single source of truth (uid or 'guest')
 };
 
 // ---------- Path helpers ----------
@@ -143,7 +144,9 @@ export async function createOnlineConversation(params: {
       lastMessagePreview: '',
       lastMessageAt: serverTimestamp(),
       lastReadAt: null as any,
+      lastMessageSenderId: null, // no message yet
     };
+
     tx.set(userInboxDoc(creatorUid, cRef.id), baseInbox);
     tx.set(userInboxDoc(otherUid, cRef.id), baseInbox);
 
@@ -173,6 +176,7 @@ export async function createLiveConversation(params: { ownerUid: string; title?:
       lastMessagePreview: '',
       lastMessageAt: serverTimestamp(),
       lastReadAt: null,
+      lastMessageSenderId: null, // no messages yet
     } as InboxItem,
     { merge: true }
   );
@@ -245,11 +249,18 @@ export async function sendMessage(params: { cid: string; senderId: string; text:
     } as Partial<Conversation>);
 
     const pv = preview(text);
+
     for (const uid of convo.memberIds) {
       const inboxRef = userInboxDoc(uid, cid);
       tx.set(
         inboxRef,
-        { mode: convo.mode, title: convo.title ?? null, lastMessagePreview: pv, lastMessageAt: serverTimestamp() } as Partial<InboxItem>,
+        {
+          mode: convo.mode,
+          title: convo.title ?? null,
+          lastMessagePreview: pv,
+          lastMessageAt: serverTimestamp(),
+          lastMessageSenderId: senderId, // uid or 'guest'
+        } as Partial<InboxItem>,
         { merge: true }
       );
     }
