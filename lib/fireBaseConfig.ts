@@ -1,6 +1,11 @@
+'use client';
 
-import { getAnalytics } from 'firebase/analytics';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApp, getApps } from 'firebase/app';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentSingleTabManager,
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -13,6 +18,13 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID!,
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
+// Use the most compatible transport in dev to avoid WebChannel 400s
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  ignoreUndefinedProperties: true,
+  localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) }),
+});
+
 export const auth = getAuth(app);
-// export const analytics = getAnalytics(app);

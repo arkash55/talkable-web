@@ -1,6 +1,5 @@
 // services/graniteClient.ts
-// Browser-side helper for fetching ranked suggestions from your Granite API route.
-// Usage: const texts = await getSuggestions("user prompt");
+// Browser helper for fetching ranked suggestions from your Granite API route.
 
 type GenParams = {
   temperature?: number;
@@ -13,8 +12,8 @@ type GenParams = {
 export type Candidate = {
   text: string;
   tokens: number;
-  avgLogProb: number;     // closer to 0 = more likely
-  relativeProb: number;   // 0..1, softmax across candidates
+  avgLogProb: number;
+  relativeProb: number;
   seed: number;
   variant: "primary" | "alt";
 };
@@ -33,22 +32,18 @@ export type SuggestionOptions = {
   system?: string;
   context?: string[];
   k?: number;                 // default 6
-  params?: GenParams;         // decoding knobs
+  params?: GenParams;
   padTo?: number;             // pad output texts to N slots (default 6)
-  signal?: AbortSignal;       // optional abort
-  route?: string;             // override route path (default "/api/granite/generate")
+  signal?: AbortSignal;
+  route?: string;             // default "/api/granite/generate"
 };
 
-/**
- * Fetch full ranked candidates (texts + scores) from the Granite route.
- * Prefer this if you want probabilities/confidence bars in the UI.
- */
 export async function getCandidates(
   prompt: string,
   opts: SuggestionOptions = {}
 ): Promise<GenerateResponse> {
   const {
-    system = "You are Talkable. Reply in one short, polite sentence.",
+    system = "You are Talkable. Reply in one short, natural sentence.",
     context = [],
     k = 6,
     params = { temperature: 0.5, top_p: 0.9, top_k: 50, max_new_tokens: 50 },
@@ -56,31 +51,23 @@ export async function getCandidates(
     signal,
   } = opts;
 
+  // Always ask for at least 3
+  const wantK = Math.max(2, k);
+
   const res = await fetch(route, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ system, context, prompt, k, params }),
+    body: JSON.stringify({ system, context, prompt, k: wantK, params }),
     signal,
   });
 
   if (!res.ok) {
-    // Try to read JSON error, fall back to text
     let body = "";
     const ct = res.headers.get("content-type") || "";
     try {
-      if (ct.includes("application/json")) {
-        const j = await res.json();
-        body = JSON.stringify(j);
-      } else {
-        body = await res.text();
-      }
-    } catch {
-      // ignore parse errors
-    }
-    const msg = `Granite route error: ${res.status} ${res.statusText}${
-      body ? ` — ${body.slice(0, 800)}` : ""
-    }`;
-    throw new Error(msg);
+      body = ct.includes("application/json") ? JSON.stringify(await res.json()) : await res.text();
+    } catch {}
+    throw new Error(`Granite route error: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 800)}` : ""}`);
   }
 
   const data = (await res.json()) as GenerateResponse;
@@ -90,10 +77,6 @@ export async function getCandidates(
   return data;
 }
 
-/**
- * Fetch just the suggestion texts (ranked), padded to a fixed grid size.
- * This is the drop-in replacement for your old `getIBMResponses`.
- */
 export async function getSuggestions(
   prompt: string,
   opts: SuggestionOptions = {}
@@ -101,13 +84,9 @@ export async function getSuggestions(
   const { padTo = 6 } = opts;
   const data = await getCandidates(prompt, opts);
   const texts = data.candidates.map((c) => (c.text || "").trim());
-  // Pad to fixed length so your grid stays stable
   while (texts.length < padTo) texts.push("");
   return texts.slice(0, padTo);
 }
 
-/**
- * Temporary alias to avoid breaking existing imports.
- * You can delete this once you've updated callers to `getSuggestions`.
- */
+// Temporary alias (remove once you’ve migrated)
 export { getSuggestions as getIBMResponses };

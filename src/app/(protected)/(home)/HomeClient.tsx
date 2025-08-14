@@ -9,6 +9,7 @@ import ControlPanel, { ActionLogEntry } from '@/app/components/home/ControlPanel
 import { speakWithGoogleTTSClient } from '@/services/ttsClient';
 import { getIBMResponses } from '@/services/ibmService';
 import { Candidate, GenerateResponse } from '@/services/graniteClient';
+import { useLiveConversationSync } from '@/app/hooks/useLiveConversation';
 
 export default function HomeClient() {
   const [aiResponses, setAiResponses] = useState<Candidate[]>([]);
@@ -17,6 +18,7 @@ export default function HomeClient() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null); // highlight selected cell
   const [panelCollapsed, setPanelCollapsed] = useState<boolean>(false);
   const [actions, setActions] = useState<ActionLogEntry[]>([]);
+   const { cid } = useLiveConversationSync();
   const theme = useTheme();
 
   const speakers = useMemo(
@@ -159,6 +161,17 @@ export default function HomeClient() {
     }
   };
 
+    // ==== DYNAMIC BLOCKS ====
+  // Show exactly 2–6 tiles based on responses.
+  const visibleCount = Math.min(Math.max(aiResponses.length, 2), 6);
+  const blocks = Array.from({ length: visibleCount }, (_, i) => {
+    const label = (aiResponses[i]?.text ?? '').trim();
+    return {
+      label: label || `Option ${i + 1}`,
+      onClick: () => handleBlockClick(i),
+    };
+  });
+
 
 
   return (
@@ -194,17 +207,14 @@ export default function HomeClient() {
           </Box>
         ) : (
           <VoiceGrid
-            blocks={speakers.map((speaker, index) => ({
-              label: (aiResponses?.[index]?.text ?? '').trim() || `Priority ${index + 1}`,
-              onClick: () => handleBlockClick(index),
-            }))}
+            blocks={blocks}
             disabled={isPlaying}
             activeIndex={activeIndex}
           />
         )}
       </div>
 
-      <ConversationSidebar />
+      {/* <ConversationSidebar /> */}
     </div>
   );
 }
