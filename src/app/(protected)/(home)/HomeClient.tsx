@@ -161,6 +161,17 @@ export default function HomeClient() {
     }
   };
 
+    // ==== DYNAMIC BLOCKS ====
+  // Show exactly 2–6 tiles based on responses.
+  const visibleCount = Math.min(Math.max(aiResponses.length, 2), 6);
+  const blocks = Array.from({ length: visibleCount }, (_, i) => {
+    const label = (aiResponses[i]?.text ?? '').trim();
+    return {
+      label: label || `Option ${i + 1}`,
+      onClick: () => handleBlockClick(i),
+    };
+  });
+
 
 
   return (
@@ -196,10 +207,7 @@ export default function HomeClient() {
           </Box>
         ) : (
           <VoiceGrid
-            blocks={speakers.map((speaker, index) => ({
-              label: (aiResponses?.[index]?.text ?? '').trim() || `Priority ${index + 1}`,
-              onClick: () => handleBlockClick(index),
-            }))}
+            blocks={blocks}
             disabled={isPlaying}
             activeIndex={activeIndex}
           />
