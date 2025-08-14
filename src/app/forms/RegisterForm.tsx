@@ -18,14 +18,14 @@ import { ensureEmailAvailable } from '@/services/authService';
 
 const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterFormProps) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [previewText, setPreviewText] = useState('Hello! This is my voice.');
+  const [previewText, setPreviewText] = useState('Hi! I’m testing different tones to hear the contrast.');
 
   const initialValues = {
     firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
     tone: '', voice: '', description: '',
   };
 
-  // Helper to detect "email already used" from different sources (Firebase / API / generic)
+  // Helper to detect "email already used"
   const isEmailTakenError = (err: any) => {
     const code = err?.code;
     const msg  = (err?.message || '').toLowerCase();
@@ -38,44 +38,40 @@ const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterForm
     );
   };
 
-const onNext1 = async (
-  values: typeof initialValues,
-  helpers: FormikHelpers<typeof initialValues>
-) => {
-  const { setErrors, setTouched, setFieldError } = helpers;
-  setError('');
-  try {
-    await step1Schema.validate(
-      {
-        email: values.email,
-        password: values.password,
-        confirmPassword: values.confirmPassword,
-      },
-      { abortEarly: false }
-    );
-
-    // 🔍 server-side check (throws if taken)
-    await ensureEmailAvailable(values.email);
-
-    setStep(2);
-  } catch (e: any) {
-    if (e?.name === 'ValidationError' && Array.isArray(e.inner)) {
-      const formErrors: Record<string, string> = {};
-      e.inner.forEach((err: any) => {
-        if (err.path) formErrors[err.path] = err.message;
-      });
-      setTouched(
-        Object.keys(formErrors).reduce((a: any, k) => ((a[k] = true), a), {}),
-        false
+  const onNext1 = async (
+    values: typeof initialValues,
+    helpers: FormikHelpers<typeof initialValues>
+  ) => {
+    const { setErrors, setTouched, setFieldError } = helpers;
+    setError('');
+    try {
+      await step1Schema.validate(
+        {
+          email: values.email,
+          password: values.password,
+          confirmPassword: values.confirmPassword,
+        },
+        { abortEarly: false }
       );
-      setErrors(formErrors);
-    } else {
-      // Comes from ensureEmailAvailable
-      setFieldError('email', e.message || 'Email check failed');
-    }
-  }
-};
 
+      await ensureEmailAvailable(values.email);
+      setStep(2);
+    } catch (e: any) {
+      if (e?.name === 'ValidationError' && Array.isArray(e.inner)) {
+        const formErrors: Record<string, string> = {};
+        e.inner.forEach((err: any) => {
+          if (err.path) formErrors[err.path] = err.message;
+        });
+        setTouched(
+          Object.keys(formErrors).reduce((a: any, k) => ((a[k] = true), a), {}),
+          false
+        );
+        setErrors(formErrors);
+      } else {
+        setFieldError('email', e.message || 'Email check failed');
+      }
+    }
+  };
 
   const onNext2 = async (
     values: typeof initialValues,
@@ -120,7 +116,6 @@ const onNext1 = async (
       });
 
     } catch (e: any) {
-      // If backend / auth provider says email is taken: go back to step 1
       if (isEmailTakenError(e)) {
         setStep(1);
         setFieldError('email', 'Email already in use');
@@ -128,7 +123,6 @@ const onNext1 = async (
         return;
       }
 
-      // Yup validation / other field errors
       const formErrors: Record<string, string> = {};
       e?.inner?.forEach((err: any) => { if (err.path) formErrors[err.path] = err.message; });
       if (Object.keys(formErrors).length) {
@@ -138,7 +132,6 @@ const onNext1 = async (
         );
         setErrors(formErrors);
       } else {
-        // Generic error fallback
         setError(e?.message || 'Registration failed');
       }
     }
@@ -146,7 +139,8 @@ const onNext1 = async (
 
   const previewSelection = (vals: { tone?: string; voice?: string; firstName?: string }) => {
     const tone = vals.tone || 'calm';
-    const voice = vals.voice || 'en-GB-Standard-A';
+    // Neural voices exaggerate prosody differences better:
+    const voice = vals.voice || 'en-GB-Neural2-A';
     speakWithGoogleTTSClient(previewText || 'Hello!', tone, voice, vals.firstName);
   };
 
@@ -267,7 +261,7 @@ const onNext1 = async (
                               subtitle={t.hint}
                               selected={values.tone === t.key}
                               onClick={() => setFieldValue('tone', t.key)}
-                              onPreview={() => previewSelection({ tone: t.key, voice: values.voice || 'en-GB-Standard-A', firstName: values.firstName })}
+                              onPreview={() => previewSelection({ tone: t.key, voice: values.voice || 'en-GB-Neural2-A', firstName: values.firstName })}
                               height={CARD_HEIGHT}
                             />
                           </Box>
