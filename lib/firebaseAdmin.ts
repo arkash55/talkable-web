@@ -42,6 +42,7 @@ if (!admin.apps.length) {
       privateKey: credentials.private_key,
     }),
   });
+  console.log('Firebase Admin initialized successfully');
 }
 
 export const adminAuth = admin.auth();

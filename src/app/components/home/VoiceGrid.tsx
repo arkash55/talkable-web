@@ -65,7 +65,7 @@ export default function VoiceGrid({
   disabled = false,
   activeIndex = null,
 }: VoiceGridProps) {
-  console.log('VoiceGrid blocks:', blocks);
+  // console.log('VoiceGrid blocks:', blocks);
   const count = Math.max(0, Math.min(blocks.length, 6));
   const positions = layoutForCount(count);
 
