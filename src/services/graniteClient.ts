@@ -52,7 +52,7 @@ export async function getCandidates(
   } = opts;
 
   // Always ask for at least 3
-  const wantK = Math.max(3, k);
+  const wantK = Math.max(2, k);
 
   const res = await fetch(route, {
     method: "POST",

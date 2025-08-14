@@ -1,6 +1,10 @@
 // lib/graniteService.ts
-// Ranked candidates with: stance enforcement, ≥3 outputs guaranteed,
-// YES/NO/MAYBE for polar/offer prompts, stronger variety, and cleanup.
+// Granite ranked candidates with:
+// - 6 calls per wave (varied seeds & decoding)
+// - softer pruning (lenient cutoff)
+// - ≥3 varied outputs guaranteed (2nd wave regen + smart fallbacks)
+// - stance plan for offers/polar prompts
+// - dedupe + distinct starts + cleanup
 
 type GenParams = {
   temperature?: number;
@@ -14,7 +18,7 @@ export type GenerateRequest = {
   prompt: string;
   context?: string[];
   system?: string;
-  k?: number;               // target count (default 6, max 8)
+  k?: number;               // requested count (we still call 6x to source variety)
   params?: GenParams;
 };
 
@@ -37,17 +41,16 @@ export type GenerateResponse = {
   };
 };
 
-const API_KEY = process.env.IBM_API_KEY!;
+const API_KEY   = process.env.IBM_API_KEY!;
 const PROJECT_ID = process.env.IBM_PROJECT_ID!;
-const MODEL_ID = process.env.IBM_MODEL_ID || "ibm/granite-3-8b-instruct";
-const BASE_URL = (process.env.IBM_WATSON_ENDPOINT || "").replace(/\/+$/, "");
+const MODEL_ID   = process.env.IBM_MODEL_ID || "ibm/granite-3-8b-instruct";
+const BASE_URL   = (process.env.IBM_WATSON_ENDPOINT || "").replace(/\/+$/, "");
 
 // ---------- token cache ----------
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
 async function getIamToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt - 60_000) return cachedToken.token;
-
   const res = await fetch("https://iam.cloud.ibm.com/identity/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -75,9 +78,8 @@ const DEFAULT_STOPS = [
   "\n#",
 ];
 
-function uniq<T>(arr: T[]): T[] {
-  return Array.from(new Set(arr));
-}
+function uniq<T>(arr: T[]): T[] { return Array.from(new Set(arr)); }
+
 function buildStops(userStops?: string[]): string[] {
   const merged = uniq([...(userStops || []), ...DEFAULT_STOPS]);
   return merged.slice(0, 6); // watsonx limit
@@ -104,7 +106,7 @@ function stancePlan(k: number, kind: PromptKind): Stance[] {
   return base.slice(0, Math.min(Math.max(1, k), 8));
 }
 
-// very simple activity extraction for offers like “do you want to X”, “would you like to X”
+// very light activity extraction
 function extractActivity(prompt: string): string | null {
   const p = prompt.trim().replace(/\s+/g, " ");
   const m1 = /(?:do you want|would you like|are you up for|shall we|how about)\s+(to\s+)?(.+?)(?:\?|$)/i.exec(p);
@@ -138,7 +140,7 @@ function composeInput(
     "Do not start with filler like “Thanks for asking,” “Well,” or “Honestly,”.",
     "Start with a letter (not punctuation).",
     "Avoid repetition. Keep grammar natural. Do not claim a name or persona.",
-    "If a [STANCE] section is present, you MUST follow it.",
+    "If a [STANCE] section is present, follow it.",
   ].join(" ");
 
   const sys = [system?.trim(), hardRule].filter(Boolean).join("\n\n");
@@ -293,7 +295,7 @@ function enforceDistinctStarts(texts: string[]): number[] {
   const keep: number[] = [];
   for (let i = 0; i < texts.length; i++) {
     const words = texts[i].toLowerCase().split(/\s+/).filter(Boolean);
-    const key = words.slice(0, 2).join(" ");
+    const key = words.slice(0, 2).join(" "); // distinct first two words
     if (!key) continue;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -302,7 +304,8 @@ function enforceDistinctStarts(texts: string[]): number[] {
   return keep.length ? keep : texts.map((_, i) => i);
 }
 
-function dedupe(texts: string[], threshold = 0.75): number[] {
+function dedupe(texts: string[], threshold = 0.85): number[] {
+  // threshold is high => only *very* similar items are dropped (more lenient)
   const keep: number[] = [];
   for (let i = 0; i < texts.length; i++) {
     const t = texts[i];
@@ -320,7 +323,19 @@ function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 
-/** idx 0 conservative, others increasingly exploratory. */
+function pickTargetCount(k?: number) {
+  // If caller provides k, respect it (clamped 3..6)
+  if (typeof k === "number") return clamp(Math.round(k), 3, 6);
+
+  // Otherwise randomize:
+  // 55% -> 5 or 6 (50/50 within)
+  // 45% -> 3 or 4 (50/50 within)
+  const p = Math.random();
+  if (p < 0.55) return 5 + (Math.random() < 0.5 ? 0 : 1);
+  return 3 + (Math.random() < 0.5 ? 0 : 1);
+}
+
+/** idx 0 conservative, others increasingly exploratory (for variety). */
 function paramsForIndex(idx: number, base: Required<GenParams>): Required<GenParams> {
   if (idx === 0) {
     return {
@@ -330,54 +345,50 @@ function paramsForIndex(idx: number, base: Required<GenParams>): Required<GenPar
       top_k: Math.min(base.top_k, 40),
     };
   }
-  const t = clamp(0.7 + idx * 0.06, 0.7, 1.0);
-  const tp = clamp(0.9 + idx * 0.02, 0.9, 0.99);
-  const tk = clamp(60 + idx * 12, 60, 160);
+  const t  = clamp(0.75 + idx * 0.05, 0.75, 1.05);
+  const tp = clamp(0.9  + idx * 0.02, 0.9,  0.995);
+  const tk = clamp(60   + idx * 12,   60,   180);
   return { ...base, temperature: t, top_p: tp, top_k: tk };
 }
 
 // ---------- stance enforcement (post-process) ----------
-function matchesYes(t: string) {
-  return /\b(yes|sure|definitely|let'?s|sounds good|i'?m in)\b/i.test(t);
-}
-function matchesNo(t: string) {
-  return /\b(no|can['’]t|cannot|won['’]t|rather not|unfortunately|sorry,? i can['’]?t)\b/i.test(t);
-}
-function matchesMaybe(t: string) {
-  return /\b(maybe|perhaps|could|another time|later|not sure)\b/i.test(t);
-}
+function matchesYes(t: string)   { return /\b(yes|sure|definitely|let'?s|sounds good|i'?m in)\b/i.test(t); }
+function matchesNo(t: string)    { return /\b(no|can['’]t|cannot|won['’]t|rather not|unfortunately|sorry,? i can['’]?t)\b/i.test(t); }
+function matchesMaybe(t: string) { return /\b(maybe|perhaps|could|another time|later|not sure)\b/i.test(t); }
 
 function enforceStanceText(stance: Stance, prompt: string, current: string): string {
   if (!stance) return current;
   const t = current.trim();
 
-  if (stance === "YES" && matchesYes(t)) return t;
-  if (stance === "NO" && matchesNo(t)) return t;
+  if (stance === "YES"   && matchesYes(t))   return t;
+  if (stance === "NO"    && matchesNo(t))    return t;
   if (stance === "MAYBE" && matchesMaybe(t)) return t;
 
   const activity = extractActivity(prompt);
   const a = activity ? activity.replace(/^to\s+/i, "") : null;
 
-  if (stance === "YES") {
-    return a ? `Yes, let’s ${a}.` : "Yes, let’s do it.";
-  }
-  if (stance === "NO") {
-    return a ? `I can’t ${a} today—sorry.` : "I can’t today—sorry.";
-  }
-  if (stance === "MAYBE") {
-    return a ? `Maybe—how about ${a} a bit later?` : "Maybe—how about a bit later?";
-  }
+  if (stance === "YES")   return a ? `Yes, let’s ${a}.` : "Yes, let’s do it.";
+  if (stance === "NO")    return a ? `I can’t ${a} today—sorry.` : "I can’t today—sorry.";
+  if (stance === "MAYBE") return a ? `Maybe—how about ${a} a bit later?` : "Maybe—how about a bit later?";
   return t || (a ? `Maybe—how about ${a} another time?` : "Maybe—another time?");
 }
 
-// ---------- Y/N/Maybe hard fallbacks ----------
+// ---------- fallbacks ----------
 function ynmFallbacks(prompt: string): string[] {
   const a = extractActivity(prompt);
   const act = a ? a.replace(/^to\s+/i, "") : null;
   return [
-    act ? `Yes, let’s ${act}.` : "Yes, let’s do it.",
-    act ? `I can’t ${act} today—sorry.` : "I can’t today—sorry.",
-    act ? `Maybe—how about ${act} a bit later?` : "Maybe—how about a bit later?",
+    act ? `Yes, let’s ${act}.`               : "Yes, let’s do it.",
+    act ? `I can’t ${act} today—sorry.`      : "I can’t today—sorry.",
+    act ? `Maybe—how about ${act} later?`    : "Maybe—how about a bit later?",
+  ];
+}
+
+function openFallbacks(): string[] {
+  return [
+    "Could you tell me a bit more?",
+    "Got it—what would you like me to focus on?",
+    "I’m not sure I follow—can you clarify?",
   ];
 }
 
@@ -387,7 +398,9 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     throw new Error("Missing IBM_API_KEY, IBM_WATSON_ENDPOINT, or IBM_PROJECT_ID");
   }
 
-  const k = Math.max(3, Math.min(req.k ?? 6, 8)); // request at least 3
+  // We *source* variety from 6 model calls; we'll still honor req.k on the final slice.
+  const SOURCE_CALLS = 6;
+  const MAX_OUTPUT   = Math.min(6, Math.max(3, req.k ?? 6)); // client-visible cap
 
   const defaults: Required<GenParams> = {
     temperature: 0.5,
@@ -397,63 +410,45 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     stop: [],
   };
 
-  const userParams = { ...(req.params || {}) };
+  const userParams  = { ...(req.params || {}) };
   const mergedStops = buildStops(userParams.stop);
-
-  const baseParams: Required<GenParams> = {
-    ...defaults,
-    ...userParams,
-    stop: mergedStops,
-  };
+  const baseParams: Required<GenParams> = { ...defaults, ...userParams, stop: mergedStops };
 
   const kind = detectPromptKind(req.prompt);
-  const plan = stancePlan(k, kind);
+  const plan = stancePlan(SOURCE_CALLS, kind);
 
   const token = await getIamToken();
-  const seeds: number[] = [101, ...Array.from({ length: k - 1 }, (_, i) => 1000 + i)];
 
-  const resultsRaw = await Promise.allSettled(
-    seeds.map((seed, idx) => {
+  // --- helper: one wave of 6 calls ---
+  async function runWave(seedBase: number, moreExploratory = false) {
+    const seeds = Array.from({ length: SOURCE_CALLS }, (_, i) => (i === 0 ? 101 : seedBase + i));
+    const calls = seeds.map((seed, idx) => {
       const stance = plan[idx] || "";
-      const input = composeInput(req.system || "", req.context || [], req.prompt, stance);
-      return generateOnce(token, input, seed, paramsForIndex(idx, baseParams)).then((r) => {
-        const variant: "primary" | "alt" = idx === 0 ? "primary" : "alt";
-        return { ...r, seed, variant, stance };
-      });
-    })
-  );
-
-  const results = resultsRaw.map((pr, idx) =>
-    pr.status === "fulfilled"
-      ? pr.value
-      : { error: String((pr as any).reason?.message || (pr as any).reason || "Generation failed"), seed: seeds[idx], stance: plan[idx] || "" }
-  );
-
-  const ok = results.filter((x: any) => !(x as any).error) as Array<{ text: string; tokens: number; avgLogProb: number; seed: number; variant: "primary"|"alt"; stance: Stance }>;
-
-  // If *everything* failed, hard Y/N/Maybe
-  if (!ok.length) {
-    const fall = ynmFallbacks(req.prompt).map((text, i) => ({
-      text,
-      tokens: Math.max(3, Math.round(text.split(/\s+/).length * 1.3)),
-      avgLogProb: -1.5,
-      relativeProb: 1/3,
-      seed: 9000 + i,
-      variant: i === 0 ? "primary" as const : "alt" as const,
-    }));
-    return {
-      candidates: fall,
-      meta: { model_id: MODEL_ID, usedK: k, dropped: 0, params: baseParams },
-    };
+      const params = moreExploratory ? paramsForIndex(idx + 1, baseParams) : paramsForIndex(idx, baseParams);
+      const input  = composeInput(req.system || "", req.context || [], req.prompt, stance);
+      return generateOnce(token, input, seed, params).then((r) => ({
+        ...r,
+        seed,
+        variant: idx === 0 ? "primary" as const : "alt" as const,
+        stance,
+      }));
+    });
+    const settled = await Promise.allSettled(calls);
+    return settled
+      .map((pr, i) =>
+        pr.status === "fulfilled"
+          ? pr.value
+          : { error: String((pr as any).reason?.message || (pr as any).reason || "Generation failed"), seed: seeds[i], stance: plan[i] || "" }
+      );
   }
 
-  // Clean & enforce stance for first three (polar/offer only)
-  let processed = ok.map((r) => ({
-    ...r,
-    text: finalizeUtterance(r.text),
-  }));
+  // Wave 1: 6 calls (mixed conservative + exploratory)
+  const wave1 = await runWave(1000, false);
+  let ok = wave1.filter((x: any) => !(x as any).error) as Array<{ text: string; tokens: number; avgLogProb: number; seed: number; variant: "primary"|"alt"; stance: Stance }>;
 
-  if (kind === "polar" || kind === "offer") {
+  // cleanup + stance touch-up
+  let processed = ok.map((r) => ({ ...r, text: finalizeUtterance(r.text) }));
+  if (kind !== "open") {
     for (let i = 0; i < Math.min(3, processed.length); i++) {
       const s = plan[i] || "";
       if (s === "YES" || s === "NO" || s === "MAYBE") {
@@ -462,49 +457,82 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     }
   }
 
-  // Filter empties/super short
+  // filter short/empty
   const MIN_TOKENS = 3;
-  const MIN_WORDS = 2;
+  const MIN_WORDS  = 2;
   processed = processed.filter(({ text, tokens }) => {
     if (!text) return false;
     const words = text.split(/\s+/).filter(Boolean).length;
     return (tokens ?? 0) >= MIN_TOKENS || words >= MIN_WORDS;
   });
 
-  // If <3 after filtering and it's a polar/offer prompt, top up with Y/N/Maybe
-  if ((kind === "polar" || kind === "offer") && processed.length < 3) {
-    const need = 3 - processed.length;
-    const adds = ynmFallbacks(req.prompt).slice(0, need).map((text, i) => ({
-      text,
-      tokens: Math.max(3, Math.round(text.split(/\s+/).length * 1.3)),
-      avgLogProb: -1.5,
-      seed: 9900 + i,
-      variant: "alt" as const,
-      stance: "" as Stance,
-    }));
-    processed = processed.concat(adds);
+  // Variety: lenient dedupe + distinct starts
+  const texts0 = processed.map((r) => r.text);
+  let keepIdxs = dedupe(texts0, 0.85);                 // only drop *very* similar
+  let kept = keepIdxs.map((i) => processed[i]);
+
+  const startsIdx = enforceDistinctStarts(kept.map((r) => r.text));
+  kept = startsIdx.map((i) => kept[i]);
+
+  // If after wave 1 we still have <3, run a second wave with *more exploratory* params
+  if (kept.length < 3) {
+    const wave2 = await runWave(2000, true);
+    const ok2 = wave2.filter((x: any) => !(x as any).error) as Array<{ text: string; tokens: number; avgLogProb: number; seed: number; variant: "primary"|"alt"; stance: Stance }>;
+    let processed2 = ok2.map((r) => ({ ...r, text: finalizeUtterance(r.text) }));
+    if (kind !== "open") {
+      for (let i = 0; i < Math.min(3, processed2.length); i++) {
+        const s = plan[i] || "";
+        if (s === "YES" || s === "NO" || s === "MAYBE") {
+          processed2[i].text = finalizeUtterance(enforceStanceText(s, req.prompt, processed2[i].text));
+        }
+      }
+    }
+    processed2 = processed2.filter(({ text, tokens }) => {
+      if (!text) return false;
+      const words = text.split(/\s+/).filter(Boolean).length;
+      return (tokens ?? 0) >= MIN_TOKENS || words >= MIN_WORDS;
+    });
+
+    // merge waves then re-variety
+    const merged = [...processed, ...processed2];
+    const textsM = merged.map((r) => r.text);
+    // relax dedupe slightly to allow more near-variants if needed
+    const k1 = dedupe(textsM, merged.length < 6 ? 0.9 : 0.85);
+    let keptM = k1.map((i) => merged[i]);
+    const k2 = enforceDistinctStarts(keptM.map((r) => r.text));
+    kept = k2.map((i) => keptM[i]);
   }
 
-  // Variety: dedupe + distinct starts
-  const texts0 = processed.map((r) => r.text);
-  const keepA = dedupe(texts0, 0.75);
-  let kept = keepA.map((i) => processed[i]);
+  // If still <3 → smart fallbacks (no duplicates, stance-aware for offers/polar)
+  if (kept.length < 3) {
+    const have = new Set(kept.map((r) => r.text.toLowerCase()));
+    const adds = (kind === "open" ? openFallbacks() : ynmFallbacks(req.prompt))
+      .filter(t => !have.has(t.toLowerCase()))
+      .slice(0, 3 - kept.length)
+      .map((text, i) => ({
+        text,
+        tokens: Math.max(3, Math.round(text.split(/\s+/).length * 1.3)),
+        avgLogProb: -1.5,
+        seed: 9900 + i,
+        variant: "alt" as const,
+        stance: "" as Stance,
+      }));
+    kept = kept.concat(adds);
+  }
 
-  const texts1 = kept.map((r) => r.text);
-  const keepB = enforceDistinctStarts(texts1);
-  kept = keepB.map((i) => kept[i]);
-
-  // Rank
+  // Rank with lenient cutoff
   const avgLogs = kept.map((r) => r.avgLogProb);
   const tokenCounts = kept.map((r) => r.tokens);
   const medianTokens = tokenCounts.slice().sort((a, b) => a - b)[Math.floor(tokenCounts.length / 2)] || 48;
   const rel = softmaxFromAvgLogProbs(avgLogs, medianTokens);
 
-  const NEGLIGIBLE = 0.02;
+  // Lower prob cutoff so we keep more viable options
+  const NEGLIGIBLE = 0.005;
   let filtered = kept
     .map((r, i) => ({ ...r, relativeProb: rel[i] }))
-    .filter((x) => x.relativeProb >= NEGLIGIBLE || kept.length <= 3);
+    .filter((x) => x.relativeProb >= NEGLIGIBLE || kept.length <= 4);
 
+  // Ensure at least 3 survive ranking
   if (filtered.length < Math.min(3, kept.length)) {
     filtered = kept
       .map((r, i) => ({ ...r, relativeProb: rel[i] }))
@@ -512,8 +540,12 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
       .slice(0, Math.min(3, kept.length));
   }
 
-  filtered.sort((a, b) => b.relativeProb - a.relativeProb);
-  const final = filtered.slice(0, 6);
+// Decide how many to return this call (randomized unless req.k provided)
+const TARGET = pickTargetCount(req.k);
+
+// Final slice
+filtered.sort((a, b) => b.relativeProb - a.relativeProb);
+const final = filtered.slice(0, TARGET);
 
   const candidates: Candidate[] = final.map((r) => ({
     text: r.text,
@@ -528,7 +560,7 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     candidates,
     meta: {
       model_id: MODEL_ID,
-      usedK: k,
+      usedK: final.length,
       dropped: kept.length - final.length,
       params: {
         temperature: baseParams.temperature,
