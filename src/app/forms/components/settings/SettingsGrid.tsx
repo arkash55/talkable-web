@@ -15,10 +15,11 @@ import ArticleIcon from '@mui/icons-material/Article';
 import PolicyIcon from '@mui/icons-material/Policy';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import MicIcon from '@mui/icons-material/Mic';
 
 export type SettingsKey =
-  | 'about'
-  | 'account'
+  | 'about-me'
+  | 'tone-voice'
   | 'terms'
   | 'privacy'
   | 'delete'
@@ -27,32 +28,17 @@ export type SettingsKey =
 export type SettingsGridProps = {
   /** Called when a card is clicked */
   onSelect?: (key: SettingsKey) => void;
-
-  /** Card height in px (default 120) */
   cardHeight?: number;
-
-  /** Gap between grid items (MUI spacing units; default 2.5) */
   gap?: number;
-
-  /** Corner radius (px; default 16) */
   radius?: number;
-
-  /**
-   * Force number of columns (default 3).
-   * For your request we keep 3 columns (→ 2 rows of 3 items).
-   */
   columns?: number;
-
-  /** Base elevation for each card (MUI elevation 0-24). Default 2 */
   elevation?: number;
-
-  /** Elevation on hover (default 8) */
   hoverElevation?: number;
 };
 
 const DEFAULT_ITEMS: { key: SettingsKey; title: string; Icon: React.ElementType }[] = [
-  { key: 'about',   title: 'About me',         Icon: PersonIcon },
-  { key: 'account', title: 'Account settings', Icon: SettingsIcon },
+  { key: 'about-me',   title: 'About me',         Icon: PersonIcon },
+  { key: 'tone-voice', title: 'Voice & Tone',    Icon: MicIcon },
   { key: 'terms',   title: 'Terms of service', Icon: ArticleIcon },
   { key: 'privacy', title: 'Privacy notice',   Icon: PolicyIcon },
   { key: 'delete',  title: 'Delete user',      Icon: DeleteForeverIcon },
