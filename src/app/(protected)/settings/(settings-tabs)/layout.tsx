@@ -85,13 +85,21 @@ function SettingsTabsNavBar() {
   );
 }
 
-export default function SettingsTabsLayout({ children }: { children: React.ReactNode }) {
+export default function SettingsTabsLayout({ children }: {
+   children: React.ReactNode
+   params: any
+   }) {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh'}}>
       <SettingsTabsNavBar />
       <Container
-        maxWidth="lg"
-        sx={{ flex: 1, py: 4, display: 'flex', flexDirection: 'column', gap: 3 }}
+        maxWidth={false}
+        sx={{ width: '100%',
+          flex: 1,
+          py: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 3, }}
       >
         {children}
       </Container>

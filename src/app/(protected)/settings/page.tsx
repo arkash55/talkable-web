@@ -27,7 +27,7 @@ export default function SettingsClient() {
   const contentLeftOffset = `calc(16px + 48px + ${theme.spacing(1.75)})`;
 
   return (
-    <Box sx={{ maxWidth: 1080, mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 2, md: 4 } }}>
+    <Box sx={{ maxWidth: '70%', mx: 'auto', px: { xs: 2, md: 3 }, py: { xs: 2, md: 4 } }}>
       <Box sx={{ mb: 5, pl: contentLeftOffset }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>Profile & Account</Typography>
         <Typography variant="body2" color="text.secondary">
