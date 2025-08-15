@@ -9,6 +9,9 @@ import {
   buildContextWindow,
   type MessageHistoryItem,
 } from '@/app/utils/contextWindow';
+import React from 'react';
+import { buildSystemPrompt } from '../utils/systemPrompt';
+import { useUserProfile } from './useUserProfile';
 
 // Tune these as needed
 const HISTORY_LIMIT = { maxCount: 50, maxChars: 8000 };
@@ -40,6 +43,10 @@ export function useVoiceControl(
     resetTranscript,
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
+
+
+  const { profile } = useUserProfile();
+
 
   // Update refs
   useEffect(() => {
@@ -192,10 +199,15 @@ Rules:
 - Do not claim a name or identity. Output only the final reply text.
 `.trim();
 
+            const SYSTEM_PROMPT = React.useMemo(
+              () => buildSystemPrompt(profile?.tone, profile?.description),
+              [profile?.tone, profile?.description]
+            );
+
             // 4) Call model with context
             const responses: GenerateResponse = await getCandidates(
               guestMsg.content,
-              { system: HUMAN_STYLE, context: ctx }
+              { system: SYSTEM_PROMPT, context: ctx }
             );
 
             // 5) Deliver to UI
