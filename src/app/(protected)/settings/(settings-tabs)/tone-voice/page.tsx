@@ -124,7 +124,7 @@ const VoiceTonePage = () => {
           <Stack spacing={3}>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Voice & Tone
+                Change Voice & Tone Settings
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Choose your default speaking voice and preferred tone.
@@ -164,7 +164,16 @@ const VoiceTonePage = () => {
         open={banner.open}
         autoHideDuration={2600}
         onClose={() => setBanner((b) => ({ ...b, open: false }))}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          sx={{
+            // give a little lift from the very bottom
+            mb: { xs: 2, sm: 3 },
+            // you can also enforce width here by targeting the child
+            '& .MuiAlert-root': {
+              width: { xs: 'calc(100vw - 32px)', sm: 560, md: 640 }, // wider on larger screens
+              maxWidth: '100%',
+            },
+          }}
       >
         <Alert
           onClose={() => setBanner((b) => ({ ...b, open: false }))}

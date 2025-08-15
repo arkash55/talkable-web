@@ -254,7 +254,16 @@ export default function AboutPage() {
         open={banner.open}
         autoHideDuration={2600}
         onClose={() => setBanner((b) => ({ ...b, open: false }))}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          sx={{
+            // give a little lift from the very bottom
+            mb: { xs: 2, sm: 3 },
+            // you can also enforce width here by targeting the child
+            '& .MuiAlert-root': {
+              width: { xs: 'calc(100vw - 32px)', sm: 560, md: 640 }, // wider on larger screens
+              maxWidth: '100%',
+            },
+          }}
       >
         <Alert
           onClose={() => setBanner((b) => ({ ...b, open: false }))}
