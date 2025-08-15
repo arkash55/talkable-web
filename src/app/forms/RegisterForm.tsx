@@ -2,23 +2,21 @@
 import {
   Box, Button, TextField, Typography, CircularProgress, Stack
 } from '@mui/material';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { Formik, Form, Field, FormikHelpers } from 'formik';
 import Link from 'next/link';
 import { useState } from 'react';
-import { speakWithGoogleTTSClient } from '@/services/ttsClient';
 import { BIG_BUTTON_SX } from '@/app/styles/buttonStyles';
 
 import { RegisterFormProps } from './types/register';
-import { TONES, VOICES, VOICE_MIN_COL, TONE_MIN_COL, CARD_HEIGHT, GRID_GAP } from './constants/voiceToneOptions';
 import { step1Schema, step2Schema, step3Schema } from './schemas/registerSchemas';
-import { SectionGrid } from './components/SectionGrid';
-import { SelectCard } from './components/SelectCard';
 import { ensureEmailAvailable } from '@/services/authService';
+import VoiceTonePicker from '../components/shared/VoiceTonerPicker';
+
+// NEW reusable Voice+Tone picker
+
 
 const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterFormProps) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [previewText, setPreviewText] = useState('Hi! I’m testing different tones to hear the contrast.');
 
   const initialValues = {
     firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
@@ -53,7 +51,6 @@ const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterForm
         },
         { abortEarly: false }
       );
-
       await ensureEmailAvailable(values.email);
       setStep(2);
     } catch (e: any) {
@@ -137,13 +134,6 @@ const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterForm
     }
   };
 
-  const previewSelection = (vals: { tone?: string; voice?: string; firstName?: string }) => {
-    const tone = vals.tone || 'calm';
-    // Neural voices exaggerate prosody differences better:
-    const voice = vals.voice || 'en-GB-Neural2-A';
-    speakWithGoogleTTSClient(previewText || 'Hello!', tone, voice, vals.firstName);
-  };
-
   return (
     <Box sx={{ maxWidth: 980, mx: 'auto', my: { xs: 2, md: 4 }, px: { xs: 2, md: 4 }, py: { xs: 2, md: 3 }, minHeight: '80vh' }}>
       <Box sx={{ textAlign: 'center', mb: 2 }}>
@@ -214,79 +204,32 @@ const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterForm
               )}
 
               {step === 3 && (
-                <Stack spacing={2} sx={{ overflow: 'hidden' }}>
-                  <Box sx={{ width: '100%', mt: 1 }}>
-                    <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', lg: 'center' }} justifyContent="center" sx={{ width: '100%' }}>
-                      <TextField size="small" fullWidth value={previewText} onChange={(e) => setPreviewText(e.target.value)} placeholder="Preview phrase" disabled={isLoading} />
-                      <Button
-                        size="medium"
-                        variant="outlined"
-                        startIcon={<VolumeUpIcon />}
-                        onClick={() => previewSelection({ tone: values.tone, voice: values.voice, firstName: values.firstName })}
-                        disabled={!values.voice || !values.tone || isLoading}
-                        sx={{ px: 3, minWidth: { md: 160 }, flexShrink: 0 }}
-                      >
-                        Listen
-                      </Button>
-                    </Stack>
-                  </Box>
+                <VoiceTonePicker
+                  tone={values.tone}
+                  voice={values.voice}
+                  onToneChange={(t: any) => setFieldValue('tone', t)}
+                  onVoiceChange={(v: any) => setFieldValue('voice', v)}
+                  name={values.firstName}
+                  disabled={isLoading}
+                  toneError={touched.tone ? (errors.tone as string) : undefined}
+                  voiceError={touched.voice ? (errors.voice as string) : undefined}
+                />
+              )}
 
-                  <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 7, alignItems: 'stretch' }}>
-                    <Stack spacing={1.25} sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="subtitle1" textAlign="center">Voice Selection</Typography>
-                      <SectionGrid minColWidth={VOICE_MIN_COL} gap={GRID_GAP}>
-                        {VOICES.map(v => (
-                          <Box key={v.id}>
-                            <SelectCard
-                              title={v.label}
-                              subtitle={v.hint || v.id}
-                              selected={values.voice === v.id}
-                              onClick={() => setFieldValue('voice', v.id)}
-                              onPreview={() => previewSelection({ tone: values.tone || 'calm', voice: v.id, firstName: values.firstName })}
-                              height={CARD_HEIGHT}
-                            />
-                          </Box>
-                        ))}
-                      </SectionGrid>
-                      {touched.voice && errors.voice && <Typography color="error" variant="caption" textAlign="center">{errors.voice}</Typography>}
-                    </Stack>
-
-                    <Stack spacing={1.25} sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="subtitle1" textAlign="center">Preferred tone</Typography>
-                      <SectionGrid minColWidth={TONE_MIN_COL} gap={GRID_GAP}>
-                        {TONES.map(t => (
-                          <Box key={t.key}>
-                            <SelectCard
-                              title={t.label}
-                              subtitle={t.hint}
-                              selected={values.tone === t.key}
-                              onClick={() => setFieldValue('tone', t.key)}
-                              onPreview={() => previewSelection({ tone: t.key, voice: values.voice || 'en-GB-Neural2-A', firstName: values.firstName })}
-                              height={CARD_HEIGHT}
-                            />
-                          </Box>
-                        ))}
-                      </SectionGrid>
-                      {touched.tone && errors.tone && <Typography color="error" variant="caption" textAlign="center">{errors.tone}</Typography>}
-                    </Stack>
-                  </Box>
-
-                  {error && <Typography color="error" textAlign="center">{error}</Typography>}
-
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                    <Button type="button" variant="outlined" fullWidth size="large" sx={BIG_BUTTON_SX} onClick={() => setStep(2)} disabled={isLoading}>Back</Button>
-                    <Button
-                      type="button"
-                      variant="contained"
-                      fullWidth
-                      size="large"
-                      sx={BIG_BUTTON_SX}
-                      onClick={() => onFinish(formik.values, formik)}
-                      disabled={isLoading || isSubmitting}
-                    >
-                      {isLoading ? <CircularProgress size={22} /> : 'Create account'}
-                    </Button>
-                  </Stack>
+              {step === 3 && (
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 2 }}>
+                  <Button type="button" variant="outlined" fullWidth size="large" sx={BIG_BUTTON_SX} onClick={() => setStep(2)} disabled={isLoading}>Back</Button>
+                  <Button
+                    type="button"
+                    variant="contained"
+                    fullWidth
+                    size="large"
+                    sx={BIG_BUTTON_SX}
+                    onClick={() => onFinish(formik.values, formik)}
+                    disabled={isLoading || isSubmitting}
+                  >
+                    {isLoading ? <CircularProgress size={22} /> : 'Create account'}
+                  </Button>
                 </Stack>
               )}
             </Form>
