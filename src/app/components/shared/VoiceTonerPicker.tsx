@@ -45,6 +45,14 @@ export type VoiceTonePickerProps = {
   voiceMinCol?: number;
   toneMinCol?: number;
   gridGap?: number;
+  /** Fixed column count for voices (overrides minCol logic when provided) */
+  voiceCols?: number;
+  /** Limit voices to a number of rows (only applies if voiceCols provided) */
+  voiceRows?: number;
+  /** Fixed column count for tones */
+  toneCols?: number;
+  /** Limit tones to a number of rows (only applies if toneCols provided) */
+  toneRows?: number;
 };
 
 export default function VoiceTonePicker({
@@ -61,6 +69,10 @@ export default function VoiceTonePicker({
   voiceMinCol = VOICE_MIN_COL,
   toneMinCol = TONE_MIN_COL,
   gridGap = GRID_GAP,
+  voiceCols,
+  voiceRows,
+  toneCols,
+  toneRows,
 }: VoiceTonePickerProps) {
   const [previewText, setPreviewText] = React.useState(defaultPreviewText);
 
@@ -69,8 +81,29 @@ export default function VoiceTonePicker({
     speakWithGoogleTTSClient(previewText || 'Hello!', tone, voice, name);
   }, [previewText, tone, voice, name]);
 
+  // Slice arrays if rows * cols is specified
+  const limitedVoices = React.useMemo(() => {
+    if (!voiceCols || !voiceRows) return VOICES;
+    const max = voiceCols * voiceRows;
+    return VOICES.slice(0, max);
+  }, [voiceCols, voiceRows]);
+
+  const limitedTones = React.useMemo(() => {
+    if (!toneCols || !toneRows) return TONES;
+    const max = toneCols * toneRows;
+    return TONES.slice(0, max);
+  }, [toneCols, toneRows]);
+
   return (
-    <Stack spacing={2} sx={{ overflow: 'hidden', width: '100%' }}>
+    <Stack
+      spacing={2}
+      sx={{
+        width: '100%',
+        overflow: 'visible',              // let cards & ripples render fully
+        px: { xs: 0, sm: 1 },             // light breathing room
+        boxSizing: 'border-box',
+      }}
+    >
       {/* Preview row */}
       <Box sx={{ width: '100%', mt: 1 }}>
         <Stack
@@ -106,21 +139,41 @@ export default function VoiceTonePicker({
         sx={{
           display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
-          gap: 7,
+          flexWrap: { xs: 'wrap', md: 'nowrap' }, // wrap on small screens
+          gap: { xs: 4, md: 7 },
           alignItems: 'stretch',
           width: '100%',
+          // Optional: allow horizontal scroll instead of clipping if extremely narrow
+          overflowX: { xs: 'auto', md: 'visible' },
+          pb: 0.5,
         }}
       >
         {/* Voice section */}
-        <Stack spacing={1.25} sx={{ flex: 1, minWidth: 0 }}>
+        <Stack
+          spacing={1.25}
+          sx={{
+            flex: 1,
+            minWidth: 0,              // allow proper shrink in flex
+            // Ensure some minimum so cards don't collapse too narrow
+            '@media (max-width:600px)': { minWidth: '100%' },
+          }}
+        >
           <Typography variant="subtitle1" textAlign="center">
             Voice Selection
           </Typography>
 
-          <SectionGrid minColWidth={voiceMinCol} gap={gridGap}>
-            {VOICES.map((v) => (
-              <Box key={v.id}>
+          {/* If voiceCols provided use fixed grid, else responsive SectionGrid */}
+          {voiceCols ? (
+            <Box
+              sx={(theme) => ({
+                display: 'grid',
+                gridTemplateColumns: `repeat(${voiceCols}, minmax(0, 1fr))`,
+                gap: theme.spacing(gridGap),
+              })}
+            >
+              {limitedVoices.map((v) => (
                 <SelectCard
+                  key={v.id}
                   title={v.label}
                   subtitle={v.hint || v.id}
                   selected={voice === v.id}
@@ -136,9 +189,32 @@ export default function VoiceTonePicker({
                   }
                   height={cardHeight}
                 />
-              </Box>
-            ))}
-          </SectionGrid>
+              ))}
+            </Box>
+          ) : (
+            <SectionGrid minColWidth={voiceMinCol} gap={gridGap}>
+              {VOICES.map((v) => (
+                <Box key={v.id}>
+                  <SelectCard
+                    title={v.label}
+                    subtitle={v.hint || v.id}
+                    selected={voice === v.id}
+                    disabled={disabled}
+                    onClick={() => onVoiceChange(v.id)}
+                    onPreview={() =>
+                      speakWithGoogleTTSClient(
+                        previewText || 'Hello!',
+                        tone || 'calm',
+                        v.id,
+                        name
+                      )
+                    }
+                    height={cardHeight}
+                  />
+                </Box>
+              ))}
+            </SectionGrid>
+          )}
 
           {!!voiceError && (
             <Typography color="error" variant="caption" textAlign="center">
@@ -148,15 +224,29 @@ export default function VoiceTonePicker({
         </Stack>
 
         {/* Tone section */}
-        <Stack spacing={1.25} sx={{ flex: 1, minWidth: 0 }}>
+        <Stack
+          spacing={1.25}
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            '@media (max-width:600px)': { minWidth: '100%' },
+          }}
+        >
           <Typography variant="subtitle1" textAlign="center">
             Preferred tone
           </Typography>
 
-          <SectionGrid minColWidth={toneMinCol} gap={gridGap}>
-            {TONES.map((t) => (
-              <Box key={t.key}>
+          {toneCols ? (
+            <Box
+              sx={(theme) => ({
+                display: 'grid',
+                gridTemplateColumns: `repeat(${toneCols}, minmax(0, 1fr))`,
+                gap: theme.spacing(gridGap),
+              })}
+            >
+              {limitedTones.map((t) => (
                 <SelectCard
+                  key={t.key}
                   title={t.label}
                   subtitle={t.hint}
                   selected={tone === t.key}
@@ -172,9 +262,32 @@ export default function VoiceTonePicker({
                   }
                   height={cardHeight}
                 />
-              </Box>
-            ))}
-          </SectionGrid>
+              ))}
+            </Box>
+          ) : (
+            <SectionGrid minColWidth={toneMinCol} gap={gridGap}>
+              {TONES.map((t) => (
+                <Box key={t.key}>
+                  <SelectCard
+                    title={t.label}
+                    subtitle={t.hint}
+                    selected={tone === t.key}
+                    disabled={disabled}
+                    onClick={() => onToneChange(t.key)}
+                    onPreview={() =>
+                      speakWithGoogleTTSClient(
+                        previewText || 'Hello!',
+                        t.key,
+                        voice || 'en-GB-Neural2-A',
+                        name
+                      )
+                    }
+                    height={cardHeight}
+                  />
+                </Box>
+              ))}
+            </SectionGrid>
+          )}
 
           {!!toneError && (
             <Typography color="error" variant="caption" textAlign="center">

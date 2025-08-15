@@ -213,6 +213,10 @@ const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterForm
                   disabled={isLoading}
                   toneError={touched.tone ? (errors.tone as string) : undefined}
                   voiceError={touched.voice ? (errors.voice as string) : undefined}
+                  voiceCols={2}
+                  voiceRows={3}
+                  toneCols={2}
+                  toneRows={4}
                 />
               )}
 
