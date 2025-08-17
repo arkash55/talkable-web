@@ -61,6 +61,15 @@ export function useVoiceControl(
     safeOnLoadingChange.current = onLoadingChange ?? (() => {});
   }, [onResponses, onLoadingChange]);
 
+
+
+    const clearContext = React.useCallback(() => {
+    historyRef.current.length = 0; // <- wipe the context window
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('context:cleared'));
+    }
+  }, []);
+
   // Start conversation (+ dispatch event)
   const startConversation = () => {
     if (!browserSupportsSpeechRecognition) return;
@@ -98,6 +107,7 @@ export function useVoiceControl(
 
     processingTranscript.current = false;
     pendingTranscript.current = '';
+    clearContext();
     safeOnLoadingChange.current(false);
 
     if (typeof window !== 'undefined') {
