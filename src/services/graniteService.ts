@@ -137,7 +137,7 @@ const ALL_SENTIMENTS: SentimentMode[] = [
 
 // Choose 6 distinct sentiment modes per wave, covering all polarities where possible.
 function sentimentPlan(): SentimentMode[] {
-  // Bias to include at least one of each polarity
+  // Helper
   const pick = <T,>(arr: T[], n: number) => {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -151,19 +151,40 @@ function sentimentPlan(): SentimentMode[] {
   const neu = ALL_SENTIMENTS.filter(s => s.pol === "NEU");
   const neg = ALL_SENTIMENTS.filter(s => s.pol === "NEG");
 
+  // 1. Guarantee one of each polarity
   const seed: SentimentMode[] = [
-    pick(pos, 2)[0],
-    pick(neu, 2)[0],
-    pick(neg, 2)[0],
-  ].filter(Boolean);
+    pick(pos, 1)[0],
+    pick(neu, 1)[0],
+    pick(neg, 1)[0],
+  ];
 
-  const remaining = ALL_SENTIMENTS.filter(s => !seed.includes(s));
-  const extra = pick(remaining, 6 - seed.length);
-  const plan = [...seed, ...extra].slice(0, 6);
+  // 2. Fill remaining 3 with diversity preference:
+  // try to cover remaining intensities first, then anything else unique.
+  const used = new Set(seed.map(s => s.tag));
+  const remaining = ALL_SENTIMENTS.filter(s => !used.has(s.tag));
 
-  // Ensure uniqueness by tag
+  // Prefer modes that add new intensities across polarities
+  const haveInt = new Set(seed.map(s => `${s.pol}:${s.int}`));
+  const prioritized = [
+    ...remaining.filter(s => !haveInt.has(`${s.pol}:${s.int}`)),
+    ...remaining.filter(s => haveInt.has(`${s.pol}:${s.int}`)),
+  ];
+
+  // Shuffle lightly, then take until 6 unique
+  for (let i = prioritized.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [prioritized[i], prioritized[j]] = [prioritized[j], prioritized[i]];
+  }
+
+  const out: SentimentMode[] = [...seed];
+  for (const m of prioritized) {
+    if (out.length >= 6) break;
+    if (!out.some(x => x.tag === m.tag)) out.push(m);
+  }
+
+  // Safety: ensure exactly 6, all unique
   const seen = new Set<string>();
-  return plan.filter(m => (seen.has(m.tag) ? false : (seen.add(m.tag), true)));
+  return out.filter(m => (seen.has(m.tag) ? false : (seen.add(m.tag), true))).slice(0, 6);
 }
 
 // ---------- input composition ----------
@@ -696,8 +717,42 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
 
   const TARGET = Math.min(pickTargetCount(req.k), MAX_OUTPUT);
 
-  filtered.sort((a, b) => b.relativeProb - a.relativeProb);
-  const final = filtered.slice(0, TARGET);
+type WithMode = typeof kept[number] & { mode?: SentimentMode };
+
+// Keep coverage in the returned set if available
+function polarityAwareSlice(items: Array<WithMode & { relativeProb: number }>, n: number) {
+  const byPol = {
+    POS: items.filter(i => i.mode?.pol === "POS").sort((a,b)=>b.relativeProb-a.relativeProb),
+    NEU: items.filter(i => i.mode?.pol === "NEU").sort((a,b)=>b.relativeProb-a.relativeProb),
+    NEG: items.filter(i => i.mode?.pol === "NEG").sort((a,b)=>b.relativeProb-a.relativeProb),
+  };
+
+  const picked: Array<WithMode & { relativeProb: number }> = [];
+
+  // 1) Pick best of each polarity if present
+  (["POS","NEU","NEG"] as const).forEach(pol => {
+    if (byPol[pol].length) picked.push(byPol[pol][0]);
+  });
+
+  // 2) Fill remaining slots by global rank, skipping duplicates
+  const already = new Set(picked.map(p => p.text));
+  const rest = items
+    .slice() // already sorted descending outside
+    .sort((a,b)=>b.relativeProb-a.relativeProb)
+    .filter(x => !already.has(x.text));
+
+  while (picked.length < Math.min(n, items.length) && rest.length) {
+    picked.push(rest.shift()!);
+  }
+
+  // 3) If we somehow still have fewer than 3 available, just return what we have;
+  // upstream fallbacks already ensure >=3 total items exist.
+  return picked.slice(0, n);
+}
+
+// --- apply it:
+filtered.sort((a, b) => b.relativeProb - a.relativeProb);
+const final = polarityAwareSlice(filtered as any, TARGET);
 
   const candidates: Candidate[] = final.map((r) => ({
     text: r.text,
