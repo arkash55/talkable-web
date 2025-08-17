@@ -45,7 +45,7 @@ const API_KEY   = process.env.IBM_API_KEY!;
 const PROJECT_ID = process.env.IBM_PROJECT_ID!;
 const MODEL_ID   = process.env.IBM_MODEL_ID || "ibm/granite-3-8b-instruct";
 const BASE_URL   = (process.env.IBM_WATSON_ENDPOINT || "").replace(/\/+$/, "");
-
+// console.log(MODEL_ID)
 // ---------- token cache ----------
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
@@ -134,16 +134,9 @@ function composeInput(
   stance: Stance
 ): string {
   const parts: string[] = [];
-  const hardRule = [
-    "Reply with ONLY the final message as plain text (no labels or brackets).",
-    "Sound like a real person speaking in first person.",
-    "Do not start with filler like “Thanks for asking,” “Well,” or “Honestly,”.",
-    "Start with a letter (not punctuation).",
-    "Avoid repetition. Keep grammar natural. Do not claim a name or persona.",
-    "If a [STANCE] section is present, follow it.",
-  ].join(" ");
 
-  const sys = [system?.trim(), hardRule].filter(Boolean).join("\n\n");
+
+  const sys = [system?.trim()].filter(Boolean).join("\n\n");
   if (sys) parts.push(`[SYSTEM]\n${sys}`);
 
   if (context?.length) {
