@@ -24,10 +24,9 @@ const TONE_PRESETS: Record<ToneKey, TonePreset> = {
 
 function buildSSML(text: string, preset: TonePreset, name?: string) {
   const safe = (text || 'Hello!').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const pre = name ? `<s>${name} says:</s> ` : '';
   const emphOpen  = preset.emphasis ? `<emphasis level="${preset.emphasis}">` : '';
   const emphClose = preset.emphasis ? `</emphasis>` : '';
-  return `<speak>${pre}${emphOpen}${safe}${emphClose}</speak>`;
+  return `<speak>${emphOpen}${safe}${emphClose}</speak>`;
 }
 
 export async function speakWithGoogleTTSClient(

@@ -1,190 +1,190 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Box, CircularProgress, Typography, useTheme } from '@mui/material';
+import * as React from 'react';
+import {
+  Box,
+  Paper,
+  Stack,
+  Typography,
+  Divider,
+  Button,
+  CircularProgress,
+  Snackbar,
+  Alert,
+} from '@mui/material';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 
-import VoiceControlBar from '@/app/components/home/VoiceControlBar';
-import VoiceGrid from '@/app/components/home/VoiceGrid';
-import ControlPanel, { ActionLogEntry } from '@/app/components/home/ControlPanel';
+import { updateUser, type UserProfile } from '@/services/firestoreService';
+import { db } from '../../../../../../lib/fireBaseConfig';
+import VoiceTonePicker from '@/app/components/shared/VoiceTonerPicker';
+import { BIG_BUTTON_SX } from '@/app/styles/buttonStyles';
 
-import { speakWithGoogleTTSClient } from '@/services/ttsClient';
-import { Candidate, GenerateResponse } from '@/services/graniteClient';
-import { useLiveConversationSync } from '@/app/hooks/useLiveConversation';
-import { useUserProfile } from '@/app/hooks/useUserProfile';
 
-export default function HomeClient() {
-  const [aiResponses, setAiResponses] = useState<Candidate[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [panelCollapsed, setPanelCollapsed] = useState<boolean>(false);
-  const [actions, setActions] = useState<ActionLogEntry[]>([]);
 
-  const { cid } = useLiveConversationSync();
-  const theme = useTheme();
+type FormState = Pick<UserProfile, 'tone' | 'voice' | 'firstName'>;
 
-  // 🔊 Pull voice & tone from the live user profile
-  const { profile } = useUserProfile();
-  const activeVoice = profile?.voice || 'en-GB-Neural2-A';
-  const activeTone  = profile?.tone  || 'friendly';
-  const speakerName = profile?.firstName || 'Assistant';
+const EMPTY: FormState = { tone: '', voice: '', firstName: '' };
 
-  // Helper: push an action entry to the panel
-  const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
-    setActions(prev => {
-      const last = prev[prev.length - 1];
-      if (
-        last &&
-        (entry.type === 'conv_start' || entry.type === 'conv_end') &&
-        last.type === entry.type
-      ) {
-        return prev;
+function diff(before: FormState, after: FormState): Partial<FormState> {
+  const out: Partial<FormState> = {};
+  (['tone', 'voice'] as const).forEach((k) => {
+    if ((before[k] ?? '') !== (after[k] ?? '')) out[k] = after[k];
+  });
+  return out;
+}
+
+const VoiceTonePage = () => {
+  const [uid, setUid] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+
+  const [initial, setInitial] = React.useState<FormState>(EMPTY);
+  const [form, setForm] = React.useState<FormState>(EMPTY);
+
+  const [banner, setBanner] = React.useState<{ open: boolean; msg: string; severity: 'success' | 'error' }>({
+    open: false,
+    msg: '',
+    severity: 'success',
+  });
+
+  // Auth + live user profile subscribe
+  React.useEffect(() => {
+    const auth = getAuth();
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        setUid(null);
+        setLoading(false);
+        setInitial(EMPTY);
+        setForm(EMPTY);
+        setBanner({ open: true, msg: 'You must be signed in to edit Voice & Tone.', severity: 'error' });
+        return;
       }
-      const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-      return [...prev, { id, ts: Date.now(), ...entry }];
+      setUid(user.uid);
+      setLoading(true);
+
+      const ref = doc(db, 'users', user.uid);
+      const unsubDoc = onSnapshot(
+        ref,
+        (snap) => {
+          const data = snap.exists() ? (snap.data() as UserProfile) : undefined;
+          const base: FormState = {
+            tone: data?.tone ?? '',
+            voice: data?.voice ?? '',
+            firstName: data?.firstName ?? '',
+          };
+          setInitial(base);
+          setForm(base);
+          setLoading(false);
+        },
+        (err) => {
+          console.error('VoiceTone subscribe error', err);
+          setLoading(false);
+          setBanner({ open: true, msg: 'Failed to load your preferences.', severity: 'error' });
+        }
+      );
+
+      return () => unsubDoc();
     });
-  };
 
-  // Conversation lifecycle
-  useEffect(() => {
-    const onConvStart = () => {
-      setActions([]);
-      logAction({ type: 'conv_start', label: 'Conversation started.' });
-    };
-    const onConvEnd = () => logAction({ type: 'conv_end', label: 'Conversation ended.' });
-
-    window.addEventListener('conversation:start', onConvStart);
-    window.addEventListener('conversation:end', onConvEnd);
-    return () => {
-      window.removeEventListener('conversation:start', onConvStart);
-      window.removeEventListener('conversation:end', onConvEnd);
-    };
+    return () => unsubAuth();
   }, []);
 
-  // TTS lifecycle -> disable/enable grid + action log
-  useEffect(() => {
-    const onStart = () => setIsPlaying(true);
-    const onEnd = () => {
-      setIsPlaying(false);
-      setActiveIndex(null);
-      logAction({ type: 'TTS End', label: 'User finished talking.' });
-    };
-    window.addEventListener('tts:start', onStart);
-    window.addEventListener('tts:end', onEnd);
-    return () => {
-      window.removeEventListener('tts:start', onStart);
-      window.removeEventListener('tts:end', onEnd);
-    };
-  }, []);
+  const isDirty = React.useMemo(() => Object.keys(diff(initial, form)).length > 0, [initial, form]);
+  const canSave = !!form.tone && !!form.voice && isDirty && !!uid;
 
-  // STT lifecycle
-  useEffect(() => {
-    const onStartListening = () => {
-      logAction({ type: 'begun listening', label: 'Listening for recipient speech...' });
-    };
-    const onEndListening = (event: Event) => {
-      const finalTranscript = (event as CustomEvent).detail;
-      logAction({ type: 'ended listening', label: 'Recipient has stopped speaking.' });
-      logAction({
-        type: 'final transcript',
-        label: `Recipient: ${finalTranscript}`,
-        payload: { transcript: finalTranscript },
-        backgroundColor: '#32CD32',
-      });
-    };
-
-    window.addEventListener('stt:startListening', onStartListening);
-    window.addEventListener('stt:finalTranscript', onEndListening);
-    return () => {
-      window.removeEventListener('stt:startListening', onStartListening);
-      window.removeEventListener('stt:finalTranscript', onEndListening);
-    };
-  }, []);
-
-  // Loading from VoiceControlBar
-  const handleLoadingChange = (loading: boolean) => {
-    setIsLoading(loading);
-    if (loading) logAction({ type: 'generating', label: 'Generating responses…' });
-  };
-
-  // Responses from VoiceControlBar
-  const handleResponsesReady = (responses: GenerateResponse) => {
-    setAiResponses(responses.candidates);
-    logAction({ type: 'responses_ready', label: 'Responses ready.' });
-  };
-
-  // Click a grid cell -> speak with *current profile* voice & tone
-  const handleBlockClick = async (index: number) => {
-    if (isPlaying) return;
-
-    const text = (aiResponses?.[index]?.text ?? '').trim() || `Here's a response.`;
-    setActiveIndex(index);
-
-    logAction({ type: 'TTS Start', label: 'User is speaking…' });
-    logAction({
-      type: 'ai_message',
-      label: `User: ${text}`,
-      payload: { index, text },
-      backgroundColor: theme.palette.primary.main,
-      textColor: 'white',
-    });
+  const handleSave = async () => {
+    if (!uid) return;
+    const changes = diff(initial, form);
+    if (!Object.keys(changes).length) return;
 
     try {
-      await speakWithGoogleTTSClient(text, activeTone, activeVoice, speakerName);
-    } catch (err) {
-      console.error('TTS error:', err);
-      window.dispatchEvent(new Event('tts:end'));
+      setSaving(true);
+      await updateUser(uid, changes); // persists { tone, voice }
+      setInitial((prev) => ({ ...prev, ...changes }));
+      setBanner({ open: true, msg: 'Voice & tone updated.', severity: 'success' });
+    } catch (e: any) {
+      console.error('updateUser failed', e);
+      setBanner({ open: true, msg: e?.message || 'Update failed.', severity: 'error' });
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Build blocks from responses (2–6)
-  const visibleCount = Math.min(Math.max(aiResponses.length, 2), 6);
-  const blocks = Array.from({ length: visibleCount }, (_, i) => {
-    const label = (aiResponses[i]?.text ?? '').trim();
-    return {
-      label: label || `Option ${i + 1}`,
-      onClick: () => handleBlockClick(i),
-    };
-  });
+  const handleReset = () => setForm(initial);
 
   return (
-    <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'row' }}>
-      <ControlPanel
-        actions={actions}
-        collapsed={panelCollapsed}
-        onToggle={() => setPanelCollapsed(p => !p)}
-      />
-
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <VoiceControlBar
-          onResponses={handleResponsesReady}
-          onLoadingChange={handleLoadingChange}
-        />
-
-        {isLoading ? (
-          <Box
-            sx={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-            }}
-          >
+    <Box sx={{minWidth: '80%', px: { xs: 2, md: 3 } }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+        {loading ? (
+          <Box sx={{ py: 8, display: 'grid', placeItems: 'center' }}>
             <CircularProgress />
-            <Typography variant="body2" color="text.secondary">
-              Generating responses…
-            </Typography>
           </Box>
         ) : (
-          <VoiceGrid
-            blocks={blocks}
-            disabled={isPlaying}
-            activeIndex={activeIndex}
-          />
+          <Stack spacing={3}>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                Change Voice & Tone Settings
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Choose your default speaking voice and preferred tone.
+              </Typography>
+            </Box>
+        
+            <VoiceTonePicker
+              tone={form.tone}
+              voice={form.voice}
+              onToneChange={(t: any) => setForm((f) => ({ ...f, tone: t }))}
+              onVoiceChange={(v: any) => setForm((f) => ({ ...f, voice: v }))}
+              name={form.firstName}
+              disabled={!uid}
+              toneError={!form.tone ? 'Select a tone' : undefined}
+              voiceError={!form.voice ? 'Select a voice' : undefined}
+              voiceCols={3}
+              voiceRows={2}
+              toneCols={4}
+              toneRows={2}
+            />
+
+            <Divider />
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'flex-end',  }}>
+              <Button variant="outlined" color="inherit" onClick={handleReset} disabled={!isDirty || saving} sx={BIG_BUTTON_SX}>
+                Reset
+              </Button>
+              <Button variant="contained" onClick={handleSave} disabled={!canSave || saving}  sx={BIG_BUTTON_SX}>
+                {saving ? <CircularProgress size={22} /> : 'Save changes'}
+              </Button>
+            </Stack>
+          </Stack>
         )}
-      </div>
-    </div>
+      </Paper>
+
+      <Snackbar
+        open={banner.open}
+        autoHideDuration={2600}
+        onClose={() => setBanner((b) => ({ ...b, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          sx={{
+            // give a little lift from the very bottom
+            mb: { xs: 2, sm: 3 },
+            // you can also enforce width here by targeting the child
+            '& .MuiAlert-root': {
+              width: { xs: 'calc(100vw - 32px)', sm: 560, md: 640 }, // wider on larger screens
+              maxWidth: '100%',
+            },
+          }}
+      >
+        <Alert
+          onClose={() => setBanner((b) => ({ ...b, open: false }))}
+          severity={banner.severity}
+          sx={{ width: '100%' }}
+        >
+          {banner.msg}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
-}
+};
+
+export default VoiceTonePage;
