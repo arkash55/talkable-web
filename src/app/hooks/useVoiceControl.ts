@@ -47,6 +47,11 @@ export function useVoiceControl(
 
   const { profile } = useUserProfile();
 
+  // MOVE system prompt memoization to top level (safe hook position)
+  const systemPrompt = React.useMemo(
+    () => buildSystemPrompt(profile?.tone, profile?.description),
+    [profile?.tone, profile?.description]
+  );
 
   // Update refs
   useEffect(() => {
@@ -153,7 +158,7 @@ export function useVoiceControl(
     return () => window.removeEventListener('ui:voicegrid:click', onGridClick);
   }, []);
 
-  // Silence → finalize (kept your existing behavior, now with sliding-window context)
+  // Silence → finalize
   useEffect(() => {
     if (!isConversationActive || !listening || speaking) return;
 
@@ -175,12 +180,11 @@ export function useVoiceControl(
             }));
           }
 
-          setListening(false);
-          setHasSoundLeeway(false);
-          safeOnLoadingChange.current(true);
+            setListening(false);
+            setHasSoundLeeway(false);
+            safeOnLoadingChange.current(true);
 
           try {
-            // 1) Append the guest message in-place (sliding window)
             const guestMsg: MessageHistoryItem = {
               sender: 'guest',
               content: pendingTranscript.current,
@@ -188,29 +192,15 @@ export function useVoiceControl(
             };
             appendWithSlidingWindow(historyRef.current, guestMsg, HISTORY_LIMIT);
 
-            // 2) Build the (read-only) context from the bounded history
             const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
             console.log('Context for AI:', ctx);
-            // 3) System style
-            const HUMAN_STYLE = `
-You speak like a real person in first person.
-Rules:
-- Be concise (10–16 words), natural, and context appropriate.
-- Do not claim a name or identity. Output only the final reply text.
-`.trim();
 
-            const SYSTEM_PROMPT = React.useMemo(
-              () => buildSystemPrompt(profile?.tone, profile?.description),
-              [profile?.tone, profile?.description]
-            );
-
-            // 4) Call model with context
+            // Use memoized prompt (no hook call here)
             const responses: GenerateResponse = await getCandidates(
               guestMsg.content,
-              { system: SYSTEM_PROMPT, context: ctx }
+              { system: systemPrompt, context: ctx }
             );
 
-            // 5) Deliver to UI
             stableOnResponses.current(responses);
           } catch (err) {
             console.error('Error getting responses:', err);
@@ -228,7 +218,7 @@ Rules:
         silenceTimer.current = null;
       }
     };
-  }, [transcript, listening, speaking, isConversationActive]);
+  }, [transcript, listening, speaking, isConversationActive, systemPrompt]); // add systemPrompt dep
 
   // Cleanup
   useEffect(() => {
