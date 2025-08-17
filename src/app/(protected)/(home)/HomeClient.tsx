@@ -1,39 +1,35 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { alpha, Box, CircularProgress, Typography, useTheme } from '@mui/material';
-import ConversationSidebar from '@/app/components/home/ConversationSideBar';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Box, CircularProgress, Typography, useTheme } from '@mui/material';
+
 import VoiceControlBar from '@/app/components/home/VoiceControlBar';
 import VoiceGrid from '@/app/components/home/VoiceGrid';
 import ControlPanel, { ActionLogEntry } from '@/app/components/home/ControlPanel';
+
 import { speakWithGoogleTTSClient } from '@/services/ttsClient';
-import { getIBMResponses } from '@/services/ibmService';
 import { Candidate, GenerateResponse } from '@/services/graniteClient';
 import { useLiveConversationSync } from '@/app/hooks/useLiveConversation';
+import { useUserProfile } from '@/app/hooks/useUserProfile';
 
 export default function HomeClient() {
   const [aiResponses, setAiResponses] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false); // disable grid during TTS
-  const [activeIndex, setActiveIndex] = useState<number | null>(null); // highlight selected cell
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [panelCollapsed, setPanelCollapsed] = useState<boolean>(false);
   const [actions, setActions] = useState<ActionLogEntry[]>([]);
-   const { cid } = useLiveConversationSync();
+
+  const { cid } = useLiveConversationSync();
   const theme = useTheme();
 
-  const speakers = useMemo(
-    () => [
-      { name: 'Maya',  tone: 'friendly',     voice: 'en-US-Wavenet-F' },
-      { name: 'Liam',  tone: 'confident',    voice: 'en-US-Wavenet-D' },
-      { name: 'Olivia',tone: 'cheerful',     voice: 'en-US-Wavenet-C' },
-      { name: 'Noah',  tone: 'calm',         voice: 'en-US-Wavenet-B' },
-      { name: 'Emma',  tone: 'enthusiastic', voice: 'en-US-Wavenet-E' },
-      { name: 'James', tone: 'serious',      voice: 'en-US-Wavenet-A' },
-    ],
-    []
-  );
+  // 🔊 Pull voice & tone from the live user profile
+  const { profile } = useUserProfile();
+  const activeVoice = profile?.voice || 'en-GB-Neural2-A';
+  const activeTone  = profile?.tone  || 'friendly';
 
-  // Helper: push an action entry to the panel (with simple de-dupe for conv start/end)
+
+  // Helper: push an action entry to the panel
   const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
     setActions(prev => {
       const last = prev[prev.length - 1];
@@ -42,7 +38,6 @@ export default function HomeClient() {
         (entry.type === 'conv_start' || entry.type === 'conv_end') &&
         last.type === entry.type
       ) {
-        // ignore consecutive identical conv_start/conv_end
         return prev;
       }
       const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -50,15 +45,14 @@ export default function HomeClient() {
     });
   };
 
-  // Conversation lifecycle via window events
+  // Conversation lifecycle
   useEffect(() => {
     const onConvStart = () => {
-      // Flush previous logs
       setActions([]);
-      // Seed with the new start entry
       logAction({ type: 'conv_start', label: 'Conversation started.' });
     };
     const onConvEnd = () => logAction({ type: 'conv_end', label: 'Conversation ended.' });
+
     window.addEventListener('conversation:start', onConvStart);
     window.addEventListener('conversation:end', onConvEnd);
     return () => {
@@ -67,19 +61,14 @@ export default function HomeClient() {
     };
   }, []);
 
-
-  
-
   // TTS lifecycle -> disable/enable grid + action log
   useEffect(() => {
-    const onStart = () => {setIsPlaying(true);};
-
+    const onStart = () => setIsPlaying(true);
     const onEnd = () => {
       setIsPlaying(false);
       setActiveIndex(null);
-      logAction({ type: 'TTS End', label: 'User finished talking.'});
+      logAction({ type: 'TTS End', label: 'User finished talking.' });
     };
-    
     window.addEventListener('tts:start', onStart);
     window.addEventListener('tts:end', onEnd);
     return () => {
@@ -88,12 +77,11 @@ export default function HomeClient() {
     };
   }, []);
 
-  //STT lifecycle -> handle listening state (separate useEffect)
+  // STT lifecycle
   useEffect(() => {
     const onStartListening = () => {
       logAction({ type: 'begun listening', label: 'Listening for recipient speech...' });
     };
-
     const onEndListening = (event: Event) => {
       const finalTranscript = (event as CustomEvent).detail;
       logAction({ type: 'ended listening', label: 'Recipient has stopped speaking.' });
@@ -101,11 +89,10 @@ export default function HomeClient() {
         type: 'final transcript',
         label: `Recipient: ${finalTranscript}`,
         payload: { transcript: finalTranscript },
-        backgroundColor: '#32CD32'
-       });
+        backgroundColor: '#32CD32',
+      });
     };
 
-    
     window.addEventListener('stt:startListening', onStartListening);
     window.addEventListener('stt:finalTranscript', onEndListening);
     return () => {
@@ -114,35 +101,26 @@ export default function HomeClient() {
     };
   }, []);
 
-  // Called by VoiceControlBar while models are working
+  // Loading from VoiceControlBar
   const handleLoadingChange = (loading: boolean) => {
     setIsLoading(loading);
-    if (loading) {
-      logAction({ type: 'generating', label: 'Generating responses…' });
-    }
+    if (loading) logAction({ type: 'generating', label: 'Generating responses…' });
   };
 
-  // Called by VoiceControlBar when it has responses (from IBM/Granite/etc.)
+  // Responses from VoiceControlBar
   const handleResponsesReady = (responses: GenerateResponse) => {
     setAiResponses(responses.candidates);
-    console.log('AI responses ready:', responses.candidates);
     logAction({ type: 'responses_ready', label: 'Responses ready.' });
   };
 
-  // Clicking a VoiceGrid cell -> play that response (AI message)
+  // Click a grid cell -> speak with *current profile* voice & tone
   const handleBlockClick = async (index: number) => {
     if (isPlaying) return;
 
-    const speaker = speakers[index];
-    const text = (aiResponses?.[index].text ?? '').trim() || `Fallback message from ${speaker.name}`;
-
-    // mark selected visually
+    const text = (aiResponses?.[index]?.text ?? '').trim() || `Here's a response.`;
     setActiveIndex(index);
 
-
     logAction({ type: 'TTS Start', label: 'User is speaking…' });
-    
-    // Log this specific AI line as a clickable action (rewind target)
     logAction({
       type: 'ai_message',
       label: `User: ${text}`,
@@ -151,18 +129,15 @@ export default function HomeClient() {
       textColor: 'white',
     });
 
- 
-
     try {
-      await speakWithGoogleTTSClient(text, speaker.tone, speaker.voice, speaker.name);
+      await speakWithGoogleTTSClient(text, activeTone, activeVoice);
     } catch (err) {
       console.error('TTS error:', err);
       window.dispatchEvent(new Event('tts:end'));
     }
   };
 
-    // ==== DYNAMIC BLOCKS ====
-  // Show exactly 2–6 tiles based on responses.
+  // Build blocks from responses (2–6)
   const visibleCount = Math.min(Math.max(aiResponses.length, 2), 6);
   const blocks = Array.from({ length: visibleCount }, (_, i) => {
     const label = (aiResponses[i]?.text ?? '').trim();
@@ -172,17 +147,14 @@ export default function HomeClient() {
     };
   });
 
-
-
   return (
     <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'row' }}>
-      {/* LEFT: Control Panel with action log + time-travel (AI-only click) */}
-      <ControlPanel 
+      <ControlPanel
         actions={actions}
         collapsed={panelCollapsed}
-        onToggle={() => setPanelCollapsed(p => !p)} />
+        onToggle={() => setPanelCollapsed(p => !p)}
+      />
 
-      {/* CENTER: Voice control + grid */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <VoiceControlBar
           onResponses={handleResponsesReady}
@@ -213,8 +185,6 @@ export default function HomeClient() {
           />
         )}
       </div>
-
-      {/* <ConversationSidebar /> */}
     </div>
   );
 }

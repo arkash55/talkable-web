@@ -27,6 +27,8 @@ export function useVoiceControl(
   const [hasSoundLeeway, setHasSoundLeeway] = useState(false);
   const [isConversationActive, setIsConversationActive] = useState(false);
 
+  
+
   // Local conversation history kept as a MUTABLE ref (in-place sliding window)
   const historyRef = useRef<MessageHistoryItem[]>([]);
 
@@ -47,11 +49,11 @@ export function useVoiceControl(
 
   const { profile } = useUserProfile();
 
-  // MOVE system prompt memoization to top level (safe hook position)
-  const systemPrompt = React.useMemo(
+  const SYSTEM_PROMPT = React.useMemo(
     () => buildSystemPrompt(profile?.tone, profile?.description),
     [profile?.tone, profile?.description]
   );
+
 
   // Update refs
   useEffect(() => {
@@ -158,7 +160,7 @@ export function useVoiceControl(
     return () => window.removeEventListener('ui:voicegrid:click', onGridClick);
   }, []);
 
-  // Silence → finalize
+  // Silence → finalize (kept your existing behavior, now with sliding-window context)
   useEffect(() => {
     if (!isConversationActive || !listening || speaking) return;
 
@@ -180,11 +182,12 @@ export function useVoiceControl(
             }));
           }
 
-            setListening(false);
-            setHasSoundLeeway(false);
-            safeOnLoadingChange.current(true);
+          setListening(false);
+          setHasSoundLeeway(false);
+          safeOnLoadingChange.current(true);
 
           try {
+            // 1) Append the guest message in-place (sliding window)
             const guestMsg: MessageHistoryItem = {
               sender: 'guest',
               content: pendingTranscript.current,
@@ -192,15 +195,19 @@ export function useVoiceControl(
             };
             appendWithSlidingWindow(historyRef.current, guestMsg, HISTORY_LIMIT);
 
+            // 2) Build the (read-only) context from the bounded history
             const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
             console.log('Context for AI:', ctx);
 
-            // Use memoized prompt (no hook call here)
+
+
+            // 4) Call model with context
             const responses: GenerateResponse = await getCandidates(
               guestMsg.content,
-              { system: systemPrompt, context: ctx }
+              { system: SYSTEM_PROMPT, context: ctx }
             );
 
+            // 5) Deliver to UI
             stableOnResponses.current(responses);
           } catch (err) {
             console.error('Error getting responses:', err);
@@ -218,7 +225,7 @@ export function useVoiceControl(
         silenceTimer.current = null;
       }
     };
-  }, [transcript, listening, speaking, isConversationActive, systemPrompt]); // add systemPrompt dep
+  }, [transcript, listening, speaking, isConversationActive]);
 
   // Cleanup
   useEffect(() => {
