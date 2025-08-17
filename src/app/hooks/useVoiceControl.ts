@@ -9,6 +9,9 @@ import {
   buildContextWindow,
   type MessageHistoryItem,
 } from '@/app/utils/contextWindow';
+import React from 'react';
+import { buildSystemPrompt } from '../utils/systemPrompt';
+import { useUserProfile } from './useUserProfile';
 
 // Tune these as needed
 const HISTORY_LIMIT = { maxCount: 50, maxChars: 8000 };
@@ -23,6 +26,8 @@ export function useVoiceControl(
   const [speaking, setSpeaking] = useState(false);
   const [hasSoundLeeway, setHasSoundLeeway] = useState(false);
   const [isConversationActive, setIsConversationActive] = useState(false);
+
+  
 
   // Local conversation history kept as a MUTABLE ref (in-place sliding window)
   const historyRef = useRef<MessageHistoryItem[]>([]);
@@ -41,11 +46,29 @@ export function useVoiceControl(
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
 
+
+  const { profile } = useUserProfile();
+
+  const SYSTEM_PROMPT = React.useMemo(
+    () => buildSystemPrompt(profile?.tone, profile?.description),
+    [profile?.tone, profile?.description]
+  );
+
+
   // Update refs
   useEffect(() => {
     stableOnResponses.current = onResponses;
     safeOnLoadingChange.current = onLoadingChange ?? (() => {});
   }, [onResponses, onLoadingChange]);
+
+
+
+    const clearContext = React.useCallback(() => {
+    historyRef.current.length = 0; // <- wipe the context window
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('context:cleared'));
+    }
+  }, []);
 
   // Start conversation (+ dispatch event)
   const startConversation = () => {
@@ -84,6 +107,7 @@ export function useVoiceControl(
 
     processingTranscript.current = false;
     pendingTranscript.current = '';
+    clearContext();
     safeOnLoadingChange.current(false);
 
     if (typeof window !== 'undefined') {
@@ -184,18 +208,13 @@ export function useVoiceControl(
             // 2) Build the (read-only) context from the bounded history
             const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
             console.log('Context for AI:', ctx);
-            // 3) System style
-            const HUMAN_STYLE = `
-You speak like a real person in first person.
-Rules:
-- Be concise (10–16 words), natural, and context appropriate.
-- Do not claim a name or identity. Output only the final reply text.
-`.trim();
+
+
 
             // 4) Call model with context
             const responses: GenerateResponse = await getCandidates(
               guestMsg.content,
-              { system: HUMAN_STYLE, context: ctx }
+              { system: SYSTEM_PROMPT, context: ctx }
             );
 
             // 5) Deliver to UI
