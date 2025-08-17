@@ -216,7 +216,7 @@ export function useVoiceControl(
               guestMsg.content,
               { system: SYSTEM_PROMPT, context: ctx }
             );
-
+            console.log('AI responses:', responses);
             // 5) Deliver to UI
             stableOnResponses.current(responses);
           } catch (err) {
