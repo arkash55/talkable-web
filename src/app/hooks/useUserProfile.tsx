@@ -7,7 +7,7 @@ import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import type { UserProfile } from '@/services/firestoreService';
 import { db } from '../../../lib/fireBaseConfig';
 
-type SlimProfile = Pick<UserProfile, 'firstName' | 'lastName' | 'description' | 'tone' | 'voice'> & {
+export type SlimProfile = Pick<UserProfile, 'firstName' | 'lastName' | 'description' | 'tone' | 'voice'> & {
   _updatedAt?: number; // millis (for cache freshness)
 };
 
