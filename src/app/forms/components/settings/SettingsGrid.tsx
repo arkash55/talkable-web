@@ -71,9 +71,9 @@ export default function SettingsGrid({
   };
 
   return (
-    <Grid container spacing={spacing}>
+    <Grid container spacing={spacing} display="flex" justifyContent="center">
       {ITEMS.map((item) => (
-        <Grid item key={item.key} xs={cols.xs} sm={cols.sm} md={cols.md}>
+        <Grid rows={2} columns={3} item key={item.key} xs={cols.xs} sm={cols.sm} md={cols.md}>
           <SettingsTile
             title={item.title}
             subtitle={item.subtitle}

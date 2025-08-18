@@ -83,6 +83,9 @@ export const SETTINGS_TILE_SX = (theme: Theme, opts?: { selected?: boolean; dang
 
   return {
     ...START_NEW_BUTTON_SX(theme),
+    // borderRadius: 2,
+    width: 350,
+    height: 120,
     background: baseGradient,
     border: isSelected ? `2px solid ${theme.palette.common.white}` : '2px solid transparent',
     outline: 'none',
