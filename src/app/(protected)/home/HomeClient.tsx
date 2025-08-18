@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, CircularProgress, Typography, useTheme } from '@mui/material';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 import VoiceControlBar from '@/app/components/home/VoiceControlBar';
 import VoiceGrid from '@/app/components/home/VoiceGrid';
@@ -23,11 +24,14 @@ export default function HomeClient() {
   const { cid } = useLiveConversationSync();
   const theme = useTheme();
 
+  // URL query helpers
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   // 🔊 Pull voice & tone from the live user profile
   const { profile } = useUserProfile();
   const activeVoice = profile?.voice || 'en-GB-Neural2-A';
   const activeTone  = profile?.tone  || 'friendly';
-
 
   // Helper: push an action entry to the panel
   const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
@@ -146,6 +150,36 @@ export default function HomeClient() {
       onClick: () => handleBlockClick(i),
     };
   });
+
+  // -------- Query param integrations --------
+
+  // A) If we arrive with ?cid=..., tell the sync hook to use it
+  useEffect(() => {
+    const qcid = searchParams.get('cid');
+    if (!qcid) return;
+    // Announce to hook; it will set the active conversation id.
+    window.dispatchEvent(new CustomEvent('conversation:load', { detail: { cid: qcid } }));
+    // keep the param so refresh persists selection (no replace)
+  }, [searchParams]);
+
+  // B) If we arrive with ?starter=...&autostart=1, auto start a convo using that opener
+  useEffect(() => {
+    const starter = searchParams.get('starter');
+    const auto = searchParams.get('autostart');
+    if (!starter || auto !== '1') return;
+
+    // 1) mark conversation started in the panel
+    window.dispatchEvent(new CustomEvent('conversation:start'));
+
+    // 2) simulate final transcript to trigger your generation pipeline
+    window.dispatchEvent(new CustomEvent('stt:finalTranscript', { detail: starter }));
+
+    // optional: clean the url so refresh doesn't re-trigger
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    params.delete('starter'); params.delete('topic'); params.delete('autostart');
+    router.replace(`/home${params.size ? `?${params.toString()}` : ''}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once only
 
   return (
     <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'row' }}>

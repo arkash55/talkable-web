@@ -17,7 +17,7 @@ export default function LoginPage() {
 
     try {
       await loginUser(email, password);
-      router.push('/');
+      router.push('/home');
     } catch (err: any) {
       setError(err.message);
     } finally {

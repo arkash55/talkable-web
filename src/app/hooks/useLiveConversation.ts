@@ -7,9 +7,12 @@ import { auth } from '../../../lib/fireBaseConfig';
 
 /**
  * Listens to app-level events and syncs with Firestore:
- * - conversation:start  -> creates live conversation (owner = current user)
- * - stt:finalTranscript -> sends message as "guest"
- * - ui:voicegrid:click  -> sends message as the current user
+ * - conversation:start      -> ensures live conversation exists (respects preloaded cid)
+ * - conversation:load {cid} -> sets current conversation to an existing one
+ * - stt:finalTranscript     -> sends message as "guest"
+ * - ui:voicegrid:click      -> sends message as the current user
+ *
+ * Also self-inits from the URL (?cid=...) on mount and on popstate navigation.
  */
 export function useLiveConversationSync() {
   const [uid, setUid] = useState<string | null>(auth.currentUser?.uid ?? null);
@@ -22,7 +25,24 @@ export function useLiveConversationSync() {
     return () => unsub();
   }, []);
 
-  // Ensure live conversation
+  // On mount: read ?cid=... directly from location to avoid any race
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const initialCid = params.get('cid');
+    if (initialCid) setCid(initialCid);
+
+    // Re-read on browser nav (back/forward)
+    const onPop = () => {
+      const p = new URLSearchParams(window.location.search);
+      const c = p.get('cid');
+      setCid(c || null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Ensure live conversation (respects existing cid)
   const ensureConversation = async () => {
     if (!uid) {
       console.warn('Cannot start conversation: user not signed in.');
@@ -45,15 +65,22 @@ export function useLiveConversationSync() {
   };
 
   useEffect(() => {
-    // START -> make a fresh live conversation
+    // START -> ensure a live conversation exists; do NOT clear preloaded cid
     const onStart = async () => {
-      setCid(null);
       await ensureConversation();
     };
 
-    // END -> clear current conversation id
+    // END -> clear current conversation id (end the session)
     const onEnd = () => {
       setCid(null);
+    };
+
+    // LOAD -> pick a specific existing conversation id (from route or UI)
+    const onLoad = (e: Event) => {
+      const anyEvent = e as CustomEvent<{ cid?: string }>;
+      const newCid = anyEvent.detail?.cid?.trim();
+      if (!newCid) return;
+      setCid(newCid);
     };
 
     // Guest transcript sends message as "guest"
@@ -94,12 +121,14 @@ export function useLiveConversationSync() {
 
     window.addEventListener('conversation:start', onStart as EventListener);
     window.addEventListener('conversation:end', onEnd as EventListener);
+    window.addEventListener('conversation:load', onLoad as EventListener);
     window.addEventListener('stt:finalTranscript', onFinalTranscript as EventListener);
     window.addEventListener('ui:voicegrid:click', onVoiceGridClick as EventListener);
 
     return () => {
       window.removeEventListener('conversation:start', onStart as EventListener);
       window.removeEventListener('conversation:end', onEnd as EventListener);
+      window.removeEventListener('conversation:load', onLoad as EventListener);
       window.removeEventListener('stt:finalTranscript', onFinalTranscript as EventListener);
       window.removeEventListener('ui:voicegrid:click', onVoiceGridClick as EventListener);
     };
