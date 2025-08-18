@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, CircularProgress, Typography, useTheme } from '@mui/material';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -12,6 +12,7 @@ import { speakWithGoogleTTSClient } from '@/services/ttsClient';
 import { Candidate, GenerateResponse } from '@/services/graniteClient';
 import { useLiveConversationSync } from '@/app/hooks/useLiveConversation';
 import { useUserProfile } from '@/app/hooks/useUserProfile';
+import { useConversationHistory } from '@/app/hooks/useConversationHistory';
 
 export default function HomeClient() {
   const [aiResponses, setAiResponses] = useState<Candidate[]>([]);
@@ -49,6 +50,55 @@ export default function HomeClient() {
     });
   };
 
+  // Conversation history + model context
+  const prevCtxSigRef = useRef<string>('');
+  const { history, contextLines } = useConversationHistory(cid, {
+    // Log each new message
+    onNewMessages: (msgs) => {
+      for (const m of msgs) {
+        // Console log each message
+        console.log(`[history:new] [${m.sender}] ${m.content}`);
+
+        // Panel log each message with light styling
+        logAction({
+          type: 'history_message',
+          label: `${m.sender}: ${m.content}`,
+          backgroundColor: m.sender === 'guest' ? '#2e7d32' /* green-ish */ : theme.palette.primary.main,
+          textColor: 'white',
+        });
+      }
+    },
+    // Keep your aggregate info too
+    onLog: (e) => {
+      if (e.type === 'history_appended') {
+        console.log(`[history] ${e.payload.appended} new, total ${e.payload.total} (cid=${cid})`);
+        // logAction({
+        //   type: 'history_update',
+        //   label: `History updated (${e.payload.appended} new, total ${e.payload.total}).`,
+        // });
+      }
+      if (e.type === 'history_reset') {
+        // logAction({ type: 'history_reset', label: `Loaded conversation ${e.payload.cid}` });
+      }
+    },
+    window: { maxCount: 200, maxChars: 12000 },
+    context: { maxMessages: 16, maxChars: 2000 },
+  });
+
+  // Also log when the context window changes (length or last line)
+  useEffect(() => {
+    const sig = `${contextLines.length}|${contextLines[contextLines.length - 1] || ''}`;
+    if (sig !== prevCtxSigRef.current) {
+      prevCtxSigRef.current = sig;
+      console.log(`[context] lines=${contextLines.length}`, contextLines);
+      // logAction({
+      //   type: 'context_update',
+      //   label: `Context window updated (${contextLines.length} lines).`,
+      //   payload: { contextLines },
+      // });
+    }
+  }, [contextLines]);
+
   // Conversation lifecycle
   useEffect(() => {
     const onConvStart = () => {
@@ -81,7 +131,7 @@ export default function HomeClient() {
     };
   }, []);
 
-  // STT lifecycle
+  // STT lifecycle (panel log)
   useEffect(() => {
     const onStartListening = () => {
       logAction({ type: 'begun listening', label: 'Listening for recipient speech...' });
@@ -153,13 +203,11 @@ export default function HomeClient() {
 
   // -------- Query param integrations --------
 
-  // A) If we arrive with ?cid=..., tell the sync hook to use it
+  // A) If we arrive with ?cid=..., also emit conversation:load (belt & braces)
   useEffect(() => {
     const qcid = searchParams.get('cid');
     if (!qcid) return;
-    // Announce to hook; it will set the active conversation id.
     window.dispatchEvent(new CustomEvent('conversation:load', { detail: { cid: qcid } }));
-    // keep the param so refresh persists selection (no replace)
   }, [searchParams]);
 
   // B) If we arrive with ?starter=...&autostart=1, auto start a convo using that opener
@@ -168,13 +216,9 @@ export default function HomeClient() {
     const auto = searchParams.get('autostart');
     if (!starter || auto !== '1') return;
 
-    // 1) mark conversation started in the panel
     window.dispatchEvent(new CustomEvent('conversation:start'));
-
-    // 2) simulate final transcript to trigger your generation pipeline
     window.dispatchEvent(new CustomEvent('stt:finalTranscript', { detail: starter }));
 
-    // optional: clean the url so refresh doesn't re-trigger
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.delete('starter'); params.delete('topic'); params.delete('autostart');
     router.replace(`/home${params.size ? `?${params.toString()}` : ''}`);
@@ -193,6 +237,7 @@ export default function HomeClient() {
         <VoiceControlBar
           onResponses={handleResponsesReady}
           onLoadingChange={handleLoadingChange}
+          modelContext={contextLines} // <- passes past messages to Granite via your hook
         />
 
         {isLoading ? (

@@ -1,15 +1,17 @@
-import { getCandidates } from '@/services/graniteClient';
-import { Candidate, GenerateResponse } from '@/services/graniteService';
-import { getIBMResponses } from '@/services/ibmService';
-import { useState, useEffect, useRef } from 'react';
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import React from 'react';
+
+import { getCandidates, type GenerateResponse } from '@/services/graniteClient';
 
 import {
   appendWithSlidingWindow,
   buildContextWindow,
   type MessageHistoryItem,
 } from '@/app/utils/contextWindow';
-import React from 'react';
+
 import { buildSystemPrompt } from '../utils/systemPrompt';
 import { useUserProfile } from './useUserProfile';
 
@@ -17,9 +19,27 @@ import { useUserProfile } from './useUserProfile';
 const HISTORY_LIMIT = { maxCount: 50, maxChars: 8000 };
 const CTX_LIMIT     = { maxMessages: 12, maxChars: 1500 };
 
+// Helper: trim arbitrary context lines to CTX_LIMIT
+function limitContextLines(lines: string[], limit = CTX_LIMIT): string[] {
+  const maxMessages = limit.maxMessages ?? 12;
+  const maxChars = limit.maxChars ?? 1500;
+
+  let chars = 0;
+  const picked: string[] = [];
+  for (let i = lines.length - 1; i >= 0 && picked.length < maxMessages; i--) {
+    const line = lines[i] ?? '';
+    if (!line) continue;
+    if (chars + line.length > maxChars) break;
+    picked.push(line);
+    chars += line.length;
+  }
+  return picked.reverse();
+}
+
 export function useVoiceControl(
   onResponses: (responses: GenerateResponse) => void,
-  onLoadingChange?: (loading: boolean) => void
+  onLoadingChange?: (loading: boolean) => void,
+  externalContext?: string[],              // NEW: pass Firestore-built history (e.g., guest:/user: lines)
 ) {
   // State
   const [listening, setListening] = useState(false);
@@ -27,17 +47,15 @@ export function useVoiceControl(
   const [hasSoundLeeway, setHasSoundLeeway] = useState(false);
   const [isConversationActive, setIsConversationActive] = useState(false);
 
-  
-
   // Local conversation history kept as a MUTABLE ref (in-place sliding window)
   const historyRef = useRef<MessageHistoryItem[]>([]);
 
   // Refs
   const silenceTimer = useRef<NodeJS.Timeout | null>(null);
   const processingTranscript = useRef<boolean>(false);
-  const pendingTranscript = useRef<string>('');
   const stableOnResponses = useRef(onResponses);
   const safeOnLoadingChange = useRef(onLoadingChange ?? (() => {}));
+  const externalContextRef = useRef<string[]>(externalContext || []);
 
   // STT
   const {
@@ -46,25 +64,20 @@ export function useVoiceControl(
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
 
-
+  // Profile → system prompt
   const { profile } = useUserProfile();
-
   const SYSTEM_PROMPT = React.useMemo(
     () => buildSystemPrompt(profile),
     [profile?.tone, profile?.description]
   );
 
+  // keep refs fresh
+  useEffect(() => { stableOnResponses.current = onResponses; }, [onResponses]);
+  useEffect(() => { safeOnLoadingChange.current = onLoadingChange ?? (() => {}); }, [onLoadingChange]);
+  useEffect(() => { externalContextRef.current = externalContext || []; }, [externalContext]);
 
-  // Update refs
-  useEffect(() => {
-    stableOnResponses.current = onResponses;
-    safeOnLoadingChange.current = onLoadingChange ?? (() => {});
-  }, [onResponses, onLoadingChange]);
-
-
-
-    const clearContext = React.useCallback(() => {
-    historyRef.current.length = 0; // <- wipe the context window
+  const clearContext = useCallback(() => {
+    historyRef.current.length = 0; // wipe the local context window
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('context:cleared'));
     }
@@ -106,9 +119,8 @@ export function useVoiceControl(
     }
 
     processingTranscript.current = false;
-    pendingTranscript.current = '';
-    clearContext();
     safeOnLoadingChange.current(false);
+    clearContext();
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('conversation:end'));
@@ -170,7 +182,55 @@ export function useVoiceControl(
     return () => window.removeEventListener('ui:voicegrid:click', onGridClick);
   }, []);
 
-  // Silence → finalize (kept your existing behavior, now with sliding-window context)
+  // Single processing path for final utterances (from silence OR direct event)
+  const processUtterance = useCallback(async (finalText: string) => {
+    const text = (finalText || '').trim();
+    if (!text) return;
+    if (processingTranscript.current) return;
+
+    processingTranscript.current = true;
+    safeOnLoadingChange.current(true);
+
+    try {
+      // 1) Append the guest message in-place (sliding window)
+      const guestMsg: MessageHistoryItem = {
+        sender: 'guest',
+        content: text,
+        createdAt: new Date().toISOString(),
+      };
+      appendWithSlidingWindow(historyRef.current, guestMsg, HISTORY_LIMIT);
+
+      // 2) Build the (read-only) context from the bounded local history
+      const localCtx = buildContextWindow(historyRef.current, CTX_LIMIT);
+
+      // 3) Merge external Firestore context (older convo) + localCtx (this session)
+      const mergedCtx = limitContextLines(
+        [...(externalContextRef.current || []), ...localCtx],
+        CTX_LIMIT
+      );
+
+      console.log('Context for AI (merged):', mergedCtx);
+
+      // 4) Call model with context
+      const responses: GenerateResponse = await getCandidates(
+        text,
+        SYSTEM_PROMPT,
+        mergedCtx,
+        { k: 6 }
+      );
+
+      console.log('AI responses:', responses);
+      // 5) Deliver to UI
+      stableOnResponses.current(responses);
+    } catch (err) {
+      console.error('Error getting responses:', err);
+    } finally {
+      processingTranscript.current = false;
+      safeOnLoadingChange.current(false);
+    }
+  }, [SYSTEM_PROMPT]);
+
+  // Silence → finalize (kept your behavior, now calls unified processUtterance)
   useEffect(() => {
     if (!isConversationActive || !listening || speaking) return;
 
@@ -180,51 +240,17 @@ export function useVoiceControl(
 
     if (transcript.trim()) {
       silenceTimer.current = setTimeout(async () => {
-        if (!processingTranscript.current && transcript.trim()) {
-          processingTranscript.current = true;
-          pendingTranscript.current = transcript.trim();
-
-          SpeechRecognition.stopListening();
-
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('stt:finalTranscript', {
-              detail: pendingTranscript.current
-            }));
-          }
-
-          setListening(false);
-          setHasSoundLeeway(false);
-          safeOnLoadingChange.current(true);
-
-          try {
-            // 1) Append the guest message in-place (sliding window)
-            const guestMsg: MessageHistoryItem = {
-              sender: 'guest',
-              content: pendingTranscript.current,
-              createdAt: new Date().toISOString(),
-            };
-            appendWithSlidingWindow(historyRef.current, guestMsg, HISTORY_LIMIT);
-
-            // 2) Build the (read-only) context from the bounded history
-            const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
-            console.log('Context for AI:', ctx);
-
-
-
-            // 4) Call model with context
-            const responses: GenerateResponse = await getCandidates(
-              guestMsg.content, SYSTEM_PROMPT, ctx
-            );
-            console.log('AI responses:', responses);
-            // 5) Deliver to UI
-            stableOnResponses.current(responses);
-          } catch (err) {
-            console.error('Error getting responses:', err);
-          } finally {
-            processingTranscript.current = false;
-            safeOnLoadingChange.current(false);
-          }
+        // Stop listening while we process the current turn
+        SpeechRecognition.stopListening();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('stt:finalTranscript', { detail: transcript.trim() })
+          );
         }
+        setListening(false);
+        setHasSoundLeeway(false);
+
+        // The actual processing happens in the event listener below
       }, 2000);
     }
 
@@ -235,6 +261,16 @@ export function useVoiceControl(
       }
     };
   }, [transcript, listening, speaking, isConversationActive]);
+
+  // NEW: also react to externally fired 'stt:finalTranscript' (e.g., autostart from /general → /home)
+  useEffect(() => {
+    const onFinal = (e: Event) => {
+      const text = (e as CustomEvent<string>).detail || '';
+      processUtterance(text);
+    };
+    window.addEventListener('stt:finalTranscript', onFinal);
+    return () => window.removeEventListener('stt:finalTranscript', onFinal);
+  }, [processUtterance]);
 
   // Cleanup
   useEffect(() => {

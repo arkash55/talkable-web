@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Button, Typography, useTheme, Stack, IconButton } from '@mui/material';
+import { Box, Button, Typography, useTheme, Stack } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -11,9 +11,10 @@ import { GenerateResponse } from '@/services/graniteClient';
 interface VoiceControlBarProps {
   onResponses: (responses: GenerateResponse) => void;
   onLoadingChange?: (loading: boolean) => void;
+  modelContext?: string[]; // NEW: compact context lines
 }
 
-export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceControlBarProps) {
+export default function VoiceControlBar({ onResponses, onLoadingChange, modelContext }: VoiceControlBarProps) {
   const theme = useTheme();
 
   const {
@@ -24,7 +25,7 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
     isConversationActive,
     toggleConversation,
     browserSupportsSpeechRecognition,
-  } = useVoiceControl(onResponses, onLoadingChange);
+  } = useVoiceControl(onResponses, onLoadingChange, modelContext); // <- pass through
 
   if (!browserSupportsSpeechRecognition) {
     return (
@@ -37,13 +38,10 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
   }
 
   const handleToggle = () => {
-    // Proactively dispatch conversation start/end so the panel definitely logs it.
     if (typeof window !== 'undefined') {
       if (isConversationActive) {
-        // we are about to stop
         window.dispatchEvent(new CustomEvent('conversation:end'));
       } else {
-        // we are about to start
         window.dispatchEvent(new CustomEvent('conversation:start'));
       }
     }
@@ -78,23 +76,17 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
       )}
 
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-        {/* Rectangular listening control with pulse animation */}
         <Box
           sx={{
             position: 'relative',
             height: 56,
-            borderRadius: 1.5, // 12px
-            // Pulse glow behind the button when active
+            borderRadius: 1.5,
             ...(isConversationActive && hasSoundLeeway
               ? {
                   animation: 'pulseRect 2s infinite',
                   '@keyframes pulseRect': {
-                    '0%': {
-                      boxShadow: '0 0 0 0 rgba(211, 47, 47, 0.35)',
-                    },
-                    '100%': {
-                      boxShadow: '0 0 0 18px rgba(211, 47, 47, 0)',
-                    },
+                    '0%': { boxShadow: '0 0 0 0 rgba(211, 47, 47, 0.35)' },
+                    '100%': { boxShadow: '0 0 0 18px rgba(211, 47, 47, 0)' },
                   },
                 }
               : {}),
@@ -103,26 +95,20 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
           <Button
             variant={isConversationActive ? 'contained' : 'outlined'}
             color={isConversationActive ? 'error' : 'inherit'}
-            disabled={!browserSupportsSpeechRecognition}
             onClick={handleToggle}
             startIcon={isConversationActive ? <MicIcon /> : <MicOffIcon />}
             sx={{
               height: 56,
-              borderRadius: 1.5, // keep same radius as wrapper
+              borderRadius: 1.5,
               px: 2.5,
               fontWeight: 700,
               textTransform: 'none',
-              bgcolor: theme =>
-                isConversationActive ? theme.palette.error.main : undefined,
-              borderColor: theme =>
-                isConversationActive ? theme.palette.error.main : theme.palette.divider,
-              color: theme =>
-                isConversationActive ? theme.palette.error.contrastText : theme.palette.text.primary,
+              bgcolor: t => (isConversationActive ? t.palette.error.main : undefined),
+              borderColor: t => (isConversationActive ? t.palette.error.main : t.palette.divider),
+              color: t => (isConversationActive ? t.palette.error.contrastText : t.palette.text.primary),
               '&:hover': {
-                bgcolor: theme =>
-                  isConversationActive ? theme.palette.error.dark : undefined,
-                borderColor: theme =>
-                  isConversationActive ? theme.palette.error.dark : theme.palette.text.secondary,
+                bgcolor: t => (isConversationActive ? t.palette.error.dark : undefined),
+                borderColor: t => (isConversationActive ? t.palette.error.dark : t.palette.text.secondary),
               },
             }}
           >
@@ -134,15 +120,9 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
           variant="outlined"
           startIcon={<RefreshIcon />}
           onClick={() => {
+            // You can decide to trigger a re-gen using the last transcript if desired.
             if (transcript) {
-              // onResponses([
-              //   'Could you repeat that?',
-              //   "I didn’t catch that",
-              //   'Let me think about that',
-              //   "That’s interesting",
-              //   'Tell me more',
-              //   "Let’s change the subject",
-              // ]);
+              window.dispatchEvent(new CustomEvent('stt:finalTranscript', { detail: transcript }));
             }
           }}
           disabled={!transcript}
