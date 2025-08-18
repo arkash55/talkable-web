@@ -40,11 +40,11 @@ export type SuggestionOptions = {
 
 export async function getCandidates(
   prompt: string,
+  system: string,
+  context: string[],
   opts: SuggestionOptions = {}
 ): Promise<GenerateResponse> {
   const {
-    system = "You are Talkable. Reply in one short, natural sentence.",
-    context = [],
     k = 6,
     params = { temperature: 0.5, top_p: 0.9, top_k: 50, max_new_tokens: 50 },
     route = "/api/granite/generate",
@@ -77,16 +77,5 @@ export async function getCandidates(
   return data;
 }
 
-export async function getSuggestions(
-  prompt: string,
-  opts: SuggestionOptions = {}
-): Promise<string[]> {
-  const { padTo = 6 } = opts;
-  const data = await getCandidates(prompt, opts);
-  const texts = data.candidates.map((c) => (c.text || "").trim());
-  while (texts.length < padTo) texts.push("");
-  return texts.slice(0, padTo);
-}
 
-// Temporary alias (remove once you’ve migrated)
-export { getSuggestions as getIBMResponses };
+

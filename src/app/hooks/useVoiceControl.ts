@@ -50,7 +50,7 @@ export function useVoiceControl(
   const { profile } = useUserProfile();
 
   const SYSTEM_PROMPT = React.useMemo(
-    () => buildSystemPrompt(profile?.tone, profile?.description),
+    () => buildSystemPrompt(profile),
     [profile?.tone, profile?.description]
   );
 
@@ -213,10 +213,9 @@ export function useVoiceControl(
 
             // 4) Call model with context
             const responses: GenerateResponse = await getCandidates(
-              guestMsg.content,
-              { system: SYSTEM_PROMPT, context: ctx }
+              guestMsg.content, SYSTEM_PROMPT, ctx
             );
-
+            console.log('AI responses:', responses);
             // 5) Deliver to UI
             stableOnResponses.current(responses);
           } catch (err) {
