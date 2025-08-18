@@ -34,6 +34,9 @@ export default function HomeClient() {
   const activeVoice = profile?.voice || 'en-GB-Neural2-A';
   const activeTone  = profile?.tone  || 'friendly';
 
+  // Flag to handle resume semantics across events
+  const resumingExistingRef = useRef<boolean>(false);
+
   // Helper: push an action entry to the panel
   const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
     setActions(prev => {
@@ -53,58 +56,92 @@ export default function HomeClient() {
   // Conversation history + model context
   const prevCtxSigRef = useRef<string>('');
   const { history, contextLines } = useConversationHistory(cid, {
-    // Log each new message
     onNewMessages: (msgs) => {
       for (const m of msgs) {
-        // Console log each message
         console.log(`[history:new] [${m.sender}] ${m.content}`);
-
-        // Panel log each message with light styling
         logAction({
           type: 'history_message',
           label: `${m.sender}: ${m.content}`,
-          backgroundColor: m.sender === 'guest' ? '#2e7d32' /* green-ish */ : theme.palette.primary.main,
+          backgroundColor: m.sender === 'guest' ? '#2e7d32' : theme.palette.primary.main,
           textColor: 'white',
         });
       }
     },
-    // Keep your aggregate info too
     onLog: (e) => {
       if (e.type === 'history_appended') {
         console.log(`[history] ${e.payload.appended} new, total ${e.payload.total} (cid=${cid})`);
-        // logAction({
-        //   type: 'history_update',
-        //   label: `History updated (${e.payload.appended} new, total ${e.payload.total}).`,
-        // });
+        logAction({
+          type: 'history_update',
+          label: `History updated (${e.payload.appended} new, total ${e.payload.total}).`,
+        });
       }
       if (e.type === 'history_reset') {
-        // logAction({ type: 'history_reset', label: `Loaded conversation ${e.payload.cid}` });
+        // we just loaded an existing conversation → mark resume
+        resumingExistingRef.current = true;
+        logAction({ type: 'history_reset', label: `Loaded conversation ${e.payload.cid}` });
       }
     },
     window: { maxCount: 200, maxChars: 12000 },
     context: { maxMessages: 16, maxChars: 2000 },
   });
 
-  // Also log when the context window changes (length or last line)
+  // Also log when the context window changes (optional, handy for debugging)
   useEffect(() => {
     const sig = `${contextLines.length}|${contextLines[contextLines.length - 1] || ''}`;
     if (sig !== prevCtxSigRef.current) {
       prevCtxSigRef.current = sig;
       console.log(`[context] lines=${contextLines.length}`, contextLines);
-      // logAction({
-      //   type: 'context_update',
-      //   label: `Context window updated (${contextLines.length} lines).`,
-      //   payload: { contextLines },
-      // });
+      logAction({
+        type: 'context_update',
+        label: `Context window updated (${contextLines.length} lines).`,
+        payload: { contextLines },
+      });
     }
   }, [contextLines]);
+
+  // ---- Utilities ----
+  const stripCidFromUrlIfPresent = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('cid')) {
+        params.delete('cid');
+        const next = `/home${params.size ? `?${params.toString()}` : ''}`;
+        router.replace(next);
+      }
+    } catch {}
+  };
+
+  const computeIsResuming = (): boolean => {
+    // Read *current* URL and current cid atomically at click time
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const hasCidParam = params.has('cid');
+      const hasActiveCid = !!cid;
+      return hasCidParam || hasActiveCid || resumingExistingRef.current;
+    } catch {
+      return !!cid || resumingExistingRef.current;
+    }
+  };
 
   // Conversation lifecycle
   useEffect(() => {
     const onConvStart = () => {
-      setActions([]);
+      const isResuming = computeIsResuming();
+
+      if (isResuming) {
+        // Keep logs when resuming existing convo
+        logAction({ type: 'conv_resume', label: 'Resuming existing conversation.' });
+        // One-shot: clear the resume flag so a *future* fresh start clears as usual
+        resumingExistingRef.current = false;
+      } else {
+        // Fresh conversation → clear panel & strip any stale ?cid from URL
+        setActions([]);
+        stripCidFromUrlIfPresent();
+      }
+
       logAction({ type: 'conv_start', label: 'Conversation started.' });
     };
+
     const onConvEnd = () => logAction({ type: 'conv_end', label: 'Conversation ended.' });
 
     window.addEventListener('conversation:start', onConvStart);
@@ -113,6 +150,14 @@ export default function HomeClient() {
       window.removeEventListener('conversation:start', onConvStart);
       window.removeEventListener('conversation:end', onConvEnd);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cid]); // depend on cid so computeIsResuming sees latest value
+
+  // Also mark resume if someone fires conversation:load directly
+  useEffect(() => {
+    const markResume = () => { resumingExistingRef.current = true; };
+    window.addEventListener('conversation:load', markResume as EventListener);
+    return () => window.removeEventListener('conversation:load', markResume as EventListener);
   }, []);
 
   // TTS lifecycle -> disable/enable grid + action log
@@ -203,10 +248,11 @@ export default function HomeClient() {
 
   // -------- Query param integrations --------
 
-  // A) If we arrive with ?cid=..., also emit conversation:load (belt & braces)
+  // A) If we arrive with ?cid=..., also emit conversation:load and mark as resuming
   useEffect(() => {
     const qcid = searchParams.get('cid');
     if (!qcid) return;
+    resumingExistingRef.current = true;
     window.dispatchEvent(new CustomEvent('conversation:load', { detail: { cid: qcid } }));
   }, [searchParams]);
 
@@ -237,7 +283,7 @@ export default function HomeClient() {
         <VoiceControlBar
           onResponses={handleResponsesReady}
           onLoadingChange={handleLoadingChange}
-          modelContext={contextLines} // <- passes past messages to Granite via your hook
+          modelContext={contextLines}
         />
 
         {isLoading ? (
