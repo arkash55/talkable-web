@@ -3,6 +3,8 @@
 import { Box, Button, Typography, useTheme, Stack } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VoiceWaveform from './VoiceWaveform';
 import { useVoiceControl } from '@/app/hooks/useVoiceControl';
@@ -11,10 +13,11 @@ import { GenerateResponse } from '@/services/graniteClient';
 interface VoiceControlBarProps {
   onResponses: (responses: GenerateResponse) => void;
   onLoadingChange?: (loading: boolean) => void;
-  modelContext?: string[]; // NEW: compact context lines
+  modelContext?: string[];
+  canResume?: boolean; // NEW: HomeClient tells us if a resume target exists (URL ?cid or last-created)
 }
 
-export default function VoiceControlBar({ onResponses, onLoadingChange, modelContext }: VoiceControlBarProps) {
+export default function VoiceControlBar({ onResponses, onLoadingChange, modelContext, canResume = false }: VoiceControlBarProps) {
   const theme = useTheme();
 
   const {
@@ -23,9 +26,11 @@ export default function VoiceControlBar({ onResponses, onLoadingChange, modelCon
     speaking,
     hasSoundLeeway,
     isConversationActive,
-    toggleConversation,
+    startNewConversation,
+    resumeConversation,
+    stopConversation,
     browserSupportsSpeechRecognition,
-  } = useVoiceControl(onResponses, onLoadingChange, modelContext); // <- pass through
+  } = useVoiceControl(onResponses, onLoadingChange);
 
   if (!browserSupportsSpeechRecognition) {
     return (
@@ -36,17 +41,6 @@ export default function VoiceControlBar({ onResponses, onLoadingChange, modelCon
       </Box>
     );
   }
-
-  const handleToggle = () => {
-    if (typeof window !== 'undefined') {
-      if (isConversationActive) {
-        window.dispatchEvent(new CustomEvent('conversation:end'));
-      } else {
-        window.dispatchEvent(new CustomEvent('conversation:start'));
-      }
-    }
-    toggleConversation();
-  };
 
   return (
     <Box
@@ -76,51 +70,59 @@ export default function VoiceControlBar({ onResponses, onLoadingChange, modelCon
       )}
 
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-        <Box
-          sx={{
-            position: 'relative',
-            height: 56,
-            borderRadius: 1.5,
-            ...(isConversationActive && hasSoundLeeway
-              ? {
-                  animation: 'pulseRect 2s infinite',
-                  '@keyframes pulseRect': {
-                    '0%': { boxShadow: '0 0 0 0 rgba(211, 47, 47, 0.35)' },
-                    '100%': { boxShadow: '0 0 0 18px rgba(211, 47, 47, 0)' },
-                  },
+        {/* Control buttons */}
+        {!isConversationActive ? (
+          <Stack direction="row" spacing={2}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<PlayArrowIcon />}
+              disabled={!canResume}
+              onClick={() => {
+                // explicit RESUME
+                resumeConversation();
+                // also broadcast a generic start for panels that listen to conversation:start (optional)
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('conversation:start'));
                 }
-              : {}),
-          }}
-        >
+              }}
+            >
+              Resume Conversation
+            </Button>
+
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<MicIcon />}
+              onClick={() => {
+                // explicit NEW
+                startNewConversation();
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('conversation:start'));
+                }
+              }}
+              sx={{ fontWeight: 700 }}
+            >
+              Start New
+            </Button>
+          </Stack>
+        ) : (
           <Button
-            variant={isConversationActive ? 'contained' : 'outlined'}
-            color={isConversationActive ? 'error' : 'inherit'}
-            onClick={handleToggle}
-            startIcon={isConversationActive ? <MicIcon /> : <MicOffIcon />}
-            sx={{
-              height: 56,
-              borderRadius: 1.5,
-              px: 2.5,
-              fontWeight: 700,
-              textTransform: 'none',
-              bgcolor: t => (isConversationActive ? t.palette.error.main : undefined),
-              borderColor: t => (isConversationActive ? t.palette.error.main : t.palette.divider),
-              color: t => (isConversationActive ? t.palette.error.contrastText : t.palette.text.primary),
-              '&:hover': {
-                bgcolor: t => (isConversationActive ? t.palette.error.dark : undefined),
-                borderColor: t => (isConversationActive ? t.palette.error.dark : t.palette.text.secondary),
-              },
+            variant="contained"
+            color="error"
+            startIcon={<MicOffIcon />}
+            onClick={() => {
+              stopConversation();
             }}
           >
-            {isConversationActive ? 'STOP CONVERSATION' : 'START CONVERSATION'}
+            Stop Conversation
           </Button>
-        </Box>
+        )}
 
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
           onClick={() => {
-            // You can decide to trigger a re-gen using the last transcript if desired.
             if (transcript) {
               window.dispatchEvent(new CustomEvent('stt:finalTranscript', { detail: transcript }));
             }

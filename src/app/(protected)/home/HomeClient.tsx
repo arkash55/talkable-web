@@ -25,27 +25,24 @@ export default function HomeClient() {
   const { cid } = useLiveConversationSync();
   const theme = useTheme();
 
-  // URL query helpers
+  // URL helpers
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // 🔊 Pull voice & tone from the live user profile
+  // Profile
   const { profile } = useUserProfile();
   const activeVoice = profile?.voice || 'en-GB-Neural2-A';
   const activeTone  = profile?.tone  || 'friendly';
 
-  // Flag to handle resume semantics across events
-  const resumingExistingRef = useRef<boolean>(false);
+  // Track mode of the current session
+  const sessionWasResumedRef = useRef<boolean>(false);
+  const lastCreatedCidRef = useRef<string | null>(null); // to enable resume-in-page without URL
 
-  // Helper: push an action entry to the panel
+  // Helper: push action to panel
   const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
     setActions(prev => {
       const last = prev[prev.length - 1];
-      if (
-        last &&
-        (entry.type === 'conv_start' || entry.type === 'conv_end') &&
-        last.type === entry.type
-      ) {
+      if (last && (entry.type === 'conv_start' || entry.type === 'conv_end') && last.type === entry.type) {
         return prev;
       }
       const id = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -53,7 +50,7 @@ export default function HomeClient() {
     });
   };
 
-  // Conversation history + model context
+  // Conversation history + context
   const prevCtxSigRef = useRef<string>('');
   const { history, contextLines } = useConversationHistory(cid, {
     onNewMessages: (msgs) => {
@@ -76,8 +73,8 @@ export default function HomeClient() {
         });
       }
       if (e.type === 'history_reset') {
-        // we just loaded an existing conversation → mark resume
-        resumingExistingRef.current = true;
+        // We loaded an existing conversation -> Resume path
+        sessionWasResumedRef.current = true;
         logAction({ type: 'history_reset', label: `Loaded conversation ${e.payload.cid}` });
       }
     },
@@ -85,7 +82,7 @@ export default function HomeClient() {
     context: { maxMessages: 16, maxChars: 2000 },
   });
 
-  // Also log when the context window changes (optional, handy for debugging)
+  // Log context changes
   useEffect(() => {
     const sig = `${contextLines.length}|${contextLines[contextLines.length - 1] || ''}`;
     if (sig !== prevCtxSigRef.current) {
@@ -99,7 +96,7 @@ export default function HomeClient() {
     }
   }, [contextLines]);
 
-  // ---- Utilities ----
+  // Util: strip ?cid from URL
   const stripCidFromUrlIfPresent = () => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -111,38 +108,49 @@ export default function HomeClient() {
     } catch {}
   };
 
-  const computeIsResuming = (): boolean => {
-    // Read *current* URL and current cid atomically at click time
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const hasCidParam = params.has('cid');
-      const hasActiveCid = !!cid;
-      return hasCidParam || hasActiveCid || resumingExistingRef.current;
-    } catch {
-      return !!cid || resumingExistingRef.current;
-    }
-  };
+  // Listen: someone created a new live conversation -> remember it for resume-in-page
+  useEffect(() => {
+    const onCreated = (e: Event) => {
+      const any = e as CustomEvent<string>;
+      const id = (any.detail || '').trim();
+      if (id) lastCreatedCidRef.current = id;
+    };
+    window.addEventListener('conversation:created', onCreated);
+    return () => window.removeEventListener('conversation:created', onCreated);
+  }, []);
 
-  // Conversation lifecycle
+  // Listen: resume/new intent so we know how to manage logs/URL
+  useEffect(() => {
+    const onResume = () => {
+      sessionWasResumedRef.current = true;
+    };
+    const onStartNew = () => {
+      sessionWasResumedRef.current = false;
+      // Starting NEW right now: clear panel & strip stale cid before anything else
+      setActions([]);
+      stripCidFromUrlIfPresent();
+    };
+    window.addEventListener('conversation:resume', onResume as EventListener);
+    window.addEventListener('conversation:startNew', onStartNew as EventListener);
+    return () => {
+      window.removeEventListener('conversation:resume', onResume as EventListener);
+      window.removeEventListener('conversation:startNew', onStartNew as EventListener);
+    };
+  }, []);
+
+  // Conversation lifecycle panel entries + Stop cleanup
   useEffect(() => {
     const onConvStart = () => {
-      const isResuming = computeIsResuming();
-
-      if (isResuming) {
-        // Keep logs when resuming existing convo
-        logAction({ type: 'conv_resume', label: 'Resuming existing conversation.' });
-        // One-shot: clear the resume flag so a *future* fresh start clears as usual
-        resumingExistingRef.current = false;
-      } else {
-        // Fresh conversation → clear panel & strip any stale ?cid from URL
-        setActions([]);
+      logAction({ type: 'conv_start', label: sessionWasResumedRef.current ? 'Resumed conversation.' : 'New conversation started.' });
+    };
+    const onConvEnd = () => {
+      logAction({ type: 'conv_end', label: 'Conversation ended.' });
+      // If this session was a resume, clear the URL to avoid sticky cid on next start
+      if (sessionWasResumedRef.current) {
         stripCidFromUrlIfPresent();
       }
-
-      logAction({ type: 'conv_start', label: 'Conversation started.' });
+      // Do not reset the flag here; if they resume again without leaving, the next resume should still be treated as resume.
     };
-
-    const onConvEnd = () => logAction({ type: 'conv_end', label: 'Conversation ended.' });
 
     window.addEventListener('conversation:start', onConvStart);
     window.addEventListener('conversation:end', onConvEnd);
@@ -150,17 +158,9 @@ export default function HomeClient() {
       window.removeEventListener('conversation:start', onConvStart);
       window.removeEventListener('conversation:end', onConvEnd);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cid]); // depend on cid so computeIsResuming sees latest value
-
-  // Also mark resume if someone fires conversation:load directly
-  useEffect(() => {
-    const markResume = () => { resumingExistingRef.current = true; };
-    window.addEventListener('conversation:load', markResume as EventListener);
-    return () => window.removeEventListener('conversation:load', markResume as EventListener);
   }, []);
 
-  // TTS lifecycle -> disable/enable grid + action log
+  // TTS lifecycle
   useEffect(() => {
     const onStart = () => setIsPlaying(true);
     const onEnd = () => {
@@ -246,17 +246,17 @@ export default function HomeClient() {
     };
   });
 
-  // -------- Query param integrations --------
+  // -------- Arrival integrations --------
 
-  // A) If we arrive with ?cid=..., also emit conversation:load and mark as resuming
+  // If we arrive with ?cid=..., mark as a resume target and load it
   useEffect(() => {
     const qcid = searchParams.get('cid');
     if (!qcid) return;
-    resumingExistingRef.current = true;
+    sessionWasResumedRef.current = true; // future start is a RESUME
     window.dispatchEvent(new CustomEvent('conversation:load', { detail: { cid: qcid } }));
   }, [searchParams]);
 
-  // B) If we arrive with ?starter=...&autostart=1, auto start a convo using that opener
+  // If we arrive with ?starter=...&autostart=1, auto start using that opener
   useEffect(() => {
     const starter = searchParams.get('starter');
     const auto = searchParams.get('autostart');
@@ -269,7 +269,12 @@ export default function HomeClient() {
     params.delete('starter'); params.delete('topic'); params.delete('autostart');
     router.replace(`/home${params.size ? `?${params.toString()}` : ''}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once only
+  }, []); // once
+
+  // Can we resume? yes if URL has ?cid OR we created a convo in this page session
+  const canResume =
+    !!searchParams.get('cid') ||
+    !!lastCreatedCidRef.current;
 
   return (
     <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'row' }}>
@@ -284,6 +289,7 @@ export default function HomeClient() {
           onResponses={handleResponsesReady}
           onLoadingChange={handleLoadingChange}
           modelContext={contextLines}
+          canResume={canResume}
         />
 
         {isLoading ? (

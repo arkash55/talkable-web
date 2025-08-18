@@ -1,17 +1,16 @@
 'use client';
 
+import { getCandidates } from '@/services/graniteClient';
+import { GenerateResponse } from '@/services/graniteService'; // keep if you use it elsewhere
 import { useState, useEffect, useRef, useCallback } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-import React from 'react';
-
-import { getCandidates, type GenerateResponse } from '@/services/graniteClient';
 
 import {
   appendWithSlidingWindow,
   buildContextWindow,
   type MessageHistoryItem,
 } from '@/app/utils/contextWindow';
-
+import React from 'react';
 import { buildSystemPrompt } from '../utils/systemPrompt';
 import { useUserProfile } from './useUserProfile';
 
@@ -19,27 +18,9 @@ import { useUserProfile } from './useUserProfile';
 const HISTORY_LIMIT = { maxCount: 50, maxChars: 8000 };
 const CTX_LIMIT     = { maxMessages: 12, maxChars: 1500 };
 
-// Helper: trim arbitrary context lines to CTX_LIMIT
-function limitContextLines(lines: string[], limit = CTX_LIMIT): string[] {
-  const maxMessages = limit.maxMessages ?? 12;
-  const maxChars = limit.maxChars ?? 1500;
-
-  let chars = 0;
-  const picked: string[] = [];
-  for (let i = lines.length - 1; i >= 0 && picked.length < maxMessages; i--) {
-    const line = lines[i] ?? '';
-    if (!line) continue;
-    if (chars + line.length > maxChars) break;
-    picked.push(line);
-    chars += line.length;
-  }
-  return picked.reverse();
-}
-
 export function useVoiceControl(
   onResponses: (responses: GenerateResponse) => void,
-  onLoadingChange?: (loading: boolean) => void,
-  externalContext?: string[],              // NEW: pass Firestore-built history (e.g., guest:/user: lines)
+  onLoadingChange?: (loading: boolean) => void
 ) {
   // State
   const [listening, setListening] = useState(false);
@@ -53,9 +34,9 @@ export function useVoiceControl(
   // Refs
   const silenceTimer = useRef<NodeJS.Timeout | null>(null);
   const processingTranscript = useRef<boolean>(false);
+  const pendingTranscript = useRef<string>('');
   const stableOnResponses = useRef(onResponses);
   const safeOnLoadingChange = useRef(onLoadingChange ?? (() => {}));
-  const externalContextRef = useRef<string[]>(externalContext || []);
 
   // STT
   const {
@@ -64,27 +45,27 @@ export function useVoiceControl(
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
 
-  // Profile → system prompt
   const { profile } = useUserProfile();
   const SYSTEM_PROMPT = React.useMemo(
     () => buildSystemPrompt(profile),
     [profile?.tone, profile?.description]
   );
 
-  // keep refs fresh
-  useEffect(() => { stableOnResponses.current = onResponses; }, [onResponses]);
-  useEffect(() => { safeOnLoadingChange.current = onLoadingChange ?? (() => {}); }, [onLoadingChange]);
-  useEffect(() => { externalContextRef.current = externalContext || []; }, [externalContext]);
+  // Update refs
+  useEffect(() => {
+    stableOnResponses.current = onResponses;
+    safeOnLoadingChange.current = onLoadingChange ?? (() => {});
+  }, [onResponses, onLoadingChange]);
 
-  const clearContext = useCallback(() => {
-    historyRef.current.length = 0; // wipe the local context window
+  const clearContext = React.useCallback(() => {
+    historyRef.current.length = 0; // wipe the context window
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('context:cleared'));
     }
   }, []);
 
-  // Start conversation (+ dispatch event)
-  const startConversation = () => {
+  // ---- NEW explicit starters ----
+  const startNewConversation = () => {
     if (!browserSupportsSpeechRecognition) return;
     if (isConversationActive) return;
 
@@ -96,15 +77,45 @@ export function useVoiceControl(
     setHasSoundLeeway(true);
 
     if (typeof window !== 'undefined') {
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('conversation:start'));
-        console.log('Starting STT listening');
-        window.dispatchEvent(new CustomEvent('stt:startListening'));
-      }, 100);
+      // announce NEW (not resume)
+      window.dispatchEvent(new CustomEvent('conversation:startNew'));
+      window.dispatchEvent(new CustomEvent('stt:startListening'));
     }
   };
 
-  // Stop conversation (+ dispatch event)
+  const resumeConversation = () => {
+    if (!browserSupportsSpeechRecognition) return;
+    if (isConversationActive) return;
+
+    setIsConversationActive(true);
+    SpeechRecognition.startListening({ continuous: true });
+
+    setListening(true);
+    resetTranscript();
+    setHasSoundLeeway(true);
+
+    if (typeof window !== 'undefined') {
+      // announce RESUME (keep cid)
+      window.dispatchEvent(new CustomEvent('conversation:resume'));
+      window.dispatchEvent(new CustomEvent('stt:startListening'));
+    }
+  };
+
+  // Backwards-compatible generic start (kept for callers that still use it)
+  const startConversation = () => {
+    // Default to RESUME if URL has cid, else NEW.
+    const hasRouteCid =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).has('cid');
+
+    if (hasRouteCid) {
+      resumeConversation();
+    } else {
+      startNewConversation();
+    }
+  };
+
+  // Stop conversation
   const stopConversation = () => {
     if (!isConversationActive) return;
 
@@ -119,21 +130,21 @@ export function useVoiceControl(
     }
 
     processingTranscript.current = false;
-    safeOnLoadingChange.current(false);
+    pendingTranscript.current = '';
     clearContext();
+    safeOnLoadingChange.current(false);
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('conversation:end'));
     }
   };
 
-  // Toggle conversation
+  // Toggle (kept)
   const toggleConversation = () => {
     if (isConversationActive) stopConversation();
     else startConversation();
   };
 
-  // Resume listening after TTS
   const resumeListening = () => {
     if (isConversationActive && !listening) {
       SpeechRecognition.startListening({ continuous: true });
@@ -146,7 +157,7 @@ export function useVoiceControl(
     }
   };
 
-  // Listen for TTS events
+  // TTS events
   useEffect(() => {
     const handleTtsStart = () => setSpeaking(true);
     const handleTtsEnd = () => {
@@ -165,7 +176,7 @@ export function useVoiceControl(
     };
   }, [isConversationActive, listening]);
 
-  // (Optional) If you want to capture selected AI replies as 'user' messages:
+  // Capture selected AI replies as 'user' messages
   useEffect(() => {
     const onGridClick = (e: Event) => {
       const detail = (e as CustomEvent).detail as { label?: string };
@@ -182,55 +193,7 @@ export function useVoiceControl(
     return () => window.removeEventListener('ui:voicegrid:click', onGridClick);
   }, []);
 
-  // Single processing path for final utterances (from silence OR direct event)
-  const processUtterance = useCallback(async (finalText: string) => {
-    const text = (finalText || '').trim();
-    if (!text) return;
-    if (processingTranscript.current) return;
-
-    processingTranscript.current = true;
-    safeOnLoadingChange.current(true);
-
-    try {
-      // 1) Append the guest message in-place (sliding window)
-      const guestMsg: MessageHistoryItem = {
-        sender: 'guest',
-        content: text,
-        createdAt: new Date().toISOString(),
-      };
-      appendWithSlidingWindow(historyRef.current, guestMsg, HISTORY_LIMIT);
-
-      // 2) Build the (read-only) context from the bounded local history
-      const localCtx = buildContextWindow(historyRef.current, CTX_LIMIT);
-
-      // 3) Merge external Firestore context (older convo) + localCtx (this session)
-      const mergedCtx = limitContextLines(
-        [...(externalContextRef.current || []), ...localCtx],
-        CTX_LIMIT
-      );
-
-      console.log('Context for AI (merged):', mergedCtx);
-
-      // 4) Call model with context
-      const responses: GenerateResponse = await getCandidates(
-        text,
-        SYSTEM_PROMPT,
-        mergedCtx,
-        { k: 6 }
-      );
-
-      console.log('AI responses:', responses);
-      // 5) Deliver to UI
-      stableOnResponses.current(responses);
-    } catch (err) {
-      console.error('Error getting responses:', err);
-    } finally {
-      processingTranscript.current = false;
-      safeOnLoadingChange.current(false);
-    }
-  }, [SYSTEM_PROMPT]);
-
-  // Silence → finalize (kept your behavior, now calls unified processUtterance)
+  // Finalize on silence
   useEffect(() => {
     if (!isConversationActive || !listening || speaking) return;
 
@@ -240,17 +203,48 @@ export function useVoiceControl(
 
     if (transcript.trim()) {
       silenceTimer.current = setTimeout(async () => {
-        // Stop listening while we process the current turn
-        SpeechRecognition.stopListening();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(
-            new CustomEvent('stt:finalTranscript', { detail: transcript.trim() })
-          );
-        }
-        setListening(false);
-        setHasSoundLeeway(false);
+        if (!processingTranscript.current && transcript.trim()) {
+          processingTranscript.current = true;
+          pendingTranscript.current = transcript.trim();
 
-        // The actual processing happens in the event listener below
+          SpeechRecognition.stopListening();
+
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('stt:finalTranscript', {
+              detail: pendingTranscript.current
+            }));
+          }
+
+          setListening(false);
+          setHasSoundLeeway(false);
+          safeOnLoadingChange.current(true);
+
+          try {
+            // 1) Append guest message in sliding window
+            const guestMsg: MessageHistoryItem = {
+              sender: 'guest',
+              content: pendingTranscript.current,
+              createdAt: new Date().toISOString(),
+            };
+            appendWithSlidingWindow(historyRef.current, guestMsg, HISTORY_LIMIT);
+
+            // 2) Build context
+            const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
+            console.log('Context for AI:', ctx);
+
+            // 3) Call model
+            const responses: GenerateResponse = await getCandidates(
+              guestMsg.content, SYSTEM_PROMPT, ctx
+            );
+            console.log('AI responses:', responses);
+            stableOnResponses.current(responses);
+          } catch (err) {
+            console.error('Error getting responses:', err);
+          } finally {
+            processingTranscript.current = false;
+            safeOnLoadingChange.current(false);
+          }
+        }
       }, 2000);
     }
 
@@ -261,16 +255,6 @@ export function useVoiceControl(
       }
     };
   }, [transcript, listening, speaking, isConversationActive]);
-
-  // NEW: also react to externally fired 'stt:finalTranscript' (e.g., autostart from /general → /home)
-  useEffect(() => {
-    const onFinal = (e: Event) => {
-      const text = (e as CustomEvent<string>).detail || '';
-      processUtterance(text);
-    };
-    window.addEventListener('stt:finalTranscript', onFinal);
-    return () => window.removeEventListener('stt:finalTranscript', onFinal);
-  }, [processUtterance]);
 
   // Cleanup
   useEffect(() => {
@@ -288,11 +272,12 @@ export function useVoiceControl(
     hasSoundLeeway,
     isConversationActive,
     toggleConversation,
-    startConversation,
+    startConversation,     // backward-compatible
     stopConversation,
+    startNewConversation,  // NEW
+    resumeConversation,    // NEW
     browserSupportsSpeechRecognition,
 
-    // If you need to inspect the live window for debugging:
     messageHistory: historyRef.current,
   };
 }
