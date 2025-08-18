@@ -29,11 +29,11 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { onInbox, type InboxItem } from '@/services/firestoreService';
 
 type TrendingTopic = {
-  id: string;            // slug/id
-  title: string;         // e.g., "Football"
-  description: string;   // short blurb
-  starter: string;       // suggested opener
-  tag?: string;          // optional category label (sports/news/politics/etc)
+  id: string;
+  title: string;
+  description: string;
+  starter: string;
+  tag?: string;
 };
 
 // ---- helpers ----
@@ -154,12 +154,16 @@ export default function GeneralClient() {
         height: '100%',
         width: '100%',
         display: 'grid',
-        gridTemplateColumns: '1fr 420px',
+        // 60% / 40% split on >= md; stack on small screens
+        gridTemplateColumns: {
+          xs: '1fr',
+          md: 'minmax(0, 3fr) minmax(0, 2fr)',
+        },
         gap: 2,
         p: 2,
       }}
     >
-      {/* Left: Trending Topics */}
+      {/* Left: Trending Topics (≈60%) */}
       <Box sx={{ overflow: 'auto' }}>
         <Box
           sx={{
@@ -181,7 +185,7 @@ export default function GeneralClient() {
 
         <Grid container spacing={2}>
           {trending.map((t) => (
-            <Grid key={t.id} item xs={12} sm={6} md={4}>
+            <Grid key={t.id} item xs={12} sm={6} md={6} lg={4}>
               <Card
                 variant="outlined"
                 sx={{
@@ -227,11 +231,12 @@ export default function GeneralClient() {
         </Grid>
       </Box>
 
-      {/* Right: Conversation History (Live) */}
+      {/* Right: Past live conversations (≈40%) */}
       <Box
         sx={{
           borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
-          pl: 2,
+          pl: { xs: 0, md: 2 },
+          pt: { xs: 2, md: 0 },
           overflow: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -243,12 +248,7 @@ export default function GeneralClient() {
           <Typography variant="h6" fontWeight={700}>
             Past live conversations
           </Typography>
-          <Chip
-            size="small"
-            label={history.length}
-            sx={{ ml: 'auto' }}
-            variant="outlined"
-          />
+          <Chip size="small" label={history.length} sx={{ ml: 'auto' }} variant="outlined" />
         </Stack>
 
         {history.length === 0 ? (
@@ -286,10 +286,17 @@ export default function GeneralClient() {
                   key={item.id}
                   variant="outlined"
                   sx={{
-                    p: 1.25,
+                    // ↑ Bigger row height
+                    minHeight: 96,            // (was ~auto) — bump to ~96px row
+                    p: 1.75,                  // more padding
                     borderRadius: 2,
-                    transition: 'transform 120ms ease, box-shadow 120ms ease, background 120ms ease',
-                    '&:hover': { transform: 'translateY(-1px)', boxShadow: 3, backgroundColor: 'action.hover' },
+                    transition:
+                      'transform 120ms ease, box-shadow 120ms ease, background 120ms ease',
+                    '&:hover': {
+                      transform: 'translateY(-1px)',
+                      boxShadow: 3,
+                      backgroundColor: 'action.hover',
+                    },
                   }}
                 >
                   <CardActionArea
@@ -297,26 +304,31 @@ export default function GeneralClient() {
                       const q = new URLSearchParams({ cid: item.id }).toString();
                       router.push(`/home?${q}`);
                     }}
-                    sx={{ borderRadius: 2, p: 0.5 }}
+                    sx={{ borderRadius: 2, p: 0.5, height: '100%' }}
                   >
-                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: 0.5, py: 0.5 }}>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1.75}
+                      sx={{ px: 0.5, py: 0.5, minHeight: 72 }}
+                    >
                       {/* Unread dot */}
-                      <Box sx={{ width: 12, display: 'flex', justifyContent: 'center' }}>
+                      <Box sx={{ width: 14, display: 'flex', justifyContent: 'center' }}>
                         {unread ? (
-                          <FiberManualRecordIcon color="primary" sx={{ fontSize: 10 }} />
+                          <FiberManualRecordIcon color="primary" sx={{ fontSize: 11 }} />
                         ) : null}
                       </Box>
 
                       {/* Live chip */}
                       <Chip size="small" label="Live" variant="outlined" />
 
-                      {/* When */}
+                      {/* When + preview */}
                       <Stack sx={{ minWidth: 0, flex: 1 }}>
                         <Stack direction="row" alignItems="center" spacing={0.75}>
-                          <ScheduleIcon fontSize="inherit" />
+                          <ScheduleIcon fontSize="small" />
                           <Tooltip title={primaryTime}>
                             <Typography
-                              variant="body2"
+                              variant="subtitle1"   // ↑ bigger than body2
                               sx={{ fontWeight: 700 }}
                               noWrap
                             >
@@ -325,12 +337,11 @@ export default function GeneralClient() {
                           </Tooltip>
                         </Stack>
 
-                        {/* Preview line */}
                         <Typography
-                          variant="body2"
+                          variant="body1"          // ↑ bigger than body2
                           color="text.secondary"
                           noWrap
-                          sx={{ mt: 0.25 }}
+                          sx={{ mt: 0.5 }}
                         >
                           {lastSender ? `${lastSender}: ` : ''}
                           {secondary}
