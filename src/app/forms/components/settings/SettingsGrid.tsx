@@ -33,7 +33,7 @@ type Item = {
 
 const ITEMS: Item[] = [
   { key: 'account',      title: 'Account',        subtitle: 'Profile & security',            icon: <User size={22} />,         href: '/settings/profile' },
-  { key: 'audio',        title: 'Voice & Tone', subtitle: 'TTS settings',            icon: <Volume2 size={22} />,      href: '/settings/audio' },
+  { key: 'audio',        title: 'Voice & Tone', subtitle: 'TTS settings',            icon: <Volume2 size={22} />,      href: '/settings/tone-voice' },
   { key: 'privacy',      title: 'Privacy',        subtitle: 'Permissions & telemetry',       icon: <ShieldCheck size={22} />,  href: '/settings/privacy' },
   { key: 'about',        title: 'About',          subtitle: 'Version & credits',             icon: <Info size={22} />,         href: '/settings/about' },
   { key: 'delete',       title: 'Delete Account', subtitle: 'Permanently remove your data',  icon: <Trash2 size={22} />,      href: '/settings/delete', danger: true,

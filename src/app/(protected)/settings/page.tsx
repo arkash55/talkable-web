@@ -10,12 +10,7 @@ export default function SettingsClient() {
   const theme = useTheme();
   const router = useRouter();
 
-  // Keys that have a dedicated page under (settings-tabs)
-  const ROUTE_KEYS: SettingsKey[] = ['about-me','tone-voice','privacy','terms','delete','profile'];
 
- 
-
-  const contentLeftOffset = `calc(16px + 48px + ${theme.spacing(1.75)})`;
 
   return (
     <Box sx={{ display: 'flex',flexDirection: 'column', alignItems: 'center',justifyContent: 'center',    
