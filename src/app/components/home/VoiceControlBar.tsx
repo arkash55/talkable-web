@@ -27,7 +27,7 @@ const CONTROL_BUTTON_SX = {
 };
 
 // Extra styling just for the “Start New” button
-const START_NEW_BUTTON_SX = (theme: any) => ({
+export const START_NEW_BUTTON_SX = (theme: any) => ({
   ...CONTROL_BUTTON_SX,
   position: 'relative',
   background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 60%)`,
