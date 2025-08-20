@@ -148,7 +148,7 @@ export default function GeneralClient({ initialTopics }: Props) {
       }}
     >
       {/* Left: Trending Topics (2 columns × 3 rows) */}
-      <Box sx={{ overflow: 'auto', background: 'red' }}>
+      <Box sx={{ overflow: 'auto', display: 'flex', flexDirection: 'column',  }}>
         <Box
           sx={{
             display: 'flex',
