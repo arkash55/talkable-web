@@ -1,15 +1,16 @@
+// src/app/components/home/VoiceControlBar.tsx
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Box, Button, Typography, useTheme, Stack } from '@mui/material';
-import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+
 import VoiceWaveform from './VoiceWaveform';
 import { useVoiceControl } from '@/app/hooks/useVoiceControl';
 import { GenerateResponse } from '@/services/graniteClient';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { START_NEW_BUTTON_SX, STOP_BUTTON_SX } from '@/app/styles/buttonStyles';
 
 // Shared size/style so all control buttons match
@@ -27,18 +28,23 @@ const CONTROL_BUTTON_SX = {
   justifyContent: 'center',
 };
 
-
-
-
+type AutoStartPayload = { mode: 'new' | 'resume'; seed?: string } | null;
 
 interface VoiceControlBarProps {
   onResponses: (responses: GenerateResponse) => void;
   onLoadingChange?: (loading: boolean) => void;
   modelContext?: string[];
   canResume?: boolean;
+  autoStart?: AutoStartPayload;           // <-- NEW
 }
 
-export default function VoiceControlBar({ onResponses, onLoadingChange, modelContext, canResume = false }: VoiceControlBarProps) {
+export default function VoiceControlBar({
+  onResponses,
+  onLoadingChange,
+  modelContext,
+  canResume = false,
+  autoStart = null,                        // <-- NEW
+}: VoiceControlBarProps) {
   const theme = useTheme();
 
   const {
@@ -52,6 +58,41 @@ export default function VoiceControlBar({ onResponses, onLoadingChange, modelCon
     stopConversation,
     browserSupportsSpeechRecognition,
   } = useVoiceControl(onResponses, onLoadingChange);
+
+  // consume autoStart prop exactly once (no new event listeners)
+  const consumedRef = useRef(false);
+  useEffect(() => {
+    if (!autoStart || consumedRef.current || !browserSupportsSpeechRecognition) return;
+
+    // 1) Flip UI into active mode & start STT
+    if (!isConversationActive) {
+      if (autoStart.mode === 'resume') {
+        resumeConversation();
+      } else {
+        startNewConversation();
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('conversation:start'));
+      }
+    }
+
+    // 2) Send the opener AS USER through existing pipeline (saves to Firestore + context)
+    if (autoStart.seed) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ui:voicegrid:click', { detail: { index: -1, label: autoStart.seed } })
+        );
+      }
+    }
+
+    consumedRef.current = true;
+  }, [
+    autoStart,
+    isConversationActive,
+    startNewConversation,
+    resumeConversation,
+    browserSupportsSpeechRecognition,
+  ]);
 
   if (!browserSupportsSpeechRecognition) {
     return (
@@ -116,7 +157,6 @@ export default function VoiceControlBar({ onResponses, onLoadingChange, modelCon
               onClick={() => {
                 // explicit RESUME
                 resumeConversation();
-                // also broadcast a generic start for panels that listen to conversation:start (optional)
                 if (typeof window !== 'undefined') {
                   window.dispatchEvent(new CustomEvent('conversation:start'));
                 }

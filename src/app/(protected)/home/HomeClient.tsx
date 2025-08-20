@@ -1,3 +1,4 @@
+// src/app/components/home/HomeClient.tsx
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -14,6 +15,8 @@ import { useLiveConversationSync } from '@/app/hooks/useLiveConversation';
 import { useUserProfile } from '@/app/hooks/useUserProfile';
 import { useConversationHistory } from '@/app/hooks/useConversationHistory';
 
+type AutoStartPayload = { mode: 'new' | 'resume'; seed?: string } | null;
+
 export default function HomeClient() {
   const [aiResponses, setAiResponses] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -21,6 +24,7 @@ export default function HomeClient() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [panelCollapsed, setPanelCollapsed] = useState<boolean>(false);
   const [actions, setActions] = useState<ActionLogEntry[]>([]);
+  const [autoStart, setAutoStart] = useState<AutoStartPayload>(null);
 
   const { cid } = useLiveConversationSync();
   const theme = useTheme();
@@ -149,7 +153,6 @@ export default function HomeClient() {
       if (sessionWasResumedRef.current) {
         stripCidFromUrlIfPresent();
       }
-      // Do not reset the flag here; if they resume again without leaving, the next resume should still be treated as resume.
     };
 
     window.addEventListener('conversation:start', onConvStart);
@@ -256,14 +259,20 @@ export default function HomeClient() {
     window.dispatchEvent(new CustomEvent('conversation:load', { detail: { cid: qcid } }));
   }, [searchParams]);
 
-  // If we arrive with ?starter=...&autostart=1, auto start using that opener
+  // If we arrive with ?starter=...&autostart=1, auto start:
+  // - set autoStart for VoiceControlBar (starts STT + sends first message AS USER)
+  // - TTS the starter immediately
+  // - clean URL
   useEffect(() => {
     const starter = searchParams.get('starter');
     const auto = searchParams.get('autostart');
     if (!starter || auto !== '1') return;
 
-    window.dispatchEvent(new CustomEvent('conversation:start'));
-    window.dispatchEvent(new CustomEvent('stt:finalTranscript', { detail: starter }));
+    setAutoStart({ mode: 'new', seed: starter });
+
+    speakWithGoogleTTSClient(starter, activeTone, activeVoice).catch(() => {
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('tts:end'));
+    });
 
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.delete('starter'); params.delete('topic'); params.delete('autostart');
@@ -290,6 +299,7 @@ export default function HomeClient() {
           onLoadingChange={handleLoadingChange}
           modelContext={contextLines}
           canResume={canResume}
+          autoStart={autoStart}     // <-- NEW
         />
 
         {isLoading ? (
