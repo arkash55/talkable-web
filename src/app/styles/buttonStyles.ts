@@ -77,43 +77,13 @@ export const START_NEW_BUTTON_SX = (theme: any) => ({
 
 // New: styling for “Stop Conversation” (same look, red theme)
 export const STOP_BUTTON_SX = (theme: any) => ({
-  ...CONTROL_BUTTON_SX,
-  position: 'relative',
-  borderRadius: 2,
+  ...START_NEW_BUTTON_SX(theme),
   background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 65%)`,
-  color: theme.palette.error.contrastText,
-  boxShadow: theme.shadows[4],
-  overflow: 'hidden',
-  transition: 'box-shadow 200ms ease, transform 180ms ease',
-  '&:hover': {
-    boxShadow: theme.shadows[8],
-    transform: 'translateY(-2px)',
-  },
-  '&:active': {
-    transform: 'translateY(0)',
-    boxShadow: theme.shadows[4],
-  },
-  '&::after': {
-    content: '""',
-    position: 'absolute',
-    top: 0,
-    left: '-40%',
-    width: '40%',
-    height: '100%',
-    background:
-      'linear-gradient(115deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 45%, rgba(255,255,255,0) 90%)',
-    transform: 'skewX(-18deg)',
-    opacity: 0,
-  },
-  '&:hover::after': {
-    animation: 'stopSheen 900ms ease forwards',
-  },
-  '@keyframes stopSheen': {
-    '0%': { left: '-40%', opacity: 0 },
-    '20%': { opacity: 1 },
-    '60%': { opacity: 0.6 },
-    '100%': { left: '140%', opacity: 0 },
-  },
+});
+
+export const REFRESH_BUTTON_SX = (theme: any) => ({
+  ...START_NEW_BUTTON_SX(theme),
+  background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.dark} 65%)`,
 });
 
 // Variant for ALL settings tiles – same look, small tweaks for states/selection

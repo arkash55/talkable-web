@@ -11,6 +11,7 @@ import {
   Paper,
   Stack,
   IconButton,
+  Button,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
@@ -22,6 +23,7 @@ import { useRouter } from 'next/navigation';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { onInbox, type InboxItem } from '@/services/firestoreService';
 import { TrendingTile, TrendingTopic } from '@/app/components/general/TrendingTile';
+import { REFRESH_BUTTON_SX } from '@/app/styles/buttonStyles';
 
 
 type Props = { initialTopics: TrendingTopic[] };
@@ -146,7 +148,7 @@ export default function GeneralClient({ initialTopics }: Props) {
       }}
     >
       {/* Left: Trending Topics (2 columns × 3 rows) */}
-      <Box sx={{ overflow: 'auto' }}>
+      <Box sx={{ overflow: 'auto', background: 'red' }}>
         <Box
           sx={{
             display: 'flex',
@@ -162,17 +164,21 @@ export default function GeneralClient({ initialTopics }: Props) {
             {loadingTrending ? (
               <Typography variant="body2" color="text.secondary">Refreshing…</Typography>
             ) : null}
-            <Tooltip title="Refresh topics">
-              <span>
-                <IconButton
-                  size="small"
-                  onClick={refreshTrending}
-                  disabled={loadingTrending}
-                >
-                  <RefreshIcon fontSize="small" />
-                </IconButton>
-              </span>
-            </Tooltip>
+
+            <Button
+              variant="contained"
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                // startNewConversation();
+                // if (typeof window !== 'undefined') {
+                //   window.dispatchEvent(new CustomEvent('conversation:start'));
+                // }
+              }}
+              sx={REFRESH_BUTTON_SX}
+            >
+              Refresh Topics
+            </Button>
+            
           </Stack>
         </Box>
 
