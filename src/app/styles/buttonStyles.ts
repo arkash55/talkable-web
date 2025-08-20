@@ -33,13 +33,15 @@ export const CONTROL_BUTTON_SX: SxProps<Theme> = {
   px: 2,
 };
 
-export const START_NEW_BUTTON_SX = (theme: Theme) => ({
+// Extra styling just for the “Start New” button
+export const START_NEW_BUTTON_SX = (theme: any) => ({
   ...CONTROL_BUTTON_SX,
   position: 'relative',
   background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 60%)`,
   color: theme.palette.primary.contrastText,
   boxShadow: theme.shadows[4],
   overflow: 'hidden',
+  borderRadius: 2,
   transition: 'box-shadow 200ms ease, transform 180ms ease',
   '&:hover': {
     boxShadow: theme.shadows[8],
@@ -65,6 +67,48 @@ export const START_NEW_BUTTON_SX = (theme: Theme) => ({
     animation: 'startSheen 900ms ease forwards',
   },
   '@keyframes startSheen': {
+    '0%': { left: '-40%', opacity: 0 },
+    '20%': { opacity: 1 },
+    '60%': { opacity: 0.6 },
+    '100%': { left: '140%', opacity: 0 },
+  },
+});
+
+
+// New: styling for “Stop Conversation” (same look, red theme)
+export const STOP_BUTTON_SX = (theme: any) => ({
+  ...CONTROL_BUTTON_SX,
+  position: 'relative',
+  borderRadius: 2,
+  background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 65%)`,
+  color: theme.palette.error.contrastText,
+  boxShadow: theme.shadows[4],
+  overflow: 'hidden',
+  transition: 'box-shadow 200ms ease, transform 180ms ease',
+  '&:hover': {
+    boxShadow: theme.shadows[8],
+    transform: 'translateY(-2px)',
+  },
+  '&:active': {
+    transform: 'translateY(0)',
+    boxShadow: theme.shadows[4],
+  },
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: '-40%',
+    width: '40%',
+    height: '100%',
+    background:
+      'linear-gradient(115deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 45%, rgba(255,255,255,0) 90%)',
+    transform: 'skewX(-18deg)',
+    opacity: 0,
+  },
+  '&:hover::after': {
+    animation: 'stopSheen 900ms ease forwards',
+  },
+  '@keyframes stopSheen': {
     '0%': { left: '-40%', opacity: 0 },
     '20%': { opacity: 1 },
     '60%': { opacity: 0.6 },
