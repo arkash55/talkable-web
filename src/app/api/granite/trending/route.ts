@@ -7,15 +7,15 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const force = searchParams.get('force') === '1';
+  const key = searchParams.get('key') || undefined;
 
   try {
-    const topics = await getTrendingTopics({ force });
+    const topics = await getTrendingTopics({ force, key });
     return NextResponse.json(
       { topics },
       {
         status: 200,
         headers: {
-          // keep browser from caching; service has its own short TTL
           'Cache-Control': 'no-store',
         },
       }

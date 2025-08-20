@@ -120,6 +120,7 @@ export default function GeneralClient({ initialTopics }: Props) {
     try {
       const res = await fetch('/api/granite/trending?force=1&min=6&limit=6', { cache: 'no-store' });
       const data = await res.json();
+      console.log('Trending refresh result:', data);
       if (Array.isArray(data?.topics)) {
         setTrending((data.topics as TrendingTopic[]).slice(0, 6));
       }

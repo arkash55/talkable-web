@@ -13,8 +13,9 @@ export type TrendingTopic = {
 
 const DEBUG = process.env.DEBUG_TRENDING === '1';
 
-// Keep output compact to avoid truncation; we’ll also raise the token budget.
+// Keep output compact to avoid truncation; model budget is generous but tight JSON helps.
 const NUM_TOPICS = 6;
+const CURR_YEAR = new Date().getFullYear();
 
 const SYSTEM = `You produce a short JSON list of high-signal conversation topics from the CURRENT YEAR for small talk.
 - Include sports, news, politics, and general trends.
@@ -29,15 +30,17 @@ function promptBody() {
 ${SYSTEM}
 
 [USER]
-Generate exactly ${NUM_TOPICS} diverse, CURRENT YEAR conversation topics that won't stale within a few weeks.
+Generate exactly ${NUM_TOPICS} diverse, ${CURR_YEAR}-${CURR_YEAR + 1} conversation topics that won't stale within a few weeks.
 Output strictly valid JSON matching the schema.
 Do not include any explanations or markdown.`;
 }
 
 const ALLOWED_TAGS = new Set(['sports', 'news', 'politics', 'trend']);
-const CACHE_TTL_MS = 3 * 60 * 1000;
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
 
-let cache: { ts: number; data: TrendingTopic[]; key: string } | null = null;
+// Short-lived “fresh” cache (last success within TTL) and a durable last-good cache.
+let freshCache: { ts: number; data: TrendingTopic[]; key: string } | null = null;
+let lastGood:   { ts: number; data: TrendingTopic[]; key: string } | null = null;
 
 const toSlug = (s: string) =>
   (s || '')
@@ -70,7 +73,6 @@ function sanitize(raw: any): TrendingTopic[] {
 
 /* ---------- tolerant parsing helpers ---------- */
 
-/** Remove common wrappers/noise. */
 function preclean(s: string): string {
   return s
     .replace(/^\uFEFF/, '')      // BOM
@@ -80,19 +82,17 @@ function preclean(s: string): string {
     .trim();
 }
 
-/** JSON.parse with a simple trailing-comma repair. */
 function parseObjectLenient(objText: string): any {
   try { return JSON.parse(objText); } catch {}
   const relaxed = objText.replace(/,\s*([}\]])/g, '$1');
   return JSON.parse(relaxed);
 }
 
-/** Extracts a balanced JSON object starting at index `i` (where s[i] === '{'). */
 function extractBalancedObject(s: string, i: number): { text: string; end: number } | null {
   let depth = 0;
   let inStr = false;
   let esc = false;
-  let start = i;
+  const start = i;
 
   for (let p = i; p < s.length; p++) {
     const ch = s[p];
@@ -108,29 +108,22 @@ function extractBalancedObject(s: string, i: number): { text: string; end: numbe
     if (ch === '{') depth++;
     else if (ch === '}') {
       depth--;
-      if (depth === 0) {
-        return { text: s.slice(start, p + 1), end: p + 1 };
-      }
+      if (depth === 0) return { text: s.slice(start, p + 1), end: p + 1 };
     }
   }
-  return null; // truncated
+  return null; // truncated mid-object
 }
 
-/**
- * Extract topics array leniently even if the JSON is truncated:
- * - Prefer object-with-"topics":[...] form; if found, parse complete objects inside the array.
- * - Otherwise, try top-level array.
- */
 function extractTopicsLenient(raw: string): any[] {
   const src = preclean(String(raw));
 
-  // 1) Try strict parse first
+  // Strict parse first
   try {
     const j = JSON.parse(src);
     if (Array.isArray(j?.topics)) return j.topics;
-  } catch { /* fallthrough */ }
+  } catch { /* ignore */ }
 
-  // 2) Find the "topics": [ ... ] array and incrementally parse objects
+  // Find the "topics": [ ... ] array
   const m = /"topics"\s*:/.exec(src);
   let idx = -1;
   if (m) {
@@ -139,53 +132,77 @@ function extractTopicsLenient(raw: string): any[] {
     if (openArr !== -1) idx = openArr;
   }
 
-  // 3) Or fallback to top-level array
-  if (idx === -1) {
-    idx = src.indexOf('[');
-  }
-
+  // Or fallback to the first array
+  if (idx === -1) idx = src.indexOf('[');
   if (idx === -1) throw new Error('No JSON array found.');
 
-  const arrText = src.slice(idx); // from '[' onward; may be truncated
+  const arrText = src.slice(idx);
   const items: any[] = [];
-  let p = 1; // position after '[' in arrText
+  let p = 1; // position after '['
 
   while (p < arrText.length) {
-    // skip whitespace and commas
     while (p < arrText.length && /[\s,]/.test(arrText[p])) p++;
-
     if (p >= arrText.length) break;
-    const ch = arrText[p];
 
-    if (ch === ']') break; // array closed properly
+    const ch = arrText[p];
+    if (ch === ']') break;
 
     if (ch === '{') {
       const obj = extractBalancedObject(arrText, p);
-      if (!obj) {
-        // truncated mid-object; stop here, we keep what we parsed so far
-        break;
-      }
+      if (!obj) break; // truncated
       try {
-        const parsed = parseObjectLenient(obj.text);
-        items.push(parsed);
+        items.push(parseObjectLenient(obj.text));
       } catch (e) {
         if (DEBUG) console.error('[trending] Failed to parse object:', (e as Error).message, obj.text.slice(0, 200));
-        // skip this object and continue
       }
       p = obj.end;
       continue;
     }
 
-    // If we see something unexpected, advance one char to avoid infinite loop
-    p++;
+    p++; // skip unexpected char defensively
   }
 
   return items;
 }
 
-/* ---------- fetch + build ---------- */
+/* ---------- helpers: shuffle + pad ---------- */
 
-async function fetchFromGranite(): Promise<TrendingTopic[]> {
+function shuffleInPlace<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+const CURATED_FILLERS: TrendingTopic[] = [
+  { id: 'football-weekend', title: 'Football',      description: 'Fixtures and standout players.', starter: 'Who will stand out this weekend?', tag: 'sports'   },
+  { id: 'uk-politics',      title: 'UK Politics',    description: 'Parliament headlines and debates.', starter: 'What’s your take on the latest debate?', tag: 'politics' },
+  { id: 'breaking-news',    title: 'News',           description: 'Top stories and why they matter.', starter: 'Have you followed today’s top story?', tag: 'news'    },
+  { id: 'tech-trends',      title: 'Tech',           description: 'AI, gadgets, and software updates.', starter: 'What new tech has caught your eye?', tag: 'trend'   },
+  { id: 'film-tv',          title: 'Film & TV',      description: 'Series finales and new releases.', starter: 'Seen anything good lately?',          tag: 'trend'   },
+  { id: 'weather-chat',     title: 'Weather',        description: 'Heatwaves, storms, and travel plans.', starter: 'How’s the weather your side?',    tag: 'news'    },
+  { id: 'fitness-wellbeing',title: 'Wellbeing',      description: 'Sleep, running, and staying active.', starter: 'What helps you unwind?',          tag: 'trend'   },
+  { id: 'gaming-releases',  title: 'Gaming',         description: 'Fresh releases and updates.',        starter: 'Tried any new games?',             tag: 'trend'   },
+];
+
+function padAndLimit(base: TrendingTopic[], n: number): TrendingTopic[] {
+  const used = new Set(base.map(t => t.id));
+  const fillers = CURATED_FILLERS.filter(t => !used.has(t.id));
+  const merged = [...base, ...fillers].slice(0, n);
+  return merged;
+}
+
+/* ---------- fetch + retries ---------- */
+
+type GenParamOverrides = Partial<{
+  temperature: number;
+  top_p: number;
+  top_k: number;
+  max_new_tokens: number;
+}>;
+
+async function fetchFromGranite(overrides?: GenParamOverrides): Promise<TrendingTopic[]> {
   assertIBMEnv();
   const token = await getIamToken();
 
@@ -195,10 +212,10 @@ async function fetchFromGranite(): Promise<TrendingTopic[]> {
     input: promptBody(),
     parameters: {
       decoding_method: 'sample',
-      temperature: 0.35,   // a bit lower to reduce rambling
-      top_p: 0.9,
-      top_k: 50,
-      max_new_tokens: 520, // more headroom to avoid truncation
+      temperature: overrides?.temperature ?? 0.35,
+      top_p:       overrides?.top_p       ?? 0.9,
+      top_k:       overrides?.top_k       ?? 50,
+      max_new_tokens: overrides?.max_new_tokens ?? 520,
       stop_sequences: ['```', '\nAssistant:', '\nUser:'],
     },
     return_options: { token_logprobs: false, token_ranks: false, top_n_tokens: 0 },
@@ -220,39 +237,55 @@ async function fetchFromGranite(): Promise<TrendingTopic[]> {
   const raw = data?.results?.[0]?.generated_text ?? '';
   if (DEBUG) console.log('[trending] raw (first 400):', String(raw).slice(0, 400));
 
-  // Parse leniently (handles trailing garbage OR truncation)
   const topicItems = extractTopicsLenient(String(raw));
+  let topics = sanitize({ topics: topicItems });
 
-  const topics = sanitize({ topics: topicItems });
-  if (!topics.length) {
-    if (DEBUG) console.error('[trending] sanitize produced 0 topics. Parsed items count =', topicItems.length);
-    throw new Error('Empty topics after sanitize.');
-  }
+  // If the model returned fewer than requested, keep what we have and pad later.
+  topics = shuffleInPlace(topics);
   return topics;
 }
 
-/** Public: getTrendingTopics (short in-memory cache). Use `force: true` to bypass cache. */
+async function fetchWithRetry(): Promise<TrendingTopic[]> {
+  try {
+    return await fetchFromGranite(); // attempt 1
+  } catch (e) {
+    if (DEBUG) console.error('[trending] attempt 1 failed:', (e as Error).message);
+  }
+  // attempt 2: slightly different sampling / bigger budget
+  return await fetchFromGranite({ temperature: 0.3, top_p: 0.92, max_new_tokens: 560 });
+}
+
+/** Public: getTrendingTopics. Returns 6 items, uses fresh cache if present, never caches fallback. */
 export async function getTrendingTopics(opts?: { force?: boolean; key?: string }): Promise<TrendingTopic[]> {
   const now = Date.now();
   const key = opts?.key || 'default';
 
-  if (!opts?.force && cache && cache.key === key && now - cache.ts < CACHE_TTL_MS) {
-    return cache.data;
+  // Serve fresh cache if valid and not forced
+  if (!opts?.force && freshCache && freshCache.key === key && now - freshCache.ts < CACHE_TTL_MS) {
+    return freshCache.data;
   }
 
   try {
-    const topics = await fetchFromGranite();
-    cache = { ts: now, data: topics, key };
+    let topics = await fetchWithRetry();
+    if (topics.length < NUM_TOPICS) {
+      topics = padAndLimit(topics, NUM_TOPICS);
+    } else {
+      topics = topics.slice(0, NUM_TOPICS);
+    }
+
+    // Cache only on success
+    freshCache = { ts: now, data: topics, key };
+    lastGood   = { ts: now, data: topics, key };
     return topics;
   } catch (e: any) {
-    if (DEBUG) console.error('[trending] graceful fallback reason:', e?.message || e);
-    const fallback: TrendingTopic[] = [
-      { id: 'football-weekend', title: 'Football', description: 'Fixtures and standout players.', starter: 'Who will stand out this weekend?', tag: 'sports' },
-      { id: 'uk-politics',      title: 'UK Politics', description: 'Parliament headlines and debates.', starter: 'What’s your take on the latest debate?', tag: 'politics' },
-      { id: 'breaking-news',    title: 'News', description: 'Top stories and why they matter.', starter: 'Have you followed today’s top story?', tag: 'news' },
-      { id: 'tech-trends',      title: 'Tech', description: 'AI, gadgets, and software updates.', starter: 'What new tech has caught your eye?', tag: 'trend' },
-    ];
-    cache = { ts: now, data: fallback, key };
-    return fallback;
+    if (DEBUG) console.error('[trending] graceful failure:', e?.message || e);
+
+    // If we have a last good set, return it (even if TTL expired).
+    if (lastGood && lastGood.key === key) {
+      return lastGood.data;
+    }
+
+    // As a final resort, return curated fallback — but DO NOT cache it.
+    return padAndLimit([], NUM_TOPICS);
   }
 }
