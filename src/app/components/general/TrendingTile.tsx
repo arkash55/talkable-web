@@ -51,9 +51,6 @@ export function TrendingTile({
             <Avatar sx={{ width: 28, height: 28, bgcolor: 'rgba(255,255,255,0.2)' }}>
               <TopicIcon tag={topic.tag} />
             </Avatar>
-            <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.1 }}>
-              {topic.title}
-            </Typography>
             {topic.tag ? (
               <Chip
                 size="small"
@@ -62,6 +59,10 @@ export function TrendingTile({
               />
             ) : null}
           </Stack>
+
+            <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.1 }}>
+              {topic.title}
+            </Typography>
 
           <Typography variant="body2" sx={{ opacity: 0.9 }}>
             {topic.description}
