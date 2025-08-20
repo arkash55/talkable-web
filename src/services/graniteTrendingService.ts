@@ -16,7 +16,7 @@ const DEBUG = process.env.DEBUG_TRENDING === '1';
 // Keep output compact to avoid truncation; we’ll also raise the token budget.
 const NUM_TOPICS = 6;
 
-const SYSTEM = `You produce a short JSON list of high-signal conversation topics for small talk.
+const SYSTEM = `You produce a short JSON list of high-signal conversation topics from the CURRENT YEAR for small talk.
 - Include sports, news, politics, and general trends.
 - Safe and non-graphic; avoid harmful or NSFW items.
 - Each item: id (slug), title, description (<= 18 words), starter (<= 12 words), tag (one of: sports, news, politics, trend).
@@ -29,7 +29,7 @@ function promptBody() {
 ${SYSTEM}
 
 [USER]
-Generate exactly ${NUM_TOPICS} diverse, current conversation topics that won't stale within a few weeks.
+Generate exactly ${NUM_TOPICS} diverse, CURRENT YEAR conversation topics that won't stale within a few weeks.
 Output strictly valid JSON matching the schema.
 Do not include any explanations or markdown.`;
 }

@@ -10,7 +10,6 @@ import {
   Tooltip,
   Paper,
   Stack,
-  IconButton,
   Button,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -24,7 +23,6 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { onInbox, type InboxItem } from '@/services/firestoreService';
 import { TrendingTile, TrendingTopic } from '@/app/components/general/TrendingTile';
 import { REFRESH_BUTTON_SX } from '@/app/styles/buttonStyles';
-
 
 type Props = { initialTopics: TrendingTopic[] };
 
@@ -120,7 +118,7 @@ export default function GeneralClient({ initialTopics }: Props) {
   async function refreshTrending() {
     setLoadingTrending(true);
     try {
-      const res = await fetch('/api/granite/trending?force=1', { cache: 'no-store' });
+      const res = await fetch('/api/granite/trending?force=1&min=6&limit=6', { cache: 'no-store' });
       const data = await res.json();
       if (Array.isArray(data?.topics)) {
         setTrending((data.topics as TrendingTopic[]).slice(0, 6));
@@ -138,17 +136,13 @@ export default function GeneralClient({ initialTopics }: Props) {
         height: '100%',
         width: '100%',
         display: 'grid',
-        // 60% / 40% split on >= md; stack on small screens
-        gridTemplateColumns: {
-          xs: '1fr',
-          md: 'minmax(0, 3fr) minmax(0, 2fr)',
-        },
+        gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 3fr) minmax(0, 2fr)' },
         gap: 2,
         p: 2,
       }}
     >
       {/* Left: Trending Topics (2 columns × 3 rows) */}
-      <Box sx={{ overflow: 'auto', display: 'flex', flexDirection: 'column',  }}>
+      <Box sx={{ overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
         <Box
           sx={{
             display: 'flex',
@@ -161,29 +155,33 @@ export default function GeneralClient({ initialTopics }: Props) {
             Trending topics
           </Typography>
           <Stack direction="row" spacing={1} alignItems="center">
-            {loadingTrending ? (
-              <Typography variant="body2" color="text.secondary">Refreshing…</Typography>
-            ) : null}
+       
 
             <Button
               variant="contained"
-              startIcon={<RefreshIcon />}
-              onClick={() => {
-                // startNewConversation();
-                // if (typeof window !== 'undefined') {
-                //   window.dispatchEvent(new CustomEvent('conversation:start'));
-                // }
-              }}
+              startIcon={
+                <RefreshIcon
+                  sx={{
+                    animation: loadingTrending ? 'spin 1s linear infinite' : 'none',
+                    '@keyframes spin': {
+                      from: { transform: 'rotate(0deg)' },
+                      to: { transform: 'rotate(360deg)' },
+                    },
+                  }}
+                />
+              }
+              onClick={refreshTrending}
+              disabled={loadingTrending}
+              aria-busy={loadingTrending ? 'true' : 'false'}
               sx={REFRESH_BUTTON_SX}
             >
-              Refresh Topics
+              {loadingTrending ? 'Refreshing…' : 'Refresh Topics'}
             </Button>
-            
           </Stack>
         </Box>
 
         {/* 2 columns on sm+; 3 rows since we show 6 items */}
-        <Grid container spacing={2} display="flex" justifyContent="center" alignItems="center">
+        <Grid container spacing={2}>
           {visibleTopics.map((t) => (
             <Grid key={t.id} item xs={12} sm={6}>
               <TrendingTile
@@ -282,17 +280,14 @@ export default function GeneralClient({ initialTopics }: Props) {
                       spacing={1.75}
                       sx={{ px: 0.5, py: 0.5, minHeight: 72 }}
                     >
-                      {/* Unread dot */}
                       <Box sx={{ width: 14, display: 'flex', justifyContent: 'center' }}>
                         {unread ? (
                           <FiberManualRecordIcon color="primary" sx={{ fontSize: 11 }} />
                         ) : null}
                       </Box>
 
-                      {/* Live chip */}
                       <Chip size="small" label="Live" variant="outlined" />
 
-                      {/* When + preview */}
                       <Stack sx={{ minWidth: 0, flex: 1 }}>
                         <Stack direction="row" alignItems="center" spacing={0.75}>
                           <ScheduleIcon fontSize="small" />
