@@ -99,7 +99,7 @@ function TopicIcon({ tag }: { tag?: string }) {
   return <WhatshotIcon fontSize="small" />;
 }
 
-export default function GeneralClient() {
+export default function GeneralClient({initialTopics}) {
   const router = useRouter();
   const [uid, setUid] = useState<string | null>(null);
   const [history, setHistory] = useState<Array<{ id: string } & InboxItem>>([]);

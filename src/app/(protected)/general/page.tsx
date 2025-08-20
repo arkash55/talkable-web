@@ -1,7 +1,18 @@
-'use server';
 
 import GeneralClient from './GeneralClient';
+import { getTrendingTopics, type TrendingTopic } from '@/services/graniteTrendingService';
+
+export const dynamic = 'force-dynamic'; // ensure this page isn’t statically cached
 
 export default async function GeneralPage() {
-  return <GeneralClient />;
+  let topics: TrendingTopic[] = [];
+  try {
+    topics = await getTrendingTopics(); // server-side fetch (secrets stay server-only)
+    console.log('Trending topics fetched:', topics);
+  } catch (err) {
+    console.error('getTrendingTopics failed:', err);
+    topics = [];
+  }
+
+  return <GeneralClient initialTopics={topics} />;
 }
