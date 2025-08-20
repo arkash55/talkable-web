@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   Typography,
   Grid,
-  Card,
-  CardContent,
   CardActionArea,
   Chip,
   Divider,
@@ -14,7 +12,9 @@ import {
   Paper,
   Stack,
   Avatar,
+  IconButton,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
@@ -25,8 +25,10 @@ import NewspaperIcon from '@mui/icons-material/Newspaper';
 import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
 import GavelIcon from '@mui/icons-material/Gavel';
 import { useRouter } from 'next/navigation';
+
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { onInbox, type InboxItem } from '@/services/firestoreService';
+import { SETTINGS_TILE_SX, TRENDING_TILE_SX } from '@/app/styles/buttonStyles';
 
 type TrendingTopic = {
   id: string;
@@ -99,12 +101,21 @@ function TopicIcon({ tag }: { tag?: string }) {
   return <WhatshotIcon fontSize="small" />;
 }
 
-export default function GeneralClient({initialTopics}) {
+
+export default function GeneralClient({ initialTopics }: { initialTopics: TrendingTopic[] }) {
   const router = useRouter();
   const [uid, setUid] = useState<string | null>(null);
   const [history, setHistory] = useState<Array<{ id: string } & InboxItem>>([]);
-  const [trending, setTrending] = useState<TrendingTopic[]>([]);
+  const [trending, setTrending] = useState<TrendingTopic[]>(initialTopics || []);
   const [loadingTrending, setLoadingTrending] = useState(false);
+
+  // Always display only the top 6 in UI
+  const visibleTopics = useMemo(() => (trending || []).slice(0, 6), [trending]);
+
+  // hydrate trending from server props if they change (e.g., RSC nav)
+  useEffect(() => {
+    setTrending(initialTopics || []);
+  }, [initialTopics]);
 
   // auth -> uid
   useEffect(() => {
@@ -126,27 +137,21 @@ export default function GeneralClient({initialTopics}) {
     return () => unsub?.();
   }, [uid]);
 
-  // fetch trending topics from Granite route
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoadingTrending(true);
-      try {
-        const res = await fetch('/api/granite/trending');
-        const data = await res.json();
-        if (alive && Array.isArray(data?.topics)) {
-          setTrending(data.topics as TrendingTopic[]);
-        }
-      } catch (e) {
-        console.error('Trending fetch error', e);
-      } finally {
-        setLoadingTrending(false);
+  // refresh trending via API route (bypasses service cache)
+  async function refreshTrending() {
+    setLoadingTrending(true);
+    try {
+      const res = await fetch('/api/granite/trending?force=1', { cache: 'no-store' });
+      const data = await res.json();
+      if (Array.isArray(data?.topics)) {
+        setTrending((data.topics as TrendingTopic[]).slice(0, 6)); // keep at most 6
       }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+    } catch (e) {
+      console.error('Trending refresh error', e);
+    } finally {
+      setLoadingTrending(false);
+    }
+  }
 
   return (
     <Box
@@ -163,12 +168,12 @@ export default function GeneralClient({initialTopics}) {
         p: 2,
       }}
     >
-      {/* Left: Trending Topics (≈60%) */}
+      {/* Left: Trending Topics (2 columns × 3 rows) */}
       <Box sx={{ overflow: 'auto' }}>
         <Box
           sx={{
             display: 'flex',
-            alignItems: 'baseline',
+            alignItems: 'center',
             justifyContent: 'space-between',
             mb: 1,
           }}
@@ -176,25 +181,29 @@ export default function GeneralClient({initialTopics}) {
           <Typography variant="h5" fontWeight={700}>
             Trending topics
           </Typography>
-          {loadingTrending ? (
-            <Typography variant="body2" color="text.secondary">
-              Refreshing…
-            </Typography>
-          ) : null}
+          <Stack direction="row" spacing={1} alignItems="center">
+            {loadingTrending ? (
+              <Typography variant="body2" color="text.secondary">Refreshing…</Typography>
+            ) : null}
+            <Tooltip title="Refresh topics">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={refreshTrending}
+                  disabled={loadingTrending}
+                >
+                  <RefreshIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
         </Box>
 
-        <Grid container spacing={2}>
-          {trending.map((t) => (
-            <Grid key={t.id} item xs={12} sm={6} md={6} lg={4}>
-              <Card
-                variant="outlined"
-                sx={{
-                  height: '100%',
-                  borderRadius: 2,
-                  transition: 'transform 120ms ease, box-shadow 120ms ease',
-                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 4 },
-                }}
-              >
+        {/* 2 columns on sm+; 3 rows since we show 6 items */}
+        <Grid container spacing={2} display='flex' justifyContent="center" alignItems="center">
+          {visibleTopics.map((t) => (
+            <Grid key={t.id} item xs={12} sm={6}>
+              <Paper elevation={0} sx={TRENDING_TILE_SX}>
                 <CardActionArea
                   onClick={() => {
                     const q = new URLSearchParams({
@@ -204,28 +213,28 @@ export default function GeneralClient({initialTopics}) {
                     }).toString();
                     router.push(`/home?${q}`);
                   }}
-                  sx={{ height: '100%' }}
+                  sx={{ borderRadius: 2, height: '100%' }}
                 >
-                  <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                  <Box sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                      <Avatar sx={{ width: 28, height: 28 }}>
+                      <Avatar sx={{ width: 28, height: 28, bgcolor: 'rgba(255,255,255,0.2)' }}>
                         <TopicIcon tag={t.tag} />
                       </Avatar>
-                      <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.1 }}>
+                      <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.1 }}>
                         {t.title}
                       </Typography>
-                      {t.tag ? <Chip size="small" label={t.tag} /> : null}
+                      {t.tag ? <Chip size="small" label={t.tag} sx={{ bgcolor: 'rgba(255,255,255,0.18)', color: '#fff' }} /> : null}
                     </Stack>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
                       {t.description}
                     </Typography>
-                    <Divider sx={{ my: 1 }} />
-                    <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                    <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.25)' }} />
+                    <Typography variant="body2" sx={{ fontStyle: 'italic', opacity: 0.95 }}>
                       “{t.starter}”
                     </Typography>
-                  </CardContent>
+                  </Box>
                 </CardActionArea>
-              </Card>
+              </Paper>
             </Grid>
           ))}
         </Grid>
@@ -286,9 +295,8 @@ export default function GeneralClient({initialTopics}) {
                   key={item.id}
                   variant="outlined"
                   sx={{
-                    // ↑ Bigger row height
-                    minHeight: 96,            // (was ~auto) — bump to ~96px row
-                    p: 1.75,                  // more padding
+                    minHeight: 96,
+                    p: 1.75,
                     borderRadius: 2,
                     transition:
                       'transform 120ms ease, box-shadow 120ms ease, background 120ms ease',
@@ -328,7 +336,7 @@ export default function GeneralClient({initialTopics}) {
                           <ScheduleIcon fontSize="small" />
                           <Tooltip title={primaryTime}>
                             <Typography
-                              variant="subtitle1"   // ↑ bigger than body2
+                              variant="subtitle1"
                               sx={{ fontWeight: 700 }}
                               noWrap
                             >
@@ -338,7 +346,7 @@ export default function GeneralClient({initialTopics}) {
                         </Stack>
 
                         <Typography
-                          variant="body1"          // ↑ bigger than body2
+                          variant="body1"
                           color="text.secondary"
                           noWrap
                           sx={{ mt: 0.5 }}

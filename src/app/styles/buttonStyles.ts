@@ -104,3 +104,16 @@ export const SETTINGS_TILE_SX = (theme: Theme, opts?: { selected?: boolean; dang
     },
   } as SxProps<Theme>;
 };
+
+
+export const TRENDING_TILE_SX = (theme: Theme) => {
+
+
+   return {
+    ...SETTINGS_TILE_SX(theme),
+    borderRadius: 2,
+    width: 520,
+    height: 230,
+   
+  } as SxProps<Theme>;
+};
