@@ -7,11 +7,9 @@ import {
   Grid,
   CardActionArea,
   Chip,
-  Divider,
   Tooltip,
   Paper,
   Stack,
-  Avatar,
   IconButton,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -19,24 +17,14 @@ import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import ScheduleIcon from '@mui/icons-material/Schedule';
-import WhatshotIcon from '@mui/icons-material/Whatshot';
-import BoltIcon from '@mui/icons-material/Bolt';
-import NewspaperIcon from '@mui/icons-material/Newspaper';
-import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
-import GavelIcon from '@mui/icons-material/Gavel';
 import { useRouter } from 'next/navigation';
 
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { onInbox, type InboxItem } from '@/services/firestoreService';
-import { SETTINGS_TILE_SX, TRENDING_TILE_SX } from '@/app/styles/buttonStyles';
+import { TrendingTile, TrendingTopic } from '@/app/components/general/TrendingTile';
 
-type TrendingTopic = {
-  id: string;
-  title: string;
-  description: string;
-  starter: string;
-  tag?: string;
-};
+
+type Props = { initialTopics: TrendingTopic[] };
 
 // ---- helpers ----
 function formatWhen(ts: any): string {
@@ -91,18 +79,7 @@ function isUnread(item: InboxItem): boolean {
   }
 }
 
-function TopicIcon({ tag }: { tag?: string }) {
-  if (!tag) return <WhatshotIcon fontSize="small" />;
-  const t = tag.toLowerCase();
-  if (t.includes('sport') || t.includes('football')) return <SportsSoccerIcon fontSize="small" />;
-  if (t.includes('news')) return <NewspaperIcon fontSize="small" />;
-  if (t.includes('politic')) return <GavelIcon fontSize="small" />;
-  if (t.includes('trend')) return <BoltIcon fontSize="small" />;
-  return <WhatshotIcon fontSize="small" />;
-}
-
-
-export default function GeneralClient({ initialTopics }: { initialTopics: TrendingTopic[] }) {
+export default function GeneralClient({ initialTopics }: Props) {
   const router = useRouter();
   const [uid, setUid] = useState<string | null>(null);
   const [history, setHistory] = useState<Array<{ id: string } & InboxItem>>([]);
@@ -144,7 +121,7 @@ export default function GeneralClient({ initialTopics }: { initialTopics: Trendi
       const res = await fetch('/api/granite/trending?force=1', { cache: 'no-store' });
       const data = await res.json();
       if (Array.isArray(data?.topics)) {
-        setTrending((data.topics as TrendingTopic[]).slice(0, 6)); // keep at most 6
+        setTrending((data.topics as TrendingTopic[]).slice(0, 6));
       }
     } catch (e) {
       console.error('Trending refresh error', e);
@@ -200,41 +177,20 @@ export default function GeneralClient({ initialTopics }: { initialTopics: Trendi
         </Box>
 
         {/* 2 columns on sm+; 3 rows since we show 6 items */}
-        <Grid container spacing={2} display='flex' justifyContent="center" alignItems="center">
+        <Grid container spacing={2} display="flex" justifyContent="center" alignItems="center">
           {visibleTopics.map((t) => (
             <Grid key={t.id} item xs={12} sm={6}>
-              <Paper elevation={0} sx={TRENDING_TILE_SX}>
-                <CardActionArea
-                  onClick={() => {
-                    const q = new URLSearchParams({
-                      starter: t.starter,
-                      topic: t.id,
-                      autostart: '1',
-                    }).toString();
-                    router.push(`/home?${q}`);
-                  }}
-                  sx={{ borderRadius: 2, height: '100%' }}
-                >
-                  <Box sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                      <Avatar sx={{ width: 28, height: 28, bgcolor: 'rgba(255,255,255,0.2)' }}>
-                        <TopicIcon tag={t.tag} />
-                      </Avatar>
-                      <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.1 }}>
-                        {t.title}
-                      </Typography>
-                      {t.tag ? <Chip size="small" label={t.tag} sx={{ bgcolor: 'rgba(255,255,255,0.18)', color: '#fff' }} /> : null}
-                    </Stack>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      {t.description}
-                    </Typography>
-                    <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.25)' }} />
-                    <Typography variant="body2" sx={{ fontStyle: 'italic', opacity: 0.95 }}>
-                      “{t.starter}”
-                    </Typography>
-                  </Box>
-                </CardActionArea>
-              </Paper>
+              <TrendingTile
+                topic={t}
+                onClick={() => {
+                  const q = new URLSearchParams({
+                    starter: t.starter,
+                    topic: t.id,
+                    autostart: '1',
+                  }).toString();
+                  router.push(`/home?${q}`);
+                }}
+              />
             </Grid>
           ))}
         </Grid>
