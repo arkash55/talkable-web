@@ -64,15 +64,23 @@ export function TrendingTile({
               {topic.title}
             </Typography>
 
-          <Typography variant="body2" sx={{ opacity: 0.9 }}>
-            {topic.description}
-          </Typography>
+<Typography
+  variant="body2"
+  sx={{
+    opacity: 0.9,
+    // overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    // whiteSpace: 'nowrap',   // or remove if you want multi-line truncation
+  }}
+>
+  {topic.description}
+</Typography>
 
           <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.25)' }} />
 
-          <Typography variant="body2" sx={{ fontStyle: 'italic', opacity: 0.95 }}>
+          {/* <Typography variant="body2" sx={{ fontStyle: 'italic', opacity: 0.95 }}>
             “{topic.starter}”
-          </Typography>
+          </Typography> */}
         </Box>
       </CardActionArea>
     </Paper>
