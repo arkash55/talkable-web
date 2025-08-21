@@ -43,6 +43,64 @@ export function TrendingTile({
   topic: TrendingTopic;
   onClick: () => void;
 }) {
+  const titleRef = React.useRef<HTMLSpanElement>(null);
+  const descRef = React.useRef<HTMLDivElement>(null);
+  const [descClamp, setDescClamp] = React.useState<number>(2);
+  const [isClamped, setIsClamped] = React.useState<boolean>(false);
+
+  // Helper: count rendered lines of an element
+  const getLineCount = (el: Element | null) => {
+    if (!el) return 1;
+    const style = window.getComputedStyle(el);
+    const lineHeightStr = style.lineHeight;
+    let lineHeight = parseFloat(lineHeightStr);
+    if (Number.isNaN(lineHeight)) {
+      // fallback: 1.2 * font-size
+      const fontSize = parseFloat(style.fontSize) || 16;
+      lineHeight = 1.2 * fontSize;
+    }
+    const h = (el as HTMLElement).scrollHeight;
+    return Math.max(1, Math.round(h / lineHeight));
+  };
+
+  // Decide desc lines based on title lines:
+  // - Title always full, no clamp.
+  // - If title takes >= 2 lines → show only 1 line of description.
+  // - Else → up to 2 lines of description.
+  const recomputeLayout = React.useCallback(() => {
+    const titleLines = getLineCount(titleRef.current);
+    const nextClamp = titleLines >= 2 ? 1 : 2;
+    setDescClamp(nextClamp);
+
+    // After clamp is applied in style, measure whether description overflows
+    requestAnimationFrame(() => {
+      if (descRef.current) {
+        const el = descRef.current;
+        const overflowing = el.scrollHeight > el.clientHeight + 1;
+        setIsClamped(overflowing);
+      }
+    });
+  }, []);
+
+  React.useEffect(() => {
+    recomputeLayout();
+  }, [topic.title, topic.description, recomputeLayout]);
+
+  // Recompute on resize (responsive tiles)
+  React.useEffect(() => {
+    if (!titleRef.current && !descRef.current) return;
+    const ro = new ResizeObserver(() => recomputeLayout());
+    if (titleRef.current) ro.observe(titleRef.current);
+    if (descRef.current) ro.observe(descRef.current);
+    return () => ro.disconnect();
+  }, [recomputeLayout]);
+
+  // If description is NOT clamped, append a "." (only if not already ending in punctuation)
+  const appendPeriodIfNeeded = (s: string) =>
+    /[.!?…]$/.test(s.trim()) ? s : s.trim().length ? `${s}.` : s;
+
+  const displayedDesc = !isClamped ? appendPeriodIfNeeded(topic.description) : topic.description;
+
   return (
     <Paper elevation={0} sx={TRENDING_TILE_SX}>
       <CardActionArea onClick={onClick} sx={{ borderRadius: 2, height: '100%' }}>
@@ -60,27 +118,34 @@ export function TrendingTile({
             ) : null}
           </Stack>
 
-            <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.1 }}>
-              {topic.title}
-            </Typography>
+          {/* Title: always full, multi-line allowed, no clamp */}
+          <Typography
+            variant="h6"
+            fontWeight={800}
+            sx={{ lineHeight: 1.1 }}
+            component="span"
+            ref={titleRef}
+          >
+            {topic.title}
+          </Typography>
 
-<Typography
-  variant="body2"
-  sx={{
-    opacity: 0.9,
-    // overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    // whiteSpace: 'nowrap',   // or remove if you want multi-line truncation
-  }}
->
-  {topic.description}
-</Typography>
+          {/* Description: clamp lines dynamically based on title's line count */}
+          <Typography
+            ref={descRef}
+            variant="body2"
+            sx={{
+              opacity: 0.9,
+              display: '-webkit-box',
+              WebkitLineClamp: descClamp,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {displayedDesc}
+          </Typography>
 
           <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.25)' }} />
-
-          {/* <Typography variant="body2" sx={{ fontStyle: 'italic', opacity: 0.95 }}>
-            “{topic.starter}”
-          </Typography> */}
         </Box>
       </CardActionArea>
     </Paper>
