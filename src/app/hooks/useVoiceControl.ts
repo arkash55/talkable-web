@@ -1,18 +1,25 @@
+// src/app/hooks/useVoiceControl.ts
 'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import React from 'react';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 import { getCandidates } from '@/services/graniteClient';
 import { GenerateResponse } from '@/services/graniteService'; // keep if you use it elsewhere
-import { useState, useEffect, useRef, useCallback } from 'react';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 import {
   appendWithSlidingWindow,
   buildContextWindow,
   type MessageHistoryItem,
 } from '@/app/utils/contextWindow';
-import React from 'react';
+
 import { buildSystemPrompt } from '../utils/systemPrompt';
 import { useUserProfile } from './useUserProfile';
+
+// 🔗 Firestore integration
+import { getAuth } from 'firebase/auth';
+import { createLiveConversation, sendMessage } from '@/services/firestoreService';
 
 // Tune these as needed
 const HISTORY_LIMIT = { maxCount: 50, maxChars: 8000 };
@@ -38,6 +45,10 @@ export function useVoiceControl(
   const stableOnResponses = useRef(onResponses);
   const safeOnLoadingChange = useRef(onLoadingChange ?? (() => {}));
 
+  // 🔗 Track current conversation id + first user message gate
+  const currentCidRef = useRef<string | null>(null);
+  const firstUserMessageSentRef = useRef<boolean>(false);
+
   // STT
   const {
     transcript,
@@ -59,16 +70,36 @@ export function useVoiceControl(
 
   const clearContext = React.useCallback(() => {
     historyRef.current.length = 0; // wipe the context window
+    firstUserMessageSentRef.current = false; // allow a fresh seed on next start
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('context:cleared'));
     }
   }, []);
 
   // ---- NEW explicit starters ----
-  const startNewConversation = () => {
+  const startNewConversation = async () => {
     if (!browserSupportsSpeechRecognition) return;
     if (isConversationActive) return;
 
+    // 0) Create the live conversation in Firestore (owner = current user)
+    try {
+      const uid = getAuth().currentUser?.uid;
+      if (!uid) throw new Error('No authenticated user to own the conversation.');
+
+      const cid = await createLiveConversation({ ownerUid: uid, title: null });
+      currentCidRef.current = cid;
+
+      // Let the rest of the app know the cid (HomeClient listens to this)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('conversation:created', { detail: cid }));
+      }
+    } catch (err) {
+      console.error('Failed to create live conversation:', err);
+      // Bail early if we cannot create a conversation
+      return;
+    }
+
+    // 1) Flip UI/live listening
     setIsConversationActive(true);
     SpeechRecognition.startListening({ continuous: true });
 
@@ -76,8 +107,8 @@ export function useVoiceControl(
     resetTranscript();
     setHasSoundLeeway(true);
 
+    // 2) Announce NEW (not resume)
     if (typeof window !== 'undefined') {
-      // announce NEW (not resume)
       window.dispatchEvent(new CustomEvent('conversation:startNew'));
       window.dispatchEvent(new CustomEvent('stt:startListening'));
     }
@@ -86,6 +117,8 @@ export function useVoiceControl(
   const resumeConversation = () => {
     if (!browserSupportsSpeechRecognition) return;
     if (isConversationActive) return;
+
+    // (Optional) If you want to support resuming by URL ?cid=..., you could read and set currentCidRef here.
 
     setIsConversationActive(true);
     SpeechRecognition.startListening({ continuous: true });
@@ -131,6 +164,9 @@ export function useVoiceControl(
 
     processingTranscript.current = false;
     pendingTranscript.current = '';
+    currentCidRef.current = null;
+    firstUserMessageSentRef.current = false;
+
     clearContext();
     safeOnLoadingChange.current(false);
 
@@ -176,21 +212,37 @@ export function useVoiceControl(
     };
   }, [isConversationActive, listening]);
 
-  // Capture selected AI replies as 'user' messages
+  // Capture selected AI replies as 'user' messages (used for auto-start seed too)
   useEffect(() => {
-    const onGridClick = (e: Event) => {
+    const onGridClick = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { label?: string };
       const text = (detail?.label ?? '').trim();
       if (!text) return;
 
+      // Append locally
       appendWithSlidingWindow(
         historyRef.current,
         { sender: 'user', content: text, createdAt: new Date().toISOString() },
         HISTORY_LIMIT
       );
+
+      // Persist the *first* user/seed message if we have a conversation id
+      if (!firstUserMessageSentRef.current && currentCidRef.current) {
+        try {
+          await sendMessage({
+            cid: currentCidRef.current,
+            senderId: 'guest',
+            text,
+          });
+          firstUserMessageSentRef.current = true;
+        } catch (err) {
+          console.error('Failed to persist first user/seed message:', err);
+        }
+      }
     };
-    window.addEventListener('ui:voicegrid:click', onGridClick);
-    return () => window.removeEventListener('ui:voicegrid:click', onGridClick);
+
+    window.addEventListener('ui:voicegrid:click', onGridClick as EventListener);
+    return () => window.removeEventListener('ui:voicegrid:click', onGridClick as EventListener);
   }, []);
 
   // Finalize on silence
@@ -227,6 +279,21 @@ export function useVoiceControl(
               createdAt: new Date().toISOString(),
             };
             appendWithSlidingWindow(historyRef.current, guestMsg, HISTORY_LIMIT);
+
+            // 🔗 Persist spoken message to Firestore if we have a cid
+            try {
+              if (currentCidRef.current && guestMsg.content.trim()) {
+                await sendMessage({
+                  cid: currentCidRef.current,
+                  senderId: 'guest',
+                  text: guestMsg.content.trim(),
+                });
+                // mark that at least one user message has been sent (covers edge case where the seed didn't fire)
+                firstUserMessageSentRef.current = true;
+              }
+            } catch (err) {
+              console.error('Failed to persist spoken user message:', err);
+            }
 
             // 2) Build context
             const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
@@ -274,7 +341,7 @@ export function useVoiceControl(
     toggleConversation,
     startConversation,     // backward-compatible
     stopConversation,
-    startNewConversation,  // NEW
+    startNewConversation,  // NEW (now creates Firestore convo + emits conversation:created)
     resumeConversation,    // NEW
     browserSupportsSpeechRecognition,
 

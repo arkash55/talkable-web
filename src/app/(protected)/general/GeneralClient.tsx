@@ -118,10 +118,10 @@ export default function GeneralClient({ initialTopics }: Props) {
   async function refreshTrending() {
     setLoadingTrending(true);
     try {
-const r = Math.random();
-const variant = r < 0.55 ? 'sample' : r < 0.90 ? 'shuffle' : 'newest';
-const seed = Date.now();
-const res = await fetch(`/api/guardian/trending?force=1&limit=6&variant=${variant}&seed=${seed}`, { cache: 'no-store' });
+  const r = Math.random();
+  const variant = r < 0.55 ? 'sample' : r < 0.90 ? 'shuffle' : 'newest';
+  const seed = Date.now();
+  const res = await fetch(`/api/guardian/trending?force=1&limit=6&variant=${variant}&seed=${seed}`, { cache: 'no-store' });
       const data = await res.json();
       console.log('Trending refresh result:', data);
 
