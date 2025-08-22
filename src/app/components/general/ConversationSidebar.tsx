@@ -1,4 +1,4 @@
-// src/app/components/general/LiveConversationsSidebar.tsx
+// src/app/components/general/ConversationsSidebar.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -76,17 +76,10 @@ export default function ConversationsSidebar() {
     return onAuthStateChanged(auth, (user) => setUid(user?.uid ?? null));
   }, []);
 
-  // live inbox for LIVE conversations only
+  // all inbox items (live + online)
   useEffect(() => {
     if (!uid) return;
-    const unsub = onInbox(
-      uid,
-      (items) => {
-        const liveOnly = items.filter((i) => i.mode === 'live');
-        setHistory(liveOnly);
-      },
-      { mode: 'live', pageSize: 100 }
-    );
+    const unsub = onInbox(uid, (items) => setHistory(items), { pageSize: 100 });
     return () => unsub?.();
   }, [uid]);
 
@@ -105,7 +98,7 @@ export default function ConversationsSidebar() {
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
         <ChatBubbleOutlineIcon fontSize="small" />
         <Typography variant="h6" fontWeight={700}>
-          Past live conversations
+          Conversations
         </Typography>
         <Chip size="small" label={history.length} sx={{ ml: 'auto' }} variant="outlined" />
       </Stack>
@@ -121,7 +114,7 @@ export default function ConversationsSidebar() {
           }}
         >
           <Typography variant="body2">
-            No live conversations yet. Start one from the topics on the left.
+            No conversations yet. Start one from the topics on the left.
           </Typography>
         </Paper>
       ) : (
@@ -159,7 +152,11 @@ export default function ConversationsSidebar() {
               >
                 <CardActionArea
                   onClick={() => {
-                    router.push(`/home?cid=${item.id}`);
+                    if (item.mode === 'online') {
+                      router.push(`/chat/${item.id}`);
+                    } else {
+                      router.push(`/home?cid=${item.id}`);
+                    }
                   }}
                   sx={{ borderRadius: 2, p: 0.5, height: '100%' }}
                 >
@@ -175,7 +172,12 @@ export default function ConversationsSidebar() {
                       ) : null}
                     </Box>
 
-                    <Chip size="small" label="Live" variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={item.mode === 'online' ? 'Online' : 'Live'}
+                      variant="outlined"
+                      color={item.mode === 'online' ? 'success' : 'default'}
+                    />
 
                     <Stack sx={{ minWidth: 0, flex: 1 }}>
                       <Stack direction="row" alignItems="center" spacing={0.75}>
