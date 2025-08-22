@@ -14,26 +14,29 @@ import {
   Box,
 } from '@mui/material';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
-import { collection, getDocs } from 'firebase/firestore';
-
-import { getAuth } from 'firebase/auth';
-import { createOnlineConversation, getUsers } from '@/services/firestoreService';
+import SearchIcon from '@mui/icons-material/Search';
 import { useRouter } from 'next/navigation';
-import { db } from '../../../../lib/fireBaseConfig';
-import { useEffect } from 'react';
+import { getAuth } from 'firebase/auth';
 
-type UserRecord = {
-  uid: string;
+// If you created listUsers in your firestore service (recommended)
+import { getUsers, type UserDirectoryEntry } from '@/services/firestoreService';
+// If you used a different name earlier (e.g., getUsers), you can import that instead.
+// import { getUsers as listUsers } from '@/services/firestoreService';
+
+import { createOnlineConversation } from '@/services/firestoreService';
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+};
+
+type UserRecord = UserDirectoryEntry & {
+  // ensure optional fields exist for rendering
   email?: string;
   firstName?: string;
   lastName?: string;
   pronouns?: string;
   description?: string;
-};
-
-type Props = {
-  open: boolean;
-  onClose: () => void;
 };
 
 const filter = createFilterOptions<UserRecord>({
@@ -46,33 +49,42 @@ const filter = createFilterOptions<UserRecord>({
 
 export default function NewOnlineChatDialog({ open, onClose }: Props) {
   const router = useRouter();
+  const currentUid = getAuth().currentUser?.uid ?? null;
+
   const [loading, setLoading] = React.useState(false);
   const [allUsers, setAllUsers] = React.useState<UserRecord[]>([]);
   const [inputValue, setInputValue] = React.useState('');
-  const currentUid = getAuth().currentUser?.uid ?? null;
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
 
-  useEffect(() => {
+  // Load users when modal opens
+  React.useEffect(() => {
     if (!open) return;
-    let mounted = true;
-
+    let canceled = false;
     (async () => {
       setLoading(true);
       try {
-        const rows = await getUsers({ excludeUid: currentUid || '' });
-        if (mounted) setAllUsers(rows);
+        const rows = await getUsers({
+          excludeUid: currentUid ?? undefined,
+          limit: 500,
+        });
+        if (!canceled) setAllUsers(rows as UserRecord[]);
       } catch (e) {
         console.error('Failed to load users:', e);
       } finally {
-        if (mounted) setLoading(false);
+        if (!canceled) setLoading(false);
       }
     })();
-
     return () => {
-      mounted = false;
+      canceled = true;
     };
   }, [open, currentUid]);
 
-  
+  // Only open dropdown when there is text
+  React.useEffect(() => {
+    const hasText = inputValue.trim().length > 0;
+    setDropdownOpen(hasText);
+  }, [inputValue]);
+
   const handleSelect = async (user: UserRecord | null) => {
     if (!user || !currentUid) return;
     try {
@@ -98,20 +110,30 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
           loading={loading}
           options={allUsers}
           filterOptions={filter}
-          // ✅ stable identity so MUI can manage selection & keys
           isOptionEqualToValue={(a, b) => a.uid === b.uid}
-          // ✅ stable, human label (dup labels are okay; identity is via uid)
           getOptionLabel={(u) =>
             (u
               ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()
               : '') || u.email || ''
           }
+          // 🔒 Control opening: only when typing
+          open={dropdownOpen}
+          onOpen={() => {
+            // Block open-on-focus / icon if no text
+            if (inputValue.trim().length === 0) {
+              setDropdownOpen(false);
+            }
+          }}
+          onClose={() => setDropdownOpen(false)}
+          openOnFocus={false}
+          forcePopupIcon // keep an icon on the right
+          popupIcon={<SearchIcon />} // 🔄 replace chevron with search icon
           renderOption={(props, u) => {
             const name =
               `${u.firstName ?? ''} ${u.lastName ?? ''}`.replace(/\s+/g, ' ').trim();
             const initials =
               (u.firstName?.[0] ?? '') + (u.lastName?.[0] ?? '');
-            // ⬇️ IMPORTANT: do NOT add your own key here; props already includes a key
+            // Do NOT add your own key; props contains a key
             return (
               <li {...props}>
                 <ListItemAvatar>
