@@ -32,6 +32,7 @@ import {
   QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../../lib/fireBaseConfig';
+import { getAuth, signOut } from 'firebase/auth';
 
 // ---------- Types (mirror your schema) ----------
 export type ConversationMode = 'live' | 'online';
@@ -374,5 +375,28 @@ async function batchDeleteCollection(colRef: CollectionReference<DocumentData>, 
 
     cursor = snap.docs[snap.docs.length - 1];
     if (snap.size < pageSize) break;
+  }
+}
+
+// Marks user offline (best effort) then signs out
+export async function logoutUser(): Promise<void> {
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  try {
+    if (user) {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          online: false,
+          lastLogoutAt: serverTimestamp(),
+        });
+      } catch {
+        // non-fatal if user doc missing or permission denied
+      }
+    }
+    await signOut(auth);
+  } catch (err) {
+    // bubble to caller so UI can show feedback
+    throw err;
   }
 }

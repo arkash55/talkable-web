@@ -5,6 +5,7 @@ import * as React from 'react';
 import { Grid } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import SettingsTile from './SettingsGridTiles';
+import { logoutUser } from '@/services/firestoreService';
 
 // lucide-react icons
 import {
@@ -33,7 +34,7 @@ type Item = {
 
 const ITEMS: Item[] = [
   { key: 'account',      title: 'Account',        subtitle: 'Profile & security',            icon: <User size={22} />,         href: '/settings/profile' },
-  { key: 'audio',        title: 'Voice & Tone', subtitle: 'TTS settings',            icon: <Volume2 size={22} />,      href: '/settings/tone-voice' },
+  { key: 'audio',        title: 'Voice & Tone', Subtitle: 'TTS settings',            icon: <Volume2 size={22} />,      href: '/settings/tone-voice' },
   { key: 'privacy',      title: 'Privacy',        subtitle: 'Permissions & telemetry',       icon: <ShieldCheck size={22} />,  href: '/settings/privacy' },
   { key: 'about',        title: 'About',          subtitle: 'Version & credits',             icon: <Info size={22} />,         href: '/settings/about' },
   { key: 'delete',       title: 'Delete Account', subtitle: 'Permanently remove your data',  icon: <Trash2 size={22} />,      href: '/settings/delete', danger: true,
@@ -63,10 +64,22 @@ export default function SettingsGrid({
 }: Props) {
   const router = useRouter();
 
-  const handleClick = (item: Item) => () => {
-    // optional callback to keep your existing logic
+  const handleClick = (item: Item) => async () => {
     onOpenSection?.(item.key);
-    // router push if an href is provided
+
+    if (item.key === 'logout') {
+      try {
+        await logoutUser();
+        // Redirect to auth entry (adjust path if your login route differs)
+        router.replace('/login');
+      } catch (e) {
+        console.error('Logout failed:', e);
+        // Fallback: hard reload to clear any client state
+        window.location.href = '/login';
+      }
+      return; // prevent href navigation
+    }
+
     if (item.href) router.push(item.href);
   };
 
