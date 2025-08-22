@@ -6,14 +6,19 @@ import { createLiveConversation, sendMessage } from '@/services/firestoreService
 import { auth } from '../../../lib/fireBaseConfig';
 
 /**
- * Listens to app-level events and syncs with Firestore:
- * - conversation:start  -> creates live conversation (owner = current user)
- * - stt:finalTranscript -> sends message as "guest"
- * - ui:voicegrid:click  -> sends message as the current user
+ * Syncs app-level events with Firestore:
+ * - conversation:startNew     -> force a brand-new live conversation
+ * - conversation:resume       -> resume existing cid (from URL or last created in this session)
+ * - conversation:load {cid}   -> set active conversation to existing one
+ * - stt:finalTranscript       -> send as "guest"
+ * - ui:voicegrid:click        -> send as current user
  */
 export function useLiveConversationSync() {
   const [uid, setUid] = useState<string | null>(auth.currentUser?.uid ?? null);
   const [cid, setCid] = useState<string | null>(null);
+
+  // Keep last created/loaded conversation id to allow resume within the same page session
+  const lastCidRef = useRef<string | null>(null);
   const creatingRef = useRef(false);
 
   // Track auth user
@@ -22,7 +27,6 @@ export function useLiveConversationSync() {
     return () => unsub();
   }, []);
 
-  // Ensure live conversation
   const ensureConversation = async () => {
     if (!uid) {
       console.warn('Cannot start conversation: user not signed in.');
@@ -33,8 +37,8 @@ export function useLiveConversationSync() {
     try {
       const newCid = await createLiveConversation({ ownerUid: uid });
       setCid(newCid);
+      lastCidRef.current = newCid;
 
-      // Optional broadcast
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('conversation:created', { detail: newCid }));
       }
@@ -45,18 +49,51 @@ export function useLiveConversationSync() {
   };
 
   useEffect(() => {
-    // START -> make a fresh live conversation
-    const onStart = async () => {
+    // Start NEW -> force a new conversation id
+    const onStartNew = async () => {
+      // clear current so ensureConversation definitely creates a fresh one
       setCid(null);
       await ensureConversation();
     };
 
-    // END -> clear current conversation id
+    // Resume -> prefer current cid; else URL cid; else lastCidRef
+    const onResume = () => {
+      // If we already have a cid, nothing to do.
+      if (cid) return;
+
+      // Try URL
+      const params = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search)
+        : null;
+      const routeCid = params?.get('cid') || null;
+
+      if (routeCid) {
+        setCid(routeCid);
+        lastCidRef.current = routeCid;
+        return;
+      }
+
+      // Fall back to last known cid from this session
+      if (lastCidRef.current) {
+        setCid(lastCidRef.current);
+      }
+    };
+
+    // External load (e.g., /home?cid=...)
+    const onLoad = (e: Event) => {
+      const anyEvent = e as CustomEvent<{ cid?: string }>;
+      const newCid = anyEvent.detail?.cid?.trim();
+      if (!newCid) return;
+      setCid(newCid);
+      lastCidRef.current = newCid;
+    };
+
+    // END -> clear active cid (keep lastCidRef for resume-in-page)
     const onEnd = () => {
       setCid(null);
     };
 
-    // Guest transcript sends message as "guest"
+    // Guest transcript -> send as "guest"
     const onFinalTranscript = async (e: Event) => {
       const anyEvent = e as CustomEvent<string>;
       const text = typeof anyEvent.detail === 'string' ? anyEvent.detail.trim() : '';
@@ -72,7 +109,7 @@ export function useLiveConversationSync() {
       }
     };
 
-    // Voice grid click sends message as current user
+    // Voice grid click -> send as current user
     const onVoiceGridClick = async (e: Event) => {
       const anyEvent = e as CustomEvent<{ index: number; label: string }>;
       const label = anyEvent.detail?.label?.trim();
@@ -92,13 +129,17 @@ export function useLiveConversationSync() {
       }
     };
 
-    window.addEventListener('conversation:start', onStart as EventListener);
+    window.addEventListener('conversation:startNew', onStartNew as EventListener);
+    window.addEventListener('conversation:resume', onResume as EventListener);
+    window.addEventListener('conversation:load', onLoad as EventListener);
     window.addEventListener('conversation:end', onEnd as EventListener);
     window.addEventListener('stt:finalTranscript', onFinalTranscript as EventListener);
     window.addEventListener('ui:voicegrid:click', onVoiceGridClick as EventListener);
 
     return () => {
-      window.removeEventListener('conversation:start', onStart as EventListener);
+      window.removeEventListener('conversation:startNew', onStartNew as EventListener);
+      window.removeEventListener('conversation:resume', onResume as EventListener);
+      window.removeEventListener('conversation:load', onLoad as EventListener);
       window.removeEventListener('conversation:end', onEnd as EventListener);
       window.removeEventListener('stt:finalTranscript', onFinalTranscript as EventListener);
       window.removeEventListener('ui:voicegrid:click', onVoiceGridClick as EventListener);

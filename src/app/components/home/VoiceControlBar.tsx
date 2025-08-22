@@ -1,19 +1,50 @@
+// src/app/components/home/VoiceControlBar.tsx
 'use client';
 
-import { Box, Button, Typography, useTheme, Stack, IconButton } from '@mui/material';
-import MicIcon from '@mui/icons-material/Mic';
+import { useEffect, useRef } from 'react';
+import { Box, Button, Typography, useTheme, Stack } from '@mui/material';
 import MicOffIcon from '@mui/icons-material/MicOff';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+
 import VoiceWaveform from './VoiceWaveform';
 import { useVoiceControl } from '@/app/hooks/useVoiceControl';
 import { GenerateResponse } from '@/services/graniteClient';
+import { START_NEW_BUTTON_SX, STOP_BUTTON_SX } from '@/app/styles/buttonStyles';
+
+// Shared size/style so all control buttons match
+const CONTROL_BUTTON_SX = {
+  fontWeight: 700,
+  px: 3,
+  py: 1.5,
+  height: 56,
+  minWidth: 200,
+  borderRadius: 2,
+  textTransform: 'none' as const,
+  lineHeight: 1.1,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+type AutoStartPayload = { mode: 'new' | 'resume'; seed?: string } | null;
 
 interface VoiceControlBarProps {
   onResponses: (responses: GenerateResponse) => void;
   onLoadingChange?: (loading: boolean) => void;
+  modelContext?: string[];
+  canResume?: boolean;
+  autoStart?: AutoStartPayload;           // <-- NEW
 }
 
-export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceControlBarProps) {
+export default function VoiceControlBar({
+  onResponses,
+  onLoadingChange,
+  modelContext,
+  canResume = false,
+  autoStart = null,                        // <-- NEW
+}: VoiceControlBarProps) {
   const theme = useTheme();
 
   const {
@@ -22,9 +53,46 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
     speaking,
     hasSoundLeeway,
     isConversationActive,
-    toggleConversation,
+    startNewConversation,
+    resumeConversation,
+    stopConversation,
     browserSupportsSpeechRecognition,
   } = useVoiceControl(onResponses, onLoadingChange);
+
+  // consume autoStart prop exactly once (no new event listeners)
+  const consumedRef = useRef(false);
+  useEffect(() => {
+    if (!autoStart || consumedRef.current || !browserSupportsSpeechRecognition) return;
+
+    // 1) Flip UI into active mode & start STT
+    if (!isConversationActive) {
+      if (autoStart.mode === 'resume') {
+        resumeConversation();
+      } else {
+        startNewConversation();
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('conversation:start'));
+      }
+    }
+
+    // 2) Send the opener AS USER through existing pipeline (saves to Firestore + context)
+    if (autoStart.seed) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ui:voicegrid:click', { detail: { index: -1, label: autoStart.seed } })
+        );
+      }
+    }
+
+    consumedRef.current = true;
+  }, [
+    autoStart,
+    isConversationActive,
+    startNewConversation,
+    resumeConversation,
+    browserSupportsSpeechRecognition,
+  ]);
 
   if (!browserSupportsSpeechRecognition) {
     return (
@@ -35,20 +103,6 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
       </Box>
     );
   }
-
-  const handleToggle = () => {
-    // Proactively dispatch conversation start/end so the panel definitely logs it.
-    if (typeof window !== 'undefined') {
-      if (isConversationActive) {
-        // we are about to stop
-        window.dispatchEvent(new CustomEvent('conversation:end'));
-      } else {
-        // we are about to start
-        window.dispatchEvent(new CustomEvent('conversation:start'));
-      }
-    }
-    toggleConversation();
-  };
 
   return (
     <Box
@@ -78,75 +132,62 @@ export default function VoiceControlBar({ onResponses, onLoadingChange }: VoiceC
       )}
 
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-        {/* Rectangular listening control with pulse animation */}
-        <Box
-          sx={{
-            position: 'relative',
-            height: 56,
-            borderRadius: 1.5, // 12px
-            // Pulse glow behind the button when active
-            ...(isConversationActive && hasSoundLeeway
-              ? {
-                  animation: 'pulseRect 2s infinite',
-                  '@keyframes pulseRect': {
-                    '0%': {
-                      boxShadow: '0 0 0 0 rgba(211, 47, 47, 0.35)',
-                    },
-                    '100%': {
-                      boxShadow: '0 0 0 18px rgba(211, 47, 47, 0)',
-                    },
-                  },
+        {/* Control buttons */}
+        {!isConversationActive ? (
+          <Stack direction="row" spacing={2}>
+            <Button
+              variant="contained"
+              startIcon={<AddCircleOutlineIcon />}
+              onClick={() => {
+                startNewConversation();
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('conversation:start'));
                 }
-              : {}),
-          }}
-        >
+              }}
+              sx={START_NEW_BUTTON_SX}
+            >
+              Start New Conversation
+            </Button>
+
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<PlayArrowIcon />}
+              disabled={!canResume}
+              onClick={() => {
+                // explicit RESUME
+                resumeConversation();
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('conversation:start'));
+                }
+              }}
+              sx={CONTROL_BUTTON_SX}
+            >
+              Resume Conversation
+            </Button>
+          </Stack>
+        ) : (
           <Button
-            variant={isConversationActive ? 'contained' : 'outlined'}
-            color={isConversationActive ? 'error' : 'inherit'}
-            disabled={!browserSupportsSpeechRecognition}
-            onClick={handleToggle}
-            startIcon={isConversationActive ? <MicIcon /> : <MicOffIcon />}
-            sx={{
-              height: 56,
-              borderRadius: 1.5, // keep same radius as wrapper
-              px: 2.5,
-              fontWeight: 700,
-              textTransform: 'none',
-              bgcolor: theme =>
-                isConversationActive ? theme.palette.error.main : undefined,
-              borderColor: theme =>
-                isConversationActive ? theme.palette.error.main : theme.palette.divider,
-              color: theme =>
-                isConversationActive ? theme.palette.error.contrastText : theme.palette.text.primary,
-              '&:hover': {
-                bgcolor: theme =>
-                  isConversationActive ? theme.palette.error.dark : undefined,
-                borderColor: theme =>
-                  isConversationActive ? theme.palette.error.dark : theme.palette.text.secondary,
-              },
+            startIcon={<MicOffIcon />}
+            onClick={() => {
+              stopConversation();
             }}
+            sx={STOP_BUTTON_SX}
           >
-            {isConversationActive ? 'STOP CONVERSATION' : 'START CONVERSATION'}
+            Stop Conversation
           </Button>
-        </Box>
+        )}
 
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
           onClick={() => {
             if (transcript) {
-              // onResponses([
-              //   'Could you repeat that?',
-              //   "I didn’t catch that",
-              //   'Let me think about that',
-              //   "That’s interesting",
-              //   'Tell me more',
-              //   "Let’s change the subject",
-              // ]);
+              window.dispatchEvent(new CustomEvent('stt:finalTranscript', { detail: transcript }));
             }
           }}
           disabled={!transcript}
-          sx={{ fontWeight: 'bold', px: 3, py: 1.5, minWidth: 200 }}
+          sx={CONTROL_BUTTON_SX}
         >
           Regenerate Responses
         </Button>

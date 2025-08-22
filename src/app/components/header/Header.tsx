@@ -18,7 +18,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 
-const routes = ['/', '/general', '/chat', '/settings'];
+const routes = ['/home', '/general', '/chat', '/settings'];
 const labels = ['Home', 'General', 'Chat', 'Settings'];
 
 export default function Header() {

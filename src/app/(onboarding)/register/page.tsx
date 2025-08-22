@@ -27,7 +27,7 @@ export default function RegisterPage() {
         description: payload.description.trim(),
       });
 
-      router.replace('/');
+      router.replace('/home');
     } catch (err: any) {
       setError(err?.message || 'Registration failed');
     } finally {
