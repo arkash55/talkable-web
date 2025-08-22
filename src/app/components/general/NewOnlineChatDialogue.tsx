@@ -17,13 +17,14 @@ import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import { collection, getDocs } from 'firebase/firestore';
 
 import { getAuth } from 'firebase/auth';
-import { createOnlineConversation } from '@/services/firestoreService';
+import { createOnlineConversation, getUsers } from '@/services/firestoreService';
 import { useRouter } from 'next/navigation';
 import { db } from '../../../../lib/fireBaseConfig';
+import { useEffect } from 'react';
 
 type UserRecord = {
   uid: string;
-  email: string;
+  email?: string;
   firstName?: string;
   lastName?: string;
   pronouns?: string;
@@ -37,45 +38,28 @@ type Props = {
 
 const filter = createFilterOptions<UserRecord>({
   stringify: (u) =>
-    `${u.firstName ?? ''} ${u.lastName ?? ''} ${u.email}`.trim().toLowerCase(),
+    `${u.firstName ?? ''} ${u.lastName ?? ''} ${u.email ?? ''}`
+      .toLowerCase()
+      .trim(),
   limit: 50,
 });
 
 export default function NewOnlineChatDialog({ open, onClose }: Props) {
   const router = useRouter();
-
   const [loading, setLoading] = React.useState(false);
   const [allUsers, setAllUsers] = React.useState<UserRecord[]>([]);
   const [inputValue, setInputValue] = React.useState('');
   const currentUid = getAuth().currentUser?.uid ?? null;
 
-  // Load users when modal opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (!open) return;
-
     let mounted = true;
+
     (async () => {
       setLoading(true);
       try {
-        const snap = await getDocs(collection(db, 'users'));
-        const users: UserRecord[] = [];
-        snap.forEach((doc) => {
-          const data = doc.data() as any;
-          // Expecting fields: firstName, lastName, email, pronouns, description
-          // (email should be stored in user doc during sign‑up/profile save)
-          if (doc.id !== currentUid && data?.email) {
-            users.push({
-              uid: doc.id,
-              email: data.email,
-              firstName: data.firstName,
-              lastName: data.lastName,
-              pronouns: data.pronouns,
-              description: data.description,
-            });
-          }
-        });
-        if (mounted) setAllUsers(users);
-        console.log(allUsers);
+        const rows = await getUsers({ excludeUid: currentUid || '' });
+        if (mounted) setAllUsers(rows);
       } catch (e) {
         console.error('Failed to load users:', e);
       } finally {
@@ -88,6 +72,7 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
     };
   }, [open, currentUid]);
 
+  
   const handleSelect = async (user: UserRecord | null) => {
     if (!user || !currentUid) return;
     try {
@@ -113,29 +98,40 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
           loading={loading}
           options={allUsers}
           filterOptions={filter}
+          // ✅ stable identity so MUI can manage selection & keys
+          isOptionEqualToValue={(a, b) => a.uid === b.uid}
+          // ✅ stable, human label (dup labels are okay; identity is via uid)
           getOptionLabel={(u) =>
-            u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email : ''
+            (u
+              ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()
+              : '') || u.email || ''
           }
-          // ensure we show *all* relevant info in the dropdown
           renderOption={(props, u) => {
             const name =
               `${u.firstName ?? ''} ${u.lastName ?? ''}`.replace(/\s+/g, ' ').trim();
             const initials =
               (u.firstName?.[0] ?? '') + (u.lastName?.[0] ?? '');
+            // ⬇️ IMPORTANT: do NOT add your own key here; props already includes a key
             return (
-              <li {...props} key={u.uid}>
+              <li {...props}>
                 <ListItemAvatar>
                   <Avatar>{initials || (u.email?.[0]?.toUpperCase() ?? '?')}</Avatar>
                 </ListItemAvatar>
                 <ListItemText
                   primary={
-                    name ? `${name}${u.pronouns ? ` (${u.pronouns})` : ''}` : u.email
+                    name ? `${name}${u.pronouns ? ` (${u.pronouns})` : ''}` : (u.email ?? 'Unknown user')
                   }
                   secondary={
                     <Box component="span" sx={{ display: 'block' }}>
-                      <Box component="span" sx={{ fontFamily: 'monospace' }}>
-                        {u.email}
-                      </Box>
+                      {u.email ? (
+                        <Box component="span" sx={{ fontFamily: 'monospace' }}>
+                          {u.email}
+                        </Box>
+                      ) : (
+                        <Box component="span" sx={{ color: 'text.disabled' }}>
+                          No email on file
+                        </Box>
+                      )}
                       {u.description ? (
                         <Box
                           component="span"
@@ -161,10 +157,9 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
               {...params}
               autoFocus
               placeholder="Search by name or email"
-              // Chrome speech input; other browsers ignore it harmlessly
               inputProps={{
                 ...params.inputProps,
-                'x-webkit-speech': 'x-webkit-speech',
+                'x-webkit-speech': 'x-webkit-speech', // Chrome mic 🎤
                 autoComplete: 'off',
               }}
               InputProps={{

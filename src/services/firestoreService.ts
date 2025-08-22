@@ -79,6 +79,17 @@ export type InboxItem = {
   lastMessageSenderId: string | null; // <-- single source of truth (uid or 'guest')
 };
 
+
+
+export type UserDirectoryEntry = {
+  uid: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  pronouns?: string;
+  description?: string;
+};
+
 // ---------- Path helpers ----------
 const usersCol = () => collection(db, 'users');
 const userDoc = (uid: string) => doc(db, 'users', uid);
@@ -117,58 +128,33 @@ export async function deleteUser(uid: string) {
   await batchDeleteCollection(userInboxCol(uid) as CollectionReference<DocumentData>);
 }
 
-
 export async function getUsers(options?: {
   excludeUid?: string;
-  search?: string;
   limit?: number;
 }): Promise<UserDirectoryEntry[]> {
-  const excludeUid = options?.excludeUid?.trim() || '';
-  const search = (options?.search || '').trim().toLowerCase();
-  const limitN = Math.max(1, Math.min(options?.limit ?? 500, 2000)); // safety cap
+  const excludeUid = options?.excludeUid ?? '';
+  const cap = Math.max(1, Math.min(options?.limit ?? 500, 2000));
 
-  // Basic capped scan; adjust to indexed prefix queries if you maintain `emailLower` fields.
-  const qRef = query(usersCol(), qLimit(limitN));
+  const qRef = query(usersCol(), qLimit(cap));
   const snap = await getDocs(qRef);
 
   const rows: UserDirectoryEntry[] = [];
   snap.forEach((d) => {
     if (excludeUid && d.id === excludeUid) return;
-
     const data = d.data() as any;
-    const entry: UserDirectoryEntry = {
+    rows.push({
       uid: d.id,
-      email: data?.email ?? data?.contact?.email ?? undefined,
-      firstName: data?.firstName,
-      lastName: data?.lastName,
-      pronouns: data?.pronouns,
-      description: data?.description,
-      createdAt: data?.createdAt,
-    };
-
-    if (search) {
-      const hay =
-        `${entry.firstName ?? ''} ${entry.lastName ?? ''} ${entry.email ?? ''}`
-          .toLowerCase()
-          .replace(/\s+/g, ' ')
-          .trim();
-      if (!hay.includes(search)) return;
-    }
-
-    rows.push(entry);
-  });
-
-  rows.sort((a, b) => {
-    const an = `${a.firstName ?? ''} ${a.lastName ?? ''}`.trim().toLowerCase();
-    const bn = `${b.firstName ?? ''} ${b.lastName ?? ''}`.trim().toLowerCase();
-    if (an && bn && an !== bn) return an.localeCompare(bn);
-    const ae = (a.email ?? '').toLowerCase();
-    const be = (b.email ?? '').toLowerCase();
-    return ae.localeCompare(be);
+      email: data?.email ?? undefined,
+      firstName: data?.firstName ?? undefined,
+      lastName: data?.lastName ?? undefined,
+      pronouns: data?.pronouns ?? undefined,
+      description: data?.description ?? undefined,
+    });
   });
 
   return rows;
 }
+
 
 
 // =====================================================
