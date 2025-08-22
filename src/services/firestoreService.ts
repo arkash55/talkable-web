@@ -43,6 +43,7 @@ export type UserProfile = {
   tone: string;
   voice: string;
   description: string;
+  email: string;
   createdAt: Timestamp | ReturnType<typeof serverTimestamp>;
 };
 
@@ -114,6 +115,60 @@ export async function deleteUser(uid: string) {
   await deleteDoc(userDoc(uid));
   await batchDeleteCollection(userInboxCol(uid) as CollectionReference<DocumentData>);
 }
+
+
+export async function getUsers(options?: {
+  excludeUid?: string;
+  search?: string;
+  limit?: number;
+}): Promise<UserDirectoryEntry[]> {
+  const excludeUid = options?.excludeUid?.trim() || '';
+  const search = (options?.search || '').trim().toLowerCase();
+  const limitN = Math.max(1, Math.min(options?.limit ?? 500, 2000)); // safety cap
+
+  // Basic capped scan; adjust to indexed prefix queries if you maintain `emailLower` fields.
+  const qRef = query(usersCol(), qLimit(limitN));
+  const snap = await getDocs(qRef);
+
+  const rows: UserDirectoryEntry[] = [];
+  snap.forEach((d) => {
+    if (excludeUid && d.id === excludeUid) return;
+
+    const data = d.data() as any;
+    const entry: UserDirectoryEntry = {
+      uid: d.id,
+      email: data?.email ?? data?.contact?.email ?? undefined,
+      firstName: data?.firstName,
+      lastName: data?.lastName,
+      pronouns: data?.pronouns,
+      description: data?.description,
+      createdAt: data?.createdAt,
+    };
+
+    if (search) {
+      const hay =
+        `${entry.firstName ?? ''} ${entry.lastName ?? ''} ${entry.email ?? ''}`
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .trim();
+      if (!hay.includes(search)) return;
+    }
+
+    rows.push(entry);
+  });
+
+  rows.sort((a, b) => {
+    const an = `${a.firstName ?? ''} ${a.lastName ?? ''}`.trim().toLowerCase();
+    const bn = `${b.firstName ?? ''} ${b.lastName ?? ''}`.trim().toLowerCase();
+    if (an && bn && an !== bn) return an.localeCompare(bn);
+    const ae = (a.email ?? '').toLowerCase();
+    const be = (b.email ?? '').toLowerCase();
+    return ae.localeCompare(be);
+  });
+
+  return rows;
+}
+
 
 // =====================================================
 // Conversations
