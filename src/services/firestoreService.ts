@@ -161,42 +161,6 @@ export async function getUsers(options?: {
 // Conversations
 // =====================================================
 
-export async function createOnlineConversation(params: {
-  creatorUid: string;
-  otherUid: string;
-  title?: string | null;
-}): Promise<string> {
-  const { creatorUid, otherUid, title = null } = params;
-
-  const cid = await runTransaction(db, async (tx) => {
-    const cRef = doc(conversationsCol());
-    const convo: Conversation = {
-      mode: 'online',
-      title,
-      createdAt: serverTimestamp(),
-      createdBy: creatorUid,
-      members: { [creatorUid]: true, [otherUid]: true },
-      memberIds: [creatorUid, otherUid],
-    };
-    tx.set(cRef, convo);
-
-    const baseInbox: InboxItem = {
-      mode: 'online',
-      title,
-      lastMessagePreview: '',
-      lastMessageAt: serverTimestamp(),
-      lastReadAt: null as any,
-      lastMessageSenderId: null, // no message yet
-    };
-
-    tx.set(userInboxDoc(creatorUid, cRef.id), baseInbox);
-    tx.set(userInboxDoc(otherUid, cRef.id), baseInbox);
-
-    return cRef.id;
-  });
-
-  return cid;
-}
 
 export async function createLiveConversation(params: { ownerUid: string; title?: string | null }): Promise<string> {
   const { ownerUid, title = null } = params;
@@ -226,14 +190,10 @@ export async function createLiveConversation(params: { ownerUid: string; title?:
   return ref.id;
 }
 
-
-export async function findOnlineConversationBetween(
+export async function findOnlineConversationBetweenByMembers(
   uidA: string,
   uidB: string
 ): Promise<string | null> {
-  // Query conversations where mode==='online' and both users are members
-  // Uses the 'members' map so we can apply two equality filters (supported).
-  // You may be prompted by Firestore to create a composite index the first time.
   const qRef = query(
     conversationsCol(),
     where('mode', '==', 'online'),
@@ -241,11 +201,68 @@ export async function findOnlineConversationBetween(
     where(`members.${uidB}`, '==', true),
     qLimit(1)
   );
-
   const snap = await getDocs(qRef);
-  if (snap.empty) return null;
-  return snap.docs[0].id;
+  return snap.empty ? null : snap.docs[0].id;
 }
+
+/** 
+ * Create the conversation FIRST, then write both inbox docs.
+ * This avoids the rule race where /conversations/{cid} doesn't exist yet.
+ */
+export async function createOnlineConversationSafe(params: {
+  creatorUid: string;
+  otherUid: string;
+  title?: string | null;
+}): Promise<string> {
+  const { creatorUid, otherUid, title = null } = params;
+
+  // 1) create conversation first
+  const cRef = await addDoc(conversationsCol(), {
+    mode: 'online',
+    title,
+    createdAt: serverTimestamp(),
+    createdBy: creatorUid,
+    members: { [creatorUid]: true, [otherUid]: true },
+    memberIds: [creatorUid, otherUid],
+  } as Conversation);
+
+  // 2) then write both inbox entries
+  const baseInbox: InboxItem = {
+    mode: 'online',
+    title,
+    lastMessagePreview: '',
+    lastMessageAt: serverTimestamp(),
+    lastReadAt: null as any,
+    lastMessageSenderId: null,
+  };
+
+  await Promise.all([
+    setDoc(userInboxDoc(creatorUid, cRef.id), baseInbox, { merge: true }),
+    setDoc(userInboxDoc(otherUid,  cRef.id), baseInbox, { merge: true }),
+  ]);
+
+  return cRef.id;
+}
+
+/**
+ * One-call helper: reuse existing convo if present, else create safely.
+ */
+export async function ensureOnlineConversation(
+  uidA: string,
+  uidB: string,
+  title?: string | null
+): Promise<string> {
+  // Try to find existing by members map
+  console.log("here")
+  const existing = await findOnlineConversationBetweenByMembers(uidA, uidB);
+  if (existing) return existing;
+  // Else create safely
+  return createOnlineConversationSafe({ creatorUid: uidA, otherUid: uidB, title: title ?? null });
+}
+
+
+
+
 
 export async function deleteConversation(cid: string) {
   const cSnap = await getDoc(conversationDoc(cid));

@@ -18,12 +18,14 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useRouter } from 'next/navigation';
 import { getAuth } from 'firebase/auth';
 
-// If you created listUsers in your firestore service (recommended)
-import { getUsers, type UserDirectoryEntry } from '@/services/firestoreService';
-// If you used a different name earlier (e.g., getUsers), you can import that instead.
-// import { getUsers as listUsers } from '@/services/firestoreService';
-
-import { createOnlineConversation } from '@/services/firestoreService';
+import {
+  getUsers,
+  type UserDirectoryEntry,
+  findOnlineConversationBetween,
+  createOnlineConversationSafe,
+  ensureOnlineConversation
+} from '@/services/firestoreService';
+import { useEffect } from 'react';
 
 type Props = {
   open: boolean;
@@ -31,7 +33,6 @@ type Props = {
 };
 
 type UserRecord = UserDirectoryEntry & {
-  // ensure optional fields exist for rendering
   email?: string;
   firstName?: string;
   lastName?: string;
@@ -56,8 +57,7 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
   const [inputValue, setInputValue] = React.useState('');
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
 
-  // Load users when modal opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (!open) return;
     let canceled = false;
     (async () => {
@@ -79,25 +79,22 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
     };
   }, [open, currentUid]);
 
-  // Only open dropdown when there is text
-  React.useEffect(() => {
-    const hasText = inputValue.trim().length > 0;
-    setDropdownOpen(hasText);
+  useEffect(() => {
+    setDropdownOpen(inputValue.trim().length > 0);
   }, [inputValue]);
 
   const handleSelect = async (user: UserRecord | null) => {
     if (!user || !currentUid) return;
-    try {
-      const cid = await createOnlineConversation({
-        creatorUid: currentUid,
-        otherUid: user.uid,
-        title: null,
-      });
-      onClose();
-      router.push(`/chat/${cid}`);
-    } catch (err) {
-      console.error('Error creating online conversation:', err);
-    }
+        try {
+            // logs help separate read vs write errors
+            console.log('[chat] resolving convo with', { currentUid, other: user.uid });
+            const cid = await ensureOnlineConversation(currentUid, user.uid);
+            onClose();
+            router.push(`/chat/${cid}`);
+        } catch (err: any) {
+            // If this prints, copy the *full* error including code into console.
+            console.error('Error resolving/creating online conversation:', err);
+        }
   };
 
   return (
@@ -116,24 +113,19 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
               ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()
               : '') || u.email || ''
           }
-          // 🔒 Control opening: only when typing
           open={dropdownOpen}
           onOpen={() => {
-            // Block open-on-focus / icon if no text
-            if (inputValue.trim().length === 0) {
-              setDropdownOpen(false);
-            }
+            if (inputValue.trim().length === 0) setDropdownOpen(false);
           }}
           onClose={() => setDropdownOpen(false)}
           openOnFocus={false}
-          forcePopupIcon // keep an icon on the right
-          popupIcon={<SearchIcon />} // 🔄 replace chevron with search icon
+          forcePopupIcon
+          popupIcon={<SearchIcon />}
           renderOption={(props, u) => {
             const name =
               `${u.firstName ?? ''} ${u.lastName ?? ''}`.replace(/\s+/g, ' ').trim();
             const initials =
               (u.firstName?.[0] ?? '') + (u.lastName?.[0] ?? '');
-            // Do NOT add your own key; props contains a key
             return (
               <li {...props}>
                 <ListItemAvatar>
@@ -181,7 +173,7 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
               placeholder="Search by name or email"
               inputProps={{
                 ...params.inputProps,
-                'x-webkit-speech': 'x-webkit-speech', // Chrome mic 🎤
+                'x-webkit-speech': 'x-webkit-speech',
                 autoComplete: 'off',
               }}
               InputProps={{
