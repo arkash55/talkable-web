@@ -226,6 +226,27 @@ export async function createLiveConversation(params: { ownerUid: string; title?:
   return ref.id;
 }
 
+
+export async function findOnlineConversationBetween(
+  uidA: string,
+  uidB: string
+): Promise<string | null> {
+  // Query conversations where mode==='online' and both users are members
+  // Uses the 'members' map so we can apply two equality filters (supported).
+  // You may be prompted by Firestore to create a composite index the first time.
+  const qRef = query(
+    conversationsCol(),
+    where('mode', '==', 'online'),
+    where(`members.${uidA}`, '==', true),
+    where(`members.${uidB}`, '==', true),
+    qLimit(1)
+  );
+
+  const snap = await getDocs(qRef);
+  if (snap.empty) return null;
+  return snap.docs[0].id;
+}
+
 export async function deleteConversation(cid: string) {
   const cSnap = await getDoc(conversationDoc(cid));
   if (!cSnap.exists()) return;
