@@ -33,7 +33,7 @@ export default function ChatClient() {
     <div style={{ display: 'flex', height: '100%', width: '100%' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <ChatVoiceBar
-          recipientName={otherName}
+          recipientName={otherName || ''}
           onTranscript={(finalText) => {
             // Send custom STT message
             sendTextMessage(finalText);
