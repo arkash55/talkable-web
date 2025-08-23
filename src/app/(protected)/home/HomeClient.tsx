@@ -320,10 +320,10 @@ export default function HomeClient() {
           </Box>
         ) : (
           <VoiceGrid
-            blocks={blocks}
-            disabled={isPlaying}
-            activeIndex={activeIndex}
-          />
+              blocks={blocks}
+              disabled={isPlaying}
+              activeIndex={activeIndex} 
+              type={'homePage'}          />
         )}
       </div>
     </div>

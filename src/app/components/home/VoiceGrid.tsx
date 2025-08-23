@@ -8,10 +8,14 @@ interface VoiceGridBlock {
   onClick: () => void;
 }
 
+
+type VoiceGridType = 'homePage' | 'chatPage';
+
 interface VoiceGridProps {
-  blocks: VoiceGridBlock[];     // supports length 2–6
-  disabled?: boolean;           // disable all clicks while TTS plays
-  activeIndex?: number | null;  // keep selected cell highlighted
+  blocks: VoiceGridBlock[];     
+  disabled?: boolean;          
+  activeIndex?: number | null;  
+  type: VoiceGridType;
 }
 
 type Pos = { col: number; row: number; colSpan: number; rowSpan: number };
@@ -64,6 +68,7 @@ export default function VoiceGrid({
   blocks,
   disabled = false,
   activeIndex = null,
+  type = 'homePage'
 }: VoiceGridProps) {
   // console.log('VoiceGrid blocks:', blocks);
   const count = Math.max(0, Math.min(blocks.length, 6));
@@ -97,11 +102,21 @@ export default function VoiceGrid({
               !disabled
                 ? () => {
                     block.onClick();
-                    window.dispatchEvent(
-                      new CustomEvent('ui:voicegrid:click', {
+
+                    if (type == 'homePage') {
+                        window.dispatchEvent(
+                          new CustomEvent('ui:voicegrid:click', {
                         detail: { index, label: block.label },
-                      })
-                    );
+                      }));
+                    } else {
+                      window.dispatchEvent(
+                        new CustomEvent('chat:ui:voicegrid:click', {
+                          detail: { index, label: block.label },
+                        })
+                      );
+                    }
+
+        
                   }
                 : undefined
             }
