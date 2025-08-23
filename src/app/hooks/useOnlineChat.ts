@@ -1,101 +1,129 @@
-// src/app/hooks/useOnlineChat.ts
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-
-import { getCandidates, type Candidate, type GenerateResponse } from '@/services/graniteClient';
-import { sendMessage, onMessages } from '@/services/firestoreService';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAuth } from 'firebase/auth';
+import { onMessages, sendMessage, type Message as FsMessage } from '@/services/firestoreService';
+import { getCandidates, type Candidate } from '@/services/graniteClient';
 
-type UseOnlineChatResult = {
-  transcript: string;
-  listening: boolean;
+import {
+  appendWithSlidingWindow,
+  buildContextWindow,
+  type MessageHistoryItem,
+} from '@/app/utils/contextWindow';
+
+type UseOnlineChatReturn = {
   aiResponses: Candidate[];
-  startRecording: () => void;
-  stopRecording: () => void;
+  messages: Array<{ id: string; text: string; senderId: string; sentAt?: Date }>;
   sendTextMessage: (text: string) => Promise<void>;
+  regenerate: () => Promise<void>;
 };
 
-export function useOnlineChat(cid: string | null): UseOnlineChatResult {
-  const [listening, setListening] = useState(false);
+const HISTORY_LIMIT = { maxCount: 200, maxChars: 12000 };
+const CTX_LIMIT = { maxMessages: 12, maxChars: 1500 };
+
+export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
   const [aiResponses, setAiResponses] = useState<Candidate[]>([]);
-  const [transcript, setTranscript] = useState('');
+  const [messages, setMessages] = useState<Array<{ id: string; text: string; senderId: string; sentAt?: Date }>>([]);
 
-  const { transcript: liveTranscript, resetTranscript } = useSpeechRecognition();
-  const processingRef = useRef(false);
+  const myUid = useMemo(() => getAuth().currentUser?.uid ?? null, []);
+  const historyRef = useRef<MessageHistoryItem[]>([]);
+  const lastGeneratedForMsgId = useRef<string | null>(null);
+  const generating = useRef<boolean>(false);
 
-  // Handle transcript updates
-  useEffect(() => {
-    if (!listening) return;
-    setTranscript(liveTranscript);
-  }, [liveTranscript, listening]);
-
-  const startRecording = () => {
-    resetTranscript();
-    SpeechRecognition.startListening({ continuous: true });
-    setListening(true);
-    window.dispatchEvent(new Event('onlinechat:record:start'));
-  };
-
-  const stopRecording = async () => {
-    SpeechRecognition.stopListening();
-    setListening(false);
-    window.dispatchEvent(new Event('onlinechat:record:end'));
-
-    if (liveTranscript.trim() && cid) {
-      await sendTextMessage(liveTranscript.trim());
+  // Helper: rebuild sliding history (idempotent) from Firestore messages
+  const rebuildHistory = (arr: Array<{ id: string; text: string; senderId: string }>) => {
+    historyRef.current.length = 0; // clear
+    for (const m of arr) {
+      appendWithSlidingWindow(
+        historyRef.current,
+        {
+          sender: m.senderId === myUid ? 'user' : 'guest',
+          content: m.text,
+          createdAt: new Date().toISOString(),
+        },
+        HISTORY_LIMIT
+      );
     }
-    resetTranscript();
-    setTranscript('');
   };
 
-  const sendTextMessage = async (text: string) => {
-    if (!cid || !text.trim()) return;
+  // Generate suggestions based on last message
+  const generateForLast = async () => {
+    if (!cid || generating.current) return;
+    if (!messages.length) return;
 
-    const uid = getAuth().currentUser?.uid ?? 'guest';
-    await sendMessage({ cid, senderId: uid, text });
+    const last = messages[messages.length - 1];
+    if (lastGeneratedForMsgId.current === last.id) return;
 
-    // After sending → generate AI responses
+    generating.current = true;
     try {
-      processingRef.current = true;
-      const resp: GenerateResponse = await getCandidates(text, 'You are an online chat AI.', []);
-      setAiResponses(resp.candidates);
+      const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
 
-      window.dispatchEvent(new CustomEvent('onlinechat:responses', { detail: resp }));
-    } catch (err) {
-      console.error('Failed to fetch AI responses:', err);
+      const lastFromMe = last.senderId === myUid;
+      const system =
+        lastFromMe
+          ? 'You are helping craft brief follow-ups. Suggest concise continuations or short add-ons (1–2 sentences). Provide diverse tones.'
+          : 'You are a helpful, concise chat assistant. Suggest short, natural replies (1–2 sentences). Provide diverse but relevant tones.';
+
+      const prompt = lastFromMe
+        ? `Continue or add a brief follow-up to my previous message:\n"${last.text}"`
+        : last.text;
+
+      const resp = await getCandidates(prompt, system, ctx, {
+        k: 6,
+        params: { temperature: 0.7, top_p: 0.95, top_k: 50, max_new_tokens: 64 },
+      });
+
+      setAiResponses(resp.candidates ?? []);
+      lastGeneratedForMsgId.current = last.id;
+    } catch (e) {
+      console.error('generateForLast error:', e);
     } finally {
-      processingRef.current = false;
+      generating.current = false;
     }
   };
 
-  // Listen for other-user messages → generate new responses
+  // Real-time subscription to messages
   useEffect(() => {
     if (!cid) return;
-    const unsub = onMessages(cid, async (msgs) => {
-      if (!msgs.length) return;
-      const last = msgs[msgs.length - 1];
-      if (last.senderId === getAuth().currentUser?.uid) return; // only react to others
+    const unsub = onMessages(
+      cid,
+      (fsMsgs) => {
+        // Normalize and keep time as Date if available
+        const norm = fsMsgs.map((m) => ({
+          id: m.id,
+          text: m.text,
+          senderId: m.senderId,
+          sentAt: (m.sentAt as any)?.toDate ? (m.sentAt as any).toDate() : undefined,
+        }));
+        setMessages(norm);
+        rebuildHistory(norm);
+      },
+      200
+    );
+    return () => unsub?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cid, myUid]);
 
-      try {
-        const resp: GenerateResponse = await getCandidates(last.text, 'You are an online chat AI.', []);
-        setAiResponses(resp.candidates);
+  // Whenever messages change, try generating
+  useEffect(() => {
+    if (!cid) return;
+    if (!messages.length) return;
+    generateForLast();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cid, messages.map(m => m.id).join('|')]);
 
-        window.dispatchEvent(new CustomEvent('onlinechat:responses', { detail: resp }));
-      } catch (err) {
-        console.error('Error generating responses to peer:', err);
-      }
-    });
-    return () => unsub();
-  }, [cid]);
-
-  return {
-    transcript,
-    listening,
-    aiResponses,
-    startRecording,
-    stopRecording,
-    sendTextMessage,
+  // Send text (user typed or STT transcript or clicked candidate)
+  const sendTextMessage = async (text: string) => {
+    const clean = (text ?? '').trim();
+    if (!clean || !cid || !myUid) return;
+    await sendMessage({ cid, senderId: myUid, text: clean });
+    // history/subscription will update and re-trigger generation automatically
   };
+
+  const regenerate = async () => {
+    lastGeneratedForMsgId.current = null;
+    await generateForLast();
+  };
+
+  return { aiResponses, messages, sendTextMessage, regenerate };
 }

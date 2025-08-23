@@ -323,7 +323,8 @@ export default function HomeClient() {
               blocks={blocks}
               disabled={isPlaying}
               activeIndex={activeIndex} 
-              type={'homePage'}          />
+              type={'homePage'}
+              activeConversation={Boolean(cid)}          />
         )}
       </div>
     </div>
