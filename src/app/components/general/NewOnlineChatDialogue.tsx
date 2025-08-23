@@ -21,9 +21,7 @@ import { getAuth } from 'firebase/auth';
 import {
   getUsers,
   type UserDirectoryEntry,
-  findOnlineConversationBetween,
-  createOnlineConversationSafe,
-  ensureOnlineConversation
+  ensureOnlineConversation,
 } from '@/services/firestoreService';
 import { useEffect } from 'react';
 
@@ -85,16 +83,25 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
 
   const handleSelect = async (user: UserRecord | null) => {
     if (!user || !currentUid) return;
-        try {
-            // logs help separate read vs write errors
-            console.log('[chat] resolving convo with', { currentUid, other: user.uid });
-            const cid = await ensureOnlineConversation(currentUid, user.uid);
-            onClose();
-            router.push(`/chat/${cid}`);
-        } catch (err: any) {
-            // If this prints, copy the *full* error including code into console.
-            console.error('Error resolving/creating online conversation:', err);
-        }
+    try {
+      // Resolve or create the online conversation
+      const cid = await ensureOnlineConversation(currentUid, user.uid);
+
+      // Build display name and pass details to chat route
+      const name = `${user.firstName ?? ''} ${user.lastName ?? ''}`
+        .replace(/\s+/g, ' ')
+        .trim() || user.email || 'Unknown user';
+
+      const params = new URLSearchParams();
+      params.set('otherUid', user.uid);
+      if (name) params.set('otherName', name);
+      if (user.email) params.set('otherEmail', user.email);
+
+      onClose();
+      router.push(`/chat/${cid}?${params.toString()}`);
+    } catch (err: any) {
+      console.error('Error resolving/creating online conversation:', err);
+    }
   };
 
   return (
@@ -133,7 +140,9 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
                 </ListItemAvatar>
                 <ListItemText
                   primary={
-                    name ? `${name}${u.pronouns ? ` (${u.pronouns})` : ''}` : (u.email ?? 'Unknown user')
+                    name
+                      ? `${name}${u.pronouns ? ` (${u.pronouns})` : ''}`
+                      : (u.email ?? 'Unknown user')
                   }
                   secondary={
                     <Box component="span" sx={{ display: 'block' }}>

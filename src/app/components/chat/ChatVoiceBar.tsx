@@ -10,14 +10,13 @@ import VoiceWaveform from '@/app/components/home/VoiceWaveform';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import { START_NEW_BUTTON_SX, STOP_BUTTON_SX } from '@/app/styles/buttonStyles';
 
+
+
 type Props = {
-  /** Optional: handle the final transcript. Leave unimplemented if you want (no-op). */
+  recipientName: string;
   onTranscript?: (finalText: string) => void;
-  /** Silence (ms) after which we finalize the transcript. Default 2000ms. */
   silenceMs?: number;
-  /** How long to keep the final transcript on screen after STT ends. Default 5000ms. */
   keepFinalMs?: number;
-  /** Show the transcript under the bar. Default true. */
   showTranscript?: boolean;
 };
 
@@ -27,6 +26,7 @@ const EVT_START = 'chat:stt:startListening';
 const EVT_FINAL = 'chat:stt:finalTranscript';
 
 export default function ChatVoiceBar({
+  recipientName,
   onTranscript,
   silenceMs = 2000,
   keepFinalMs = 5000,
@@ -159,7 +159,7 @@ export default function ChatVoiceBar({
       }}
     >
       <Typography variant="h6" sx={{ fontWeight: 600 }}>
-        Conversation With Name
+         {`Conversation With ${recipientName}`}
       </Typography>
 
       {(listening || speaking) && (

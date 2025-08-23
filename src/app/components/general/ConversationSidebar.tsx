@@ -1,7 +1,7 @@
 // src/app/components/general/ConversationsSidebar.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Box,
   Paper,
@@ -10,15 +10,6 @@ import {
   Tooltip,
   Chip,
   CardActionArea,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  TextField,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
   CircularProgress,
   Button,
 } from '@mui/material';
@@ -26,11 +17,16 @@ import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ScheduleIcon from '@mui/icons-material/Schedule';
-import AddIcon from '@mui/icons-material/Add';
 import { useRouter } from 'next/navigation';
 
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  doc,
+  onSnapshot,
+  Unsubscribe,
+} from 'firebase/firestore';
 
 import { onInbox, type InboxItem, createOnlineConversation } from '@/services/firestoreService';
 import { db } from '../../../../lib/fireBaseConfig';
@@ -90,6 +86,12 @@ function isUnread(item: InboxItem): boolean {
   }
 }
 
+type OtherDetails = {
+  otherUid: string;
+  name: string;       // "First Last" or email or "Unknown user"
+  email?: string;
+};
+
 export default function ConversationsSidebar() {
   const router = useRouter();
   const [uid, setUid] = useState<string | null>(null);
@@ -98,10 +100,15 @@ export default function ConversationsSidebar() {
   // dialog state
   const [openDialog, setOpenDialog] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [users, setUsers] = useState<{ uid: string; email: string }[]>([]);
-  const [search, setSearch] = useState('');
 
   const currentUid = getAuth().currentUser?.uid ?? null;
+
+  // Map: cid -> details for the OTHER participant (for online convos)
+  const [otherByCid, setOtherByCid] = useState<Record<string, OtherDetails>>({});
+
+  // Keep unsubscribers so we can clean up as the list changes
+  const convUnsubsRef = useRef<Record<string, Unsubscribe>>({});
+  const userUnsubsRef = useRef<Record<string, Unsubscribe>>({});
 
   // auth -> uid
   useEffect(() => {
@@ -116,18 +123,81 @@ export default function ConversationsSidebar() {
     return () => unsub?.();
   }, [uid]);
 
+  // Resolve/display other user's details for ONLINE conversations and keep them fresh
+  useEffect(() => {
+    const me = getAuth().currentUser?.uid ?? null;
+    if (!me) return;
+
+    const onlineCids = new Set(history.filter(h => h.mode === 'online').map(h => h.id));
+
+    // Unsubscribe stale listeners for conversations not in the list anymore
+    for (const cid of Object.keys(convUnsubsRef.current)) {
+      if (!onlineCids.has(cid)) {
+        convUnsubsRef.current[cid]?.();
+        delete convUnsubsRef.current[cid];
+      }
+    }
+    // Unsubscribe stale user profile listeners (keyed as `${cid}:${uid}`)
+    for (const key of Object.keys(userUnsubsRef.current)) {
+      const [cidFromKey] = key.split(':');
+      if (!onlineCids.has(cidFromKey)) {
+        userUnsubsRef.current[key]?.();
+        delete userUnsubsRef.current[key];
+      }
+    }
+
+    // For each online conversation, attach a listener to find the other participant uid,
+    // then attach a listener to that user's profile to resolve name/email.
+    onlineCids.forEach((cid) => {
+      if (convUnsubsRef.current[cid]) return; // already listening
+
+      const cRef = doc(db, 'conversations', cid);
+      convUnsubsRef.current[cid] = onSnapshot(cRef, async (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() as any;
+        const memberIds: string[] = Array.isArray(data?.memberIds) ? data.memberIds : [];
+        const otherUid = memberIds.find((m) => m !== me);
+        if (!otherUid) return;
+
+        const userKey = `${cid}:${otherUid}`;
+        if (userUnsubsRef.current[userKey]) return; // already listening to user
+
+        const uRef = doc(db, 'users', otherUid);
+        userUnsubsRef.current[userKey] = onSnapshot(uRef, (uSnap) => {
+          const u = uSnap.data() as any;
+          const full = [u?.firstName, u?.lastName].filter(Boolean).join(' ').trim();
+          const display = full || u?.email || 'Unknown user';
+          setOtherByCid((prev) => {
+            const existing = prev[cid];
+            const next: OtherDetails = { otherUid, name: display, email: u?.email };
+            if (
+              existing &&
+              existing.otherUid === next.otherUid &&
+              existing.name === next.name &&
+              existing.email === next.email
+            ) {
+              return prev;
+            }
+            return { ...prev, [cid]: next };
+          });
+        });
+      });
+    });
+
+    // Cleanup on unmount
+    return () => {
+      Object.values(convUnsubsRef.current).forEach((u) => u?.());
+      convUnsubsRef.current = {};
+      Object.values(userUnsubsRef.current).forEach((u) => u?.());
+      userUnsubsRef.current = {};
+    };
+  }, [history]);
+
+  // (Optional spinner trigger you had)
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const snap = await getDocs(collection(db, 'users'));
-      const allUsers: { uid: string; email: string }[] = [];
-      snap.forEach((doc) => {
-        const data = doc.data();
-        if (doc.id !== currentUid && data?.email) {
-          allUsers.push({ uid: doc.id, email: data.email });
-        }
-      });
-      setUsers(allUsers);
+      await getDocs(collection(db, 'users'));
     } catch (err) {
       console.error('Error fetching users:', err);
     } finally {
@@ -170,23 +240,22 @@ export default function ConversationsSidebar() {
           </Typography>
           <Chip size="small" label={history.length} sx={{ ml: 'auto' }} variant="outlined" />
 
-          <Button sx={REFRESH_BUTTON_SX}
-            onClick={() => {
-              fetchUsers();
-              setOpenDialog(true);
-            }}
-            
-          >   
-            Create New Online Chat
-          </Button>
-          {/* <IconButton
+          <Button
+            sx={REFRESH_BUTTON_SX}
             onClick={() => {
               fetchUsers();
               setOpenDialog(true);
             }}
           >
-            <AddIcon />
-          </IconButton> */}
+            {loadingUsers ? (
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <CircularProgress size={16} />
+                <span>Loading…</span>
+              </Stack>
+            ) : (
+              'Create New Online Chat'
+            )}
+          </Button>
         </Stack>
 
         {history.length === 0 ? (
@@ -219,6 +288,23 @@ export default function ConversationsSidebar() {
                   ? 'You'
                   : '';
 
+              const other = item.mode === 'online' ? otherByCid[item.id] : undefined;
+              const namePrefix =
+                item.mode === 'online' && other?.name ? `${other.name} — ` : '';
+
+              const go = () => {
+                if (item.mode === 'online') {
+                  // Pass other user's details via querystring to /chat/[cid]
+                  const params = new URLSearchParams();
+                  if (other?.otherUid) params.set('otherUid', other.otherUid);
+                  if (other?.name) params.set('otherName', other.name);
+                  if (other?.email) params.set('otherEmail', other.email);
+                  router.push(`/chat/${item.id}${params.toString() ? `?${params.toString()}` : ''}`);
+                } else {
+                  router.push(`/home?cid=${item.id}`);
+                }
+              };
+
               return (
                 <Paper
                   key={item.id}
@@ -236,16 +322,7 @@ export default function ConversationsSidebar() {
                     },
                   }}
                 >
-                  <CardActionArea
-                    onClick={() => {
-                      if (item.mode === 'online') {
-                        router.push(`/chat/${item.id}`);
-                      } else {
-                        router.push(`/home?cid=${item.id}`);
-                      }
-                    }}
-                    sx={{ borderRadius: 2, p: 0.5, height: '100%' }}
-                  >
+                  <CardActionArea onClick={go} sx={{ borderRadius: 2, p: 0.5, height: '100%' }}>
                     <Stack
                       direction="row"
                       alignItems="center"
@@ -285,6 +362,7 @@ export default function ConversationsSidebar() {
                           noWrap
                           sx={{ mt: 0.5 }}
                         >
+                          {namePrefix}
                           {lastSender ? `${lastSender}: ` : ''}
                           {secondary}
                         </Typography>
@@ -300,7 +378,7 @@ export default function ConversationsSidebar() {
         )}
       </Box>
 
-     <NewOnlineChatDialogue open={openDialog} onClose={() => setOpenDialog(false)} />
+      <NewOnlineChatDialogue open={openDialog} onClose={() => setOpenDialog(false)} />
     </>
   );
 }

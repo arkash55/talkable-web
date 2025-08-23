@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import ChatVoiceBar from '@/app/components/chat/ChatVoiceBar';
 import ChatHistoryPanel from '@/app/components/chat/ChatHistoryPanel';
 import VoiceGrid from '@/app/components/home/VoiceGrid';
@@ -16,7 +16,13 @@ function formatMetaLabel(text: string, avgLogProb?: number, relativeProb?: numbe
 
 export default function ChatClient() {
   const { cid } = useParams<{ cid: string }>();
+   const qs = useSearchParams();
+  const otherUid   = qs.get('otherUid');
+  const otherName  = qs.get('otherName');
+  const otherEmail = qs.get('otherEmail');
   const { aiResponses, messages, sendTextMessage, regenerate } = useOnlineChat(cid ?? null);
+
+
 
   const blocks = aiResponses.slice(0, 6).map((c) => ({
     label: formatMetaLabel(c.text.trim(), c.avgLogProb, c.relativeProb, c.tokens),
@@ -27,6 +33,7 @@ export default function ChatClient() {
     <div style={{ display: 'flex', height: '100%', width: '100%' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <ChatVoiceBar
+          recipientName={otherName}
           onTranscript={(finalText) => {
             // Send custom STT message
             sendTextMessage(finalText);
