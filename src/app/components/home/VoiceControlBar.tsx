@@ -151,6 +151,7 @@ export default function VoiceControlBar({
 
             <Button
               variant="contained"
+      
               startIcon={<PlayArrowIcon />}
               disabled={!canResume}
               onClick={() => {
