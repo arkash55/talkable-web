@@ -3,6 +3,7 @@
 
 import { Box, Typography, Button, Stack } from '@mui/material';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
+import { useAdvancedMode } from '@/app/context/AdvancedModeContext';
 
 interface FlowDebug {
   prob?: number;               // 0..1
@@ -145,6 +146,7 @@ export default function VoiceGrid({
   // Normal grid
   const count = Math.max(0, Math.min(blocks.length, 6));
   const positions = layoutForCount(count);
+  const { advanced } = useAdvancedMode(); 
 
   return (
     <Box
@@ -229,7 +231,7 @@ export default function VoiceGrid({
             </Typography>
 
             {/* Bottom-right debug panel */}
-            {hasDebug && (
+            {advanced && hasDebug && (
               <Box
                 sx={{
                   position: 'absolute',
