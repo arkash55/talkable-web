@@ -11,7 +11,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import VoiceWaveform from './VoiceWaveform';
 import { useVoiceControl } from '@/app/hooks/useVoiceControl';
 import { GenerateResponse } from '@/services/graniteClient';
-import { START_NEW_BUTTON_SX, STOP_BUTTON_SX } from '@/app/styles/buttonStyles';
+import { REFRESH_BUTTON_SX, START_NEW_BUTTON_SX, STOP_BUTTON_SX } from '@/app/styles/buttonStyles';
 
 // Shared size/style so all control buttons match
 const CONTROL_BUTTON_SX = {
@@ -151,7 +151,6 @@ export default function VoiceControlBar({
 
             <Button
               variant="contained"
-              color="primary"
               startIcon={<PlayArrowIcon />}
               disabled={!canResume}
               onClick={() => {
@@ -161,7 +160,7 @@ export default function VoiceControlBar({
                   window.dispatchEvent(new CustomEvent('conversation:start'));
                 }
               }}
-              sx={CONTROL_BUTTON_SX}
+              sx={START_NEW_BUTTON_SX}
             >
               Resume Conversation
             </Button>
@@ -187,7 +186,7 @@ export default function VoiceControlBar({
             }
           }}
           disabled={!transcript}
-          sx={CONTROL_BUTTON_SX}
+          sx={REFRESH_BUTTON_SX}
         >
           Regenerate Responses
         </Button>

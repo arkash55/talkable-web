@@ -7,6 +7,11 @@
 // - smalltalk bypass + casual style nudge + bounce-back
 // - lenient dedupe for short replies, distinct starts for longer
 // - cleanup that keeps natural smalltalk openers
+//
+// Now with Level-1 "flow" ranking (mean log-prob + topical alignment - penalties -> softmax).
+// relativeProb is set to flow.prob for backward compatibility.
+
+import { scoreFlowLevel1, type FlowSignalsOutput, type FlowSignalsInput } from '../app/utils/flowRank';
 
 type GenParams = {
   temperature?: number;
@@ -28,9 +33,21 @@ export type Candidate = {
   text: string;
   tokens: number;
   avgLogProb: number;       // closer to 0 = more likely
+  /** kept for backward compat; equals flow.prob */
   relativeProb: number;     // 0..1 softmax across candidates
   seed: number;
   variant: "primary" | "alt";
+
+  // ---- Level-1 flow features used for utility ----
+  flow: {
+    simToLastUser: number;       // 0..1 (token Jaccard fallback or cosine if you plug embeddings)
+    lengthPenalty: number;       // 0..+
+    repetitionPenalty: number;   // 0..+
+    totalPenalty: number;        // sum of penalties
+    utility: number;             // a*meanLogProb + b*sim - g*penalty
+    prob: number;                // softmax over utilities across shown set
+    weights: { a: number; b: number; g: number; tau: number };
+  };
 };
 
 export type GenerateResponse = {
@@ -159,11 +176,9 @@ function sentimentPlan(): SentimentMode[] {
   ];
 
   // 2. Fill remaining 3 with diversity preference:
-  // try to cover remaining intensities first, then anything else unique.
   const used = new Set(seed.map(s => s.tag));
   const remaining = ALL_SENTIMENTS.filter(s => !used.has(s.tag));
 
-  // Prefer modes that add new intensities across polarities
   const haveInt = new Set(seed.map(s => `${s.pol}:${s.int}`));
   const prioritized = [
     ...remaining.filter(s => !haveInt.has(`${s.pol}:${s.int}`)),
@@ -200,7 +215,6 @@ const STANCE_HINT: Record<Exclude<Stance, "">, string> = {
 
 function sentimentGuidance(mode: SentimentMode): string {
   const { pol, int } = mode;
-  // Keep guidance crisp; no moral overreach, just tone.
   const core =
     pol === "POS" ? "Positive tone."
     : pol === "NEG" ? "Negative tone."
@@ -209,7 +223,6 @@ function sentimentGuidance(mode: SentimentMode): string {
     int === "SUPER"  ? (pol === "POS" ? "Very enthusiastic, upbeat." : pol === "NEG" ? "Strongly negative; firm." : "Warm neutral; friendly.")
     : int === "PLAIN" ? (pol === "POS" ? "Clearly positive." : pol === "NEG" ? "Clearly negative." : "Even, matter-of-fact.")
     : /* SLIGHT */     (pol === "POS" ? "Slightly positive." : pol === "NEG" ? "Slightly negative." : "Terse neutral.");
-  // Style guardrails for brevity & realism
   return `${core} ${shading} 1–2 sentences, natural, concise. No emoji or role labels.`;
 }
 
@@ -695,7 +708,7 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     kept = kept.concat(adds);
   }
 
-  // Rank with lenient cutoff
+  // Initial ranking via avg log-prob (legacy relative prob; used for polarity-aware slicing)
   const avgLogs = kept.map((r) => r.avgLogProb);
   const tokenCounts = kept.map((r) => r.tokens);
   const medianTokens = tokenCounts.slice().sort((a, b) => a - b)[Math.floor(tokenCounts.length / 2)] || 48;
@@ -717,57 +730,90 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
 
   const TARGET = Math.min(pickTargetCount(req.k), MAX_OUTPUT);
 
-type WithMode = typeof kept[number] & { mode?: SentimentMode };
+  type WithMode = typeof kept[number] & { mode?: SentimentMode };
 
-// Keep coverage in the returned set if available
-function polarityAwareSlice(items: Array<WithMode & { relativeProb: number }>, n: number) {
-  const byPol = {
-    POS: items.filter(i => i.mode?.pol === "POS").sort((a,b)=>b.relativeProb-a.relativeProb),
-    NEU: items.filter(i => i.mode?.pol === "NEU").sort((a,b)=>b.relativeProb-a.relativeProb),
-    NEG: items.filter(i => i.mode?.pol === "NEG").sort((a,b)=>b.relativeProb-a.relativeProb),
-  };
+  // Keep polarity coverage if available
+  function polarityAwareSlice(items: Array<WithMode & { relativeProb: number }>, n: number) {
+    const byPol = {
+      POS: items.filter(i => i.mode?.pol === "POS").sort((a,b)=>b.relativeProb-a.relativeProb),
+      NEU: items.filter(i => i.mode?.pol === "NEU").sort((a,b)=>b.relativeProb-a.relativeProb),
+      NEG: items.filter(i => i.mode?.pol === "NEG").sort((a,b)=>b.relativeProb-a.relativeProb),
+    };
 
-  const picked: Array<WithMode & { relativeProb: number }> = [];
+    const picked: Array<WithMode & { relativeProb: number }> = [];
 
-  // 1) Pick best of each polarity if present
-  (["POS","NEU","NEG"] as const).forEach(pol => {
-    if (byPol[pol].length) picked.push(byPol[pol][0]);
-  });
+    // 1) Pick best of each polarity if present
+    (["POS","NEU","NEG"] as const).forEach(pol => {
+      if (byPol[pol].length) picked.push(byPol[pol][0]);
+    });
 
-  // 2) Fill remaining slots by global rank, skipping duplicates
-  const already = new Set(picked.map(p => p.text));
-  const rest = items
-    .slice() // already sorted descending outside
-    .sort((a,b)=>b.relativeProb-a.relativeProb)
-    .filter(x => !already.has(x.text));
+    // 2) Fill remaining slots by global rank, skipping duplicates
+    const already = new Set(picked.map(p => p.text));
+    const rest = items
+      .slice()
+      .sort((a,b)=>b.relativeProb-a.relativeProb)
+      .filter(x => !already.has(x.text));
 
-  while (picked.length < Math.min(n, items.length) && rest.length) {
-    picked.push(rest.shift()!);
+    while (picked.length < Math.min(n, items.length) && rest.length) {
+      picked.push(rest.shift()!);
+    }
+
+    return picked.slice(0, n);
   }
 
-  // 3) If we somehow still have fewer than 3 available, just return what we have;
-  // upstream fallbacks already ensure >=3 total items exist.
-  return picked.slice(0, n);
-}
+  // --- apply polarity-aware selection:
+  filtered.sort((a, b) => b.relativeProb - a.relativeProb);
+  const final = polarityAwareSlice(filtered as any, TARGET);
 
-// --- apply it:
-filtered.sort((a, b) => b.relativeProb - a.relativeProb);
-const final = polarityAwareSlice(filtered as any, TARGET);
+  // -------- Level-1 Flow Ranking (Likelihood + Alignment) --------
+  const lastUser = (req.prompt || '').trim();
+  const flowInputs: FlowSignalsInput[] = final.map(r => ({
+    text: r.text,
+    meanLogProb: r.avgLogProb
+  }));
 
-  const candidates: Candidate[] = final.map((r) => ({
+  const flowRows: FlowSignalsOutput[] = await scoreFlowLevel1(flowInputs, {
+    lastUser,
+    // getEmbedding: async (s: string) => [...], // optional future plug-in
+    weights: { a: 1.0, b: 0.8, g: 0.2, tau: 0.9 },
+  });
+
+  // Attach flow features and re-rank by flow utility
+  const withFlow = final.map((r, i) => {
+    const f = flowRows[i];
+    return {
+      ...r,
+      flow: {
+        simToLastUser: f.simToLastUser,
+        lengthPenalty: f.lengthPenalty,
+        repetitionPenalty: f.repetitionPenalty,
+        totalPenalty: f.totalPenalty,
+        utility: f.flowUtility,
+        prob: f.flowProb,
+        weights: { a: 1.0, b: 0.8, g: 0.2, tau: 0.9 },
+      },
+      // For backward compatibility: expose flow probability as relativeProb
+      relativeProb: f.flowProb,
+    };
+  });
+
+  withFlow.sort((a, b) => b.flow.utility - a.flow.utility);
+
+  const candidates: Candidate[] = withFlow.map((r) => ({
     text: r.text,
     tokens: r.tokens,
     avgLogProb: r.avgLogProb,
-    relativeProb: (r as any).relativeProb ?? 1 / final.length,
+    relativeProb: r.relativeProb,   // == flow.prob
     seed: r.seed,
     variant: r.variant,
+    flow: r.flow,
   }));
 
   return {
     candidates,
     meta: {
       model_id: MODEL_ID,
-      usedK: final.length,
+      usedK: candidates.length,
       dropped: kept.length - final.length,
       params: {
         temperature: baseParams.temperature,
