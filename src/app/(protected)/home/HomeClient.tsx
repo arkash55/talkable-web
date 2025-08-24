@@ -123,20 +123,47 @@ export default function HomeClient() {
   }, []);
 
   // Listen: resume/new intent so we know how to manage logs/URL
-  useEffect(() => {
-    const onResume = () => {
-      sessionWasResumedRef.current = true;
-    };
+
+
+
+
+
+
+
+  const clearUiForNewSession = () => {
+    setAiResponses([]);          // <-- clear grid options
+    setActiveIndex(null);
+    setIsLoading(false);
+  };
+
+ useEffect(() => {
     const onStartNew = () => {
-      sessionWasResumedRef.current = false;
+      clearUiForNewSession();
+      // Existing behavior
       setActions([]);
       stripCidFromUrlIfPresent();
     };
-    window.addEventListener('conversation:resume', onResume as EventListener);
+    const onResume = () => {
+      clearUiForNewSession();
+    };
+    const onEnd = () => {
+      clearUiForNewSession();
+    };
+    const onContextCleared = () => {
+      // defensive: if someone fires this, ensure UI is clean
+      clearUiForNewSession();
+    };
+
     window.addEventListener('conversation:startNew', onStartNew as EventListener);
+    window.addEventListener('conversation:resume', onResume as EventListener);
+    window.addEventListener('conversation:end', onEnd as EventListener);
+    window.addEventListener('context:cleared', onContextCleared as EventListener);
+
     return () => {
-      window.removeEventListener('conversation:resume', onResume as EventListener);
       window.removeEventListener('conversation:startNew', onStartNew as EventListener);
+      window.removeEventListener('conversation:resume', onResume as EventListener);
+      window.removeEventListener('conversation:end', onEnd as EventListener);
+      window.removeEventListener('context:cleared', onContextCleared as EventListener);
     };
   }, []);
 
