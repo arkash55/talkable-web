@@ -9,10 +9,11 @@ import VoiceGrid from '@/app/components/home/VoiceGrid';
 import ControlPanel, { ActionLogEntry } from '@/app/components/home/ControlPanel';
 
 import { speakWithGoogleTTSClient } from '@/services/ttsClient';
-import { Candidate, GenerateResponse } from '@/services/graniteClient';
+import { GenerateResponse } from '@/services/graniteClient';
 import { useLiveConversationSync } from '@/app/hooks/useLiveConversation';
 import { useUserProfile } from '@/app/hooks/useUserProfile';
 import { useConversationHistory } from '@/app/hooks/useConversationHistory';
+import { Candidate } from '@/services/graniteService';
 
 type AutoStartPayload = { mode: 'new' | 'resume'; seed?: string } | null;
 
@@ -227,15 +228,31 @@ export default function HomeClient() {
     }
   };
 
-  // Build blocks from responses (2–6)
-  const visibleCount = Math.min(Math.max(aiResponses.length, 2), 6);
-  const blocks = Array.from({ length: visibleCount }, (_, i) => {
-    const label = (aiResponses[i]?.text ?? '').trim();
-    return {
-      label: label || `Option ${i + 1}`,
-      onClick: () => handleBlockClick(i),
-    };
-  });
+// Build blocks from responses (2–6) and pass flow debug info for the bottom-right panel
+const visibleCount = Math.min(Math.max(aiResponses.length, 2), 6);
+
+const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
+  const label = (c?.text ?? '').trim();
+
+  return {
+    label: label || `Option ${i + 1}`,
+    onClick: () => handleBlockClick(i),
+
+    // 👇 This powers the bottom-right “mathsy” panel in VoiceGrid
+    debug: {
+      prob: c?.flow?.prob ?? c?.relativeProb,                 // fallback to relativeProb if needed
+      utility: c?.flow?.utility,
+      meanLogProb: c?.avgLogProb,
+      simToLastUser: c?.flow?.simToLastUser,
+      lengthPenalty: c?.flow?.lengthPenalty,
+      repetitionPenalty: c?.flow?.repetitionPenalty,
+      totalPenalty:
+        c?.flow?.totalPenalty ??
+        ((c?.flow?.lengthPenalty ?? 0) + (c?.flow?.repetitionPenalty ?? 0)),
+      weights: c?.flow?.weights, // { a, b, g, tau }
+    },
+  };
+});
 
   // -------- Arrival integrations --------
 

@@ -4,9 +4,22 @@
 import { Box, Typography, Button, Stack } from '@mui/material';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 
+interface FlowDebug {
+  prob?: number;               // 0..1
+  utility?: number;
+  meanLogProb?: number;
+  simToLastUser?: number;      // 0..1
+  lengthPenalty?: number;      // >= 0
+  repetitionPenalty?: number;  // >= 0
+  totalPenalty?: number;       // >= 0
+  weights?: { a: number; b: number; g: number; tau: number };
+}
+
 interface VoiceGridBlock {
   label: string;
   onClick: () => void;
+  /** optional: flow debug info to render bottom-right */
+  debug?: FlowDebug;
 }
 
 type VoiceGridType = 'homePage' | 'chatPage';
@@ -58,6 +71,10 @@ function layoutForCount(n: number): Pos[] {
     default:
       return original;
   }
+}
+
+function formatNum(n: number | undefined, digits = 3) {
+  return typeof n === 'number' && isFinite(n) ? n.toFixed(digits) : undefined;
 }
 
 export default function VoiceGrid({
@@ -146,6 +163,21 @@ export default function VoiceGrid({
         const dimmed = disabled && !isActive;
         const isLarge = pos.colSpan * pos.rowSpan >= 12;
 
+        const d = block.debug;
+        const hasDebug =
+          d &&
+          (d.prob !== undefined ||
+            d.utility !== undefined ||
+            d.meanLogProb !== undefined ||
+            d.simToLastUser !== undefined ||
+            d.lengthPenalty !== undefined ||
+            d.repetitionPenalty !== undefined ||
+            d.totalPenalty !== undefined ||
+            d.weights !== undefined);
+
+        const probPct =
+          typeof d?.prob === 'number' && isFinite(d.prob) ? `${Math.round(Math.max(0, Math.min(1, d.prob)) * 100)}%` : undefined;
+
         return (
           <Box
             key={index}
@@ -181,6 +213,7 @@ export default function VoiceGrid({
               outlineOffset: isActive ? '-3px' : 0,
               p: 1,
               textAlign: 'center',
+              position: 'relative',
             }}
           >
             <Typography
@@ -194,6 +227,70 @@ export default function VoiceGrid({
             >
               {block.label}
             </Typography>
+
+            {/* Bottom-right debug panel */}
+            {hasDebug && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  right: 8,
+                  bottom: 8,
+                  maxWidth: '92%',
+                  bgcolor: 'rgba(0,0,0,0.38)',
+                  color: 'white',
+                  borderRadius: 1,
+                  px: 1,
+                  py: 0.5,
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    lineHeight: 1.2,
+                    opacity: 0.95,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  prob: {probPct ?? (formatNum(d?.prob) ?? '—')}
+                  | utility: {formatNum(d?.utility) ?? '—'}  
+                  |  meanLogProb: {formatNum(d?.meanLogProb) ?? '—'}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    lineHeight: 1.2,
+                    opacity: 0.95,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  simToLastUser: {formatNum(d?.simToLastUser) ?? '—'}  
+                  |  lengthPenalty: {formatNum(d?.lengthPenalty) ?? '—'}  |
+                    repetitionPenalty: {formatNum(d?.repetitionPenalty) ?? '—'}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    lineHeight: 1.2,
+                    opacity: 0.9,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  totalPenalty: {formatNum(d?.totalPenalty) ?? '—'}  |
+                    weights: {d?.weights
+                    ? `a=${formatNum(d.weights.a)} b=${formatNum(d.weights.b)} g=${formatNum(d.weights.g)} τ=${formatNum(d.weights.tau)}`
+                    : '—'}
+                </Typography>
+              </Box>
+            )}
           </Box>
         );
       })}
