@@ -81,24 +81,7 @@ export function useVoiceControl(
     if (!browserSupportsSpeechRecognition) return;
     if (isConversationActive) return;
 
-    // 0) Create the live conversation in Firestore (owner = current user)
-    try {
-      const uid = getAuth().currentUser?.uid;
-      if (!uid) throw new Error('No authenticated user to own the conversation.');
-
-      const cid = await createLiveConversation({ ownerUid: uid, title: null });
-      currentCidRef.current = cid;
-
-      // Let the rest of the app know the cid (HomeClient listens to this)
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('conversation:created', { detail: cid }));
-      }
-    } catch (err) {
-      console.error('Failed to create live conversation:', err);
-      // Bail early if we cannot create a conversation
-      return;
-    }
-
+    currentCidRef.current = null;
     // 1) Flip UI/live listening
     setIsConversationActive(true);
     SpeechRecognition.startListening({ continuous: true });
