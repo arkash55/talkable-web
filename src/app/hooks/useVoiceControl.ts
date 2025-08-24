@@ -165,6 +165,7 @@ export function useVoiceControl(
     SpeechRecognition.stopListening();
     setListening(false);
     setHasSoundLeeway(false);
+    resetTranscript();
 
     if (silenceTimer.current) {
       clearTimeout(silenceTimer.current);
