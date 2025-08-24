@@ -57,7 +57,17 @@ export default function HomeClient() {
   // Conversation history + context
   const prevCtxSigRef = useRef<string>('');
   const { history, contextLines } = useConversationHistory(cid, {
-
+    onNewMessages: (msgs) => {
+      for (const m of msgs) {
+        console.log(`[history:new] [${m.sender}] ${m.content}`);
+        logAction({
+          type: 'Chat Message',
+          label: `${m.sender}: ${m.content}`,
+          backgroundColor: m.sender === 'guest' ? '#2e7d32' : theme.palette.primary.main,
+          textColor: 'white',
+        });
+      }
+    },
     onLog: (e) => {
       if (e.type === 'history_appended') {
         console.log(`[history] ${e.payload.appended} new, total ${e.payload.total} (cid=${cid})`);
@@ -181,7 +191,6 @@ export default function HomeClient() {
         type: 'final transcript',
         label: `Recipient: ${finalTranscript}`,
         payload: { transcript: finalTranscript },
-        backgroundColor: '#32CD32',
       });
     };
 
@@ -213,13 +222,7 @@ export default function HomeClient() {
     setActiveIndex(index);
 
     logAction({ type: 'TTS Start', label: 'User is speaking…' });
-    logAction({
-      type: 'ai_message',
-      label: `User: ${text}`,
-      payload: { index, text },
-      backgroundColor: theme.palette.primary.main,
-      textColor: 'white',
-    });
+
 
     try {
       await speakWithGoogleTTSClient(text, activeTone, activeVoice);
