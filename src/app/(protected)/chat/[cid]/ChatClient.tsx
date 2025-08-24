@@ -6,13 +6,7 @@ import ChatHistoryPanel from '@/app/components/chat/ChatHistoryPanel';
 import VoiceGrid from '@/app/components/home/VoiceGrid';
 import { useOnlineChat } from '@/app/hooks/useOnlineChat';
 
-function formatMetaLabel(text: string, avgLogProb?: number, relativeProb?: number, tokens?: number) {
-  const meta: string[] = [];
-  if (typeof avgLogProb === 'number') meta.push(`logp ${avgLogProb.toFixed(2)}`);
-  if (typeof relativeProb === 'number') meta.push(`rel ${(relativeProb * 100).toFixed(1)}%`);
-  if (typeof tokens === 'number') meta.push(`tok ${tokens}`);
-  return meta.length ? `${text}\n[${meta.join(' · ')}]` : text;
-}
+
 
 export default function ChatClient() {
   const { cid } = useParams<{ cid: string }>();
@@ -25,8 +19,20 @@ export default function ChatClient() {
 
 
   const blocks = aiResponses.slice(0, 6).map((c) => ({
-    label: formatMetaLabel(c.text.trim(), c.avgLogProb, c.relativeProb, c.tokens),
+    label: c.text.trim(),
     onClick: () => sendTextMessage(c.text),
+     debug: {
+      prob: c.flow?.prob ?? c.relativeProb,
+      utility: c.flow?.utility,
+      meanLogProb: c.avgLogProb,
+      simToLastUser: c.flow?.simToLastUser,
+      lengthPenalty: c.flow?.lengthPenalty,
+      repetitionPenalty: c.flow?.repetitionPenalty,
+      totalPenalty:
+        c.flow?.totalPenalty ??
+        ((c.flow?.lengthPenalty ?? 0) + (c.flow?.repetitionPenalty ?? 0)),
+      weights: c.flow?.weights, // { a, b, g, tau }
+    },
   }));
 
   return (
