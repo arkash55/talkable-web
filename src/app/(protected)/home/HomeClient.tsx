@@ -1,4 +1,3 @@
-// src/app/components/home/HomeClient.tsx
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -77,7 +76,6 @@ export default function HomeClient() {
         });
       }
       if (e.type === 'history_reset') {
-        // We loaded an existing conversation -> Resume path
         sessionWasResumedRef.current = true;
         logAction({ type: 'history_reset', label: `Loaded conversation ${e.payload.cid}` });
       }
@@ -130,7 +128,6 @@ export default function HomeClient() {
     };
     const onStartNew = () => {
       sessionWasResumedRef.current = false;
-      // Starting NEW right now: clear panel & strip stale cid before anything else
       setActions([]);
       stripCidFromUrlIfPresent();
     };
@@ -149,7 +146,6 @@ export default function HomeClient() {
     };
     const onConvEnd = () => {
       logAction({ type: 'conv_end', label: 'Conversation ended.' });
-      // If this session was a resume, clear the URL to avoid sticky cid on next start
       if (sessionWasResumedRef.current) {
         stripCidFromUrlIfPresent();
       }
@@ -223,7 +219,6 @@ export default function HomeClient() {
 
     logAction({ type: 'TTS Start', label: 'User is speaking…' });
 
-
     try {
       await speakWithGoogleTTSClient(text, activeTone, activeVoice);
     } catch (err) {
@@ -252,20 +247,37 @@ export default function HomeClient() {
     window.dispatchEvent(new CustomEvent('conversation:load', { detail: { cid: qcid } }));
   }, [searchParams]);
 
-  // If we arrive with ?starter=...&autostart=1, auto start:
-  // - set autoStart for VoiceControlBar (starts STT + sends first message AS USER)
-  // - TTS the starter immediately
-  // - clean URL
+  // Autostart: ensure this fires ONCE even in Strict Mode
+  const autostartFiredRef = useRef(false);
+
   useEffect(() => {
     const starter = searchParams.get('starter');
     const auto = searchParams.get('autostart');
     if (!starter || auto !== '1') return;
 
+    if (autostartFiredRef.current) return; // local guard
+    autostartFiredRef.current = true;
+
+    // global guard (in case multiple HomeClient instances render)
+    try {
+      const w = window as any;
+      const token = `starter|${starter}`;
+      if (w.__talkableAutoStartToken === token) {
+        return; // already handled globally
+      }
+      w.__talkableAutoStartToken = token;
+    } catch {}
+
     setAutoStart({ mode: 'new', seed: starter });
 
+    // speak the starter
     speakWithGoogleTTSClient(starter, activeTone, activeVoice).catch(() => {
       if (typeof window !== 'undefined') window.dispatchEvent(new Event('tts:end'));
     });
+
+    // ensure new conversation + persist the seed as first USER message
+    window.dispatchEvent(new CustomEvent('conversation:startNew'));
+    window.dispatchEvent(new CustomEvent('conversation:seed', { detail: { text: starter, sender: 'user' } }));
 
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.delete('starter'); params.delete('topic'); params.delete('autostart');
@@ -292,7 +304,7 @@ export default function HomeClient() {
           onLoadingChange={handleLoadingChange}
           modelContext={contextLines}
           canResume={canResume}
-          autoStart={autoStart}     // <-- NEW
+          autoStart={autoStart}
         />
 
         {isLoading ? (
@@ -313,11 +325,12 @@ export default function HomeClient() {
           </Box>
         ) : (
           <VoiceGrid
-              blocks={blocks}
-              disabled={isPlaying}
-              activeIndex={activeIndex} 
-              type={'homePage'}
-              activeConversation={Boolean(cid)}          />
+            blocks={blocks}
+            disabled={isPlaying}
+            activeIndex={activeIndex}
+            type={'homePage'}
+            activeConversation={Boolean(cid)}
+          />
         )}
       </div>
     </div>
