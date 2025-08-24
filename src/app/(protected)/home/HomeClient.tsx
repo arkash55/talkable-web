@@ -57,17 +57,7 @@ export default function HomeClient() {
   // Conversation history + context
   const prevCtxSigRef = useRef<string>('');
   const { history, contextLines } = useConversationHistory(cid, {
-    onNewMessages: (msgs) => {
-      for (const m of msgs) {
-        console.log(`[history:new] [${m.sender}] ${m.content}`);
-        logAction({
-          type: 'history_message',
-          label: `${m.sender}: ${m.content}`,
-          backgroundColor: m.sender === 'guest' ? '#2e7d32' : theme.palette.primary.main,
-          textColor: 'white',
-        });
-      }
-    },
+
     onLog: (e) => {
       if (e.type === 'history_appended') {
         console.log(`[history] ${e.payload.appended} new, total ${e.payload.total} (cid=${cid})`);
