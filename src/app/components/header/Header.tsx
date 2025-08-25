@@ -11,15 +11,24 @@ import {
   Slide,
   alpha,
 } from '@mui/material';
+import Link from 'next/link';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ThemeToggle from './ThemeToggle';
 import AdvancedToggle from './AdvancedToggle';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 
-const routes = ['/home', '/general', '/chat', '/settings'];
-const labels = ['Home', 'General', 'Chat', 'Settings'];
+const routes = ['/home', '/general', '/settings'];
+const labels = ['Home', 'General', 'Settings'];
+
+function getTabIndex(pathname: string): number {
+  // Normalize (strip trailing slash except root)
+  const norm =
+    pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+
+  return routes.findIndex((r) => norm === r || norm.startsWith(r + '/'));
+}
 
 export default function Header() {
   const pathname = usePathname();
@@ -27,12 +36,16 @@ export default function Header() {
   const theme = useTheme();
   const { user } = useAuth();
 
-  const currentTab = routes.findIndex((r) => pathname === r);
-  const [value, setValue] = useState(currentTab === -1 ? 0 : currentTab);
+  const computedIndex = useMemo(() => getTabIndex(pathname), [pathname]);
+
+  // Allow "no selection" with false when there is no match
+  const [value, setValue] = useState<number | false>(
+    computedIndex === -1 ? false : computedIndex
+  );
 
   useEffect(() => {
-    setValue(currentTab === -1 ? 0 : currentTab);
-  }, [pathname, currentTab]);
+    setValue(computedIndex === -1 ? false : computedIndex);
+  }, [computedIndex]);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -43,7 +56,7 @@ export default function Header() {
   const background = isLight ? theme.palette.grey[200] : theme.palette.background.paper;
 
   return (
-    <Slide in={true} direction="down" timeout={400}>
+    <Slide in direction="down" timeout={400}>
       <AppBar
         position="sticky"
         elevation={0}
@@ -102,8 +115,14 @@ export default function Header() {
                 },
               }}
             >
-              {labels.map((label) => (
-                <Tab key={label} label={label} disableRipple />
+              {labels.map((label, i) => (
+                <Tab
+                  key={label}
+                  label={label}
+                  disableRipple
+                  component={Link}
+                  href={routes[i]}
+                />
               ))}
             </Tabs>
           )}
