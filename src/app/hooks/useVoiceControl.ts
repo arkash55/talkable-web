@@ -305,6 +305,32 @@ export function useVoiceControl(
     };
   }, [transcript, listening, speaking, isConversationActive]);
 
+ useEffect(() => {
+    const onRegen = async () => {
+      // pick the latest message (prefer guest, then user)
+      const last = [...historyRef.current].reverse().find(m => m.sender === 'guest') ??
+                   [...historyRef.current].reverse().find(m => m.sender === 'user');
+
+      if (!last?.content?.trim()) return;
+
+      safeOnLoadingChange.current(true);
+      try {
+        const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
+        const responses: GenerateResponse = await getCandidates(last.content, SYSTEM_PROMPT, ctx);
+        stableOnResponses.current(responses);
+      } catch (err) {
+        console.error('Regenerate error:', err);
+      } finally {
+        safeOnLoadingChange.current(false);
+      }
+    };
+
+    window.addEventListener('ui:regenerate', onRegen as EventListener);
+    return () => window.removeEventListener('ui:regenerate', onRegen as EventListener);
+  }, []);
+
+
+
   // Cleanup
   useEffect(() => {
     return () => {

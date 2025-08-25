@@ -182,8 +182,8 @@ export default function VoiceControlBar({
           variant="outlined"
           startIcon={<RefreshIcon />}
           onClick={() => {
-            if (transcript) {
-              window.dispatchEvent(new CustomEvent('stt:finalTranscript', { detail: transcript }));
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('ui:regenerate'));
             }
           }}
           disabled={!transcript}

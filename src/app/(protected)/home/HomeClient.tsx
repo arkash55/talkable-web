@@ -43,7 +43,7 @@ export default function HomeClient() {
   const lastCreatedCidRef = useRef<string | null>(null); // to enable resume-in-page without URL
 
   // Helper: push action to panel
-  const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
+   const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
     setActions(prev => {
       const last = prev[prev.length - 1];
       if (last && (entry.type === 'conv_start' || entry.type === 'conv_end') && last.type === entry.type) {
@@ -122,7 +122,17 @@ export default function HomeClient() {
     return () => window.removeEventListener('conversation:created', onCreated);
   }, []);
 
-  // Listen: resume/new intent so we know how to manage logs/URL
+
+ useEffect(() => {
+    const onRegen = () => {
+      regenInProgressRef.current = true;
+      logAction({ type: 'regenerate', label: 'Regenerating responses…' });
+    };
+    window.addEventListener('ui:regenerate', onRegen as EventListener);
+    return () => window.removeEventListener('ui:regenerate', onRegen as EventListener);
+  }, []);
+
+
 
 
 
@@ -131,11 +141,13 @@ export default function HomeClient() {
 
 
   const clearUiForNewSession = () => {
-    setAiResponses([]);          // <-- clear grid options
+    setAiResponses([]);      
     setActiveIndex(null);
     setIsLoading(false);
   };
 
+
+    // Listen: resume/new intent so we know how to manage logs/URL
  useEffect(() => {
     const onStartNew = () => {
       clearUiForNewSession();
@@ -226,14 +238,34 @@ export default function HomeClient() {
     };
   }, []);
 
-  // Loading from VoiceControlBar
-  const handleLoadingChange = (loading: boolean) => {
-    setIsLoading(loading);
-    if (loading) logAction({ type: 'generating', label: 'Generating responses…' });
-  };
 
+ const regenInProgressRef = useRef(false);
+ const genLogTimeoutRef = useRef<number | null>(null);
+
+  // Loading from VoiceControlBar
+// replace handleLoadingChange with this version
+const handleLoadingChange = (loading: boolean) => {
+  setIsLoading(loading);
+
+  // clear any pending "Generating…" log
+  if (genLogTimeoutRef.current) {
+    clearTimeout(genLogTimeoutRef.current);
+    genLogTimeoutRef.current = null;
+  }
+
+  if (loading) {
+    // defer by one tick so ui:regenerate sets the flag first
+    genLogTimeoutRef.current = window.setTimeout(() => {
+      if (!regenInProgressRef.current) {
+        logAction({ type: 'generating', label: 'Generating responses…' });
+      }
+      genLogTimeoutRef.current = null;
+    }, 0);
+  }
+};
   // Responses from VoiceControlBar
   const handleResponsesReady = (responses: GenerateResponse) => {
+    if (regenInProgressRef.current) regenInProgressRef.current = false; 
     setAiResponses(responses.candidates);
     logAction({ type: 'responses_ready', label: 'Responses ready.' });
   };
