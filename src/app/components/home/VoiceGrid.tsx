@@ -1,7 +1,7 @@
 // src/app/components/home/VoiceGrid.tsx
 'use client';
 
-import { Box, Typography, Button, Stack } from '@mui/material';
+import { Box, Typography, Stack } from '@mui/material';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import { useAdvancedMode } from '@/app/context/AdvancedModeContext';
 
@@ -60,14 +60,12 @@ function layoutForCount(n: number): Pos[] {
         { col: 4, row: 4, colSpan: 3, rowSpan: 3 },
       ];
     case 4:
-
       return [
         { col: 1, row: 1, colSpan: 4, rowSpan: 4 },
-        { col: 1, row: 5, colSpan: 6, rowSpan: 2 }, 
+        { col: 1, row: 5, colSpan: 6, rowSpan: 2 },
         { col: 5, row: 1, colSpan: 2, rowSpan: 2 },
         { col: 5, row: 3, colSpan: 2, rowSpan: 2 },
       ];
-
     case 5:
       return [
         { col: 1, row: 1, colSpan: 2, rowSpan: 6 },
@@ -84,6 +82,30 @@ function layoutForCount(n: number): Pos[] {
 
 function formatNum(n: number | undefined, digits = 3) {
   return typeof n === 'number' && isFinite(n) ? n.toFixed(digits) : undefined;
+}
+
+/**
+ * Map a block's surface area to a dark-mode-friendly blue.
+ * Larger area => brighter (higher lightness). Smaller => darker.
+ * We keep saturation high so it stays vivid against dark surfaces.
+ *
+ * We also clamp lightness to keep white text (forced) readable.
+ */
+function blueForArea(area: number, minArea: number, maxArea: number) {
+  const range = Math.max(1, maxArea - minArea);
+  const t = (area - minArea) / range; // 0..1 (small..large)
+  const hue = 215;          // deep blue
+  const sat = 92;           // vivid
+  const Lmin = 32;          // darkest for smallest area
+  const Lmax = 54;          // brightest for largest area (still OK with white text)
+  const light = Lmin + t * (Lmax - Lmin);
+  return `hsl(${hue} ${sat}% ${light}%)`;
+}
+
+/** Slight hover lift on the same hue but a touch brighter */
+function hoverBlue(color: string) {
+  // crude lighten: rely on CSS color-mix if supported, fallback via filter-like effect
+  return `color-mix(in oklab, ${color} 84%, white)`;
 }
 
 export default function VoiceGrid({
@@ -110,7 +132,6 @@ export default function VoiceGrid({
           role="button"
           tabIndex={0}
           onClick={() => {
-            // Optional: emit a request to start listening on home page
             const evtName = type === 'homePage' ? 'home:stt:requestStart' : 'chat:stt:requestStart';
             window.dispatchEvent(new CustomEvent(evtName));
           }}
@@ -154,7 +175,12 @@ export default function VoiceGrid({
   // Normal grid
   const count = Math.max(0, Math.min(blocks.length, 6));
   const positions = layoutForCount(count);
-  const { advanced } = useAdvancedMode(); 
+  const { advanced } = useAdvancedMode();
+
+  // Precompute areas → min/max for color scaling
+  const areas = positions.map((p) => p.colSpan * p.rowSpan);
+  const minArea = Math.min(...areas);
+  const maxArea = Math.max(...areas);
 
   return (
     <Box
@@ -171,7 +197,10 @@ export default function VoiceGrid({
         const pos = positions[index];
         const isActive = activeIndex === index;
         const dimmed = disabled && !isActive;
-        const isLarge = pos.colSpan * pos.rowSpan >= 12;
+
+        const area = pos.colSpan * pos.rowSpan;
+        const baseBg = blueForArea(area, minArea, maxArea);
+        const baseColor = '#fff'; // force white text for visibility
 
         const d = block.debug;
         const hasDebug =
@@ -186,7 +215,11 @@ export default function VoiceGrid({
             d.weights !== undefined);
 
         const probPct =
-          typeof d?.prob === 'number' && isFinite(d.prob) ? `${Math.round(Math.max(0, Math.min(1, d.prob)) * 100)}%` : undefined;
+          typeof d?.prob === 'number' && isFinite(d?.prob)
+            ? `${Math.round(Math.max(0, Math.min(1, d.prob)) * 100)}%`
+            : undefined;
+
+        const isLarge = area >= 12;
 
         return (
           <Box
@@ -206,30 +239,37 @@ export default function VoiceGrid({
             sx={{
               gridColumn: `${pos.col} / span ${pos.colSpan}`,
               gridRow: `${pos.row} / span ${pos.rowSpan}`,
-              backgroundColor: index === 0 ? 'primary.main' : 'secondary.main',
+              backgroundColor: baseBg,
+              color: baseColor,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid white',
+              border: '1px solid rgba(255,255,255,0.18)',
               userSelect: 'none',
               cursor: disabled ? 'not-allowed' : 'pointer',
               opacity: dimmed ? 0.5 : 1,
-              transition: 'opacity 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease',
+              transition:
+                'opacity 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease, background-color 0.15s ease',
               transform: isActive ? 'scale(1.02)' : 'scale(1)',
               boxShadow: isActive
-                ? '0 0 0 3px rgba(255,255,255,0.6) inset, 0 8px 24px rgba(0,0,0,0.2)'
+                ? '0 0 0 3px rgba(255,255,255,0.6) inset, 0 8px 24px rgba(0,0,0,0.28)'
                 : 'none',
               outline: isActive ? '3px solid rgba(255,255,255,0.7)' : 'none',
               outlineOffset: isActive ? '-3px' : 0,
               p: 1,
               textAlign: 'center',
               position: 'relative',
+              '&:hover': {
+                backgroundColor: hoverBlue(baseBg),
+              },
+              // improve legibility if text wraps onto multiple lines
+              textShadow: '0 1px 2px rgba(0,0,0,0.35)',
             }}
           >
             <Typography
               variant={isLarge ? 'h4' : 'h6'}
               sx={{
-                color: index === 0 ? 'primary.contrastText' : 'secondary.contrastText',
+                color: baseColor,
                 px: 2,
                 textAlign: 'center',
                 wordBreak: 'break-word',
@@ -265,8 +305,8 @@ export default function VoiceGrid({
                   }}
                 >
                   prob: {probPct ?? (formatNum(d?.prob) ?? '—')}
-                  | utility: {formatNum(d?.utility) ?? '—'}  
-                  |  meanLogProb: {formatNum(d?.meanLogProb) ?? '—'}
+                  | utility: {formatNum(d?.utility) ?? '—'} | meanLogProb:{' '}
+                  {formatNum(d?.meanLogProb) ?? '—'}
                 </Typography>
                 <Typography
                   variant="caption"
@@ -279,9 +319,9 @@ export default function VoiceGrid({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  simToLastUser: {formatNum(d?.simToLastUser) ?? '—'}  
-                  |  lengthPenalty: {formatNum(d?.lengthPenalty) ?? '—'}  |
-                    repetitionPenalty: {formatNum(d?.repetitionPenalty) ?? '—'}
+                  simToLastUser: {formatNum(d?.simToLastUser) ?? '—'} | lengthPenalty:{' '}
+                  {formatNum(d?.lengthPenalty) ?? '—'} | repetitionPenalty:{' '}
+                  {formatNum(d?.repetitionPenalty) ?? '—'}
                 </Typography>
                 <Typography
                   variant="caption"
@@ -294,9 +334,11 @@ export default function VoiceGrid({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  totalPenalty: {formatNum(d?.totalPenalty) ?? '—'}  |
-                    weights: {d?.weights
-                    ? `a=${formatNum(d.weights.a)} b=${formatNum(d.weights.b)} g=${formatNum(d.weights.g)} τ=${formatNum(d.weights.tau)}`
+                  totalPenalty: {formatNum(d?.totalPenalty) ?? '—'} | weights:{' '}
+                  {d?.weights
+                    ? `a=${formatNum(d.weights.a)} b=${formatNum(d.weights.b)} g=${formatNum(
+                        d.weights.g
+                      )} τ=${formatNum(d.weights.tau)}`
                     : '—'}
                 </Typography>
               </Box>
