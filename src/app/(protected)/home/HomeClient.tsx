@@ -42,6 +42,13 @@ export default function HomeClient() {
   const sessionWasResumedRef = useRef<boolean>(false);
   const lastCreatedCidRef = useRef<string | null>(null); // to enable resume-in-page without URL
 
+  // Track which message ids we've already logged for the *current* conversation
+  const loggedMsgIdsRef = useRef<Set<string>>(new Set());
+  // Remember the last non-null cid we've seen, so we only clear the set when cid *changes* to a new one
+  const lastCidSeenRef = useRef<string | null>(null);
+
+
+
   // Helper: push action to panel
    const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
     setActions(prev => {
@@ -58,7 +65,11 @@ export default function HomeClient() {
   const prevCtxSigRef = useRef<string>('');
   const { history, contextLines } = useConversationHistory(cid, {
     onNewMessages: (msgs) => {
+       const seen = loggedMsgIdsRef.current;
       for (const m of msgs) {
+            if (!m?.createdAt || seen.has(m.createdAt)) continue;
+            seen.add(m.createdAt);
+
         console.log(`[history:new] [${m.sender}] ${m.content}`);
         logAction({
           type: 'Chat Message',
@@ -84,6 +95,16 @@ export default function HomeClient() {
     window: { maxCount: 200, maxChars: 12000 },
     context: { maxMessages: 16, maxChars: 2000 },
   });
+
+  useEffect(() => {
+  if (cid && cid !== lastCidSeenRef.current) {
+    // new conversation loaded -> allow logging its history once
+    loggedMsgIdsRef.current.clear();
+    lastCidSeenRef.current = cid;
+  }
+  // If cid becomes null (stop), leave the set intact so resume doesn't re-log
+}, [cid]);
+
 
   // Log context changes
   useEffect(() => {
@@ -151,9 +172,10 @@ export default function HomeClient() {
  useEffect(() => {
     const onStartNew = () => {
       clearUiForNewSession();
-      // Existing behavior
       setActions([]);
       stripCidFromUrlIfPresent();
+      loggedMsgIdsRef.current.clear();
+      lastCidSeenRef.current = null;
     };
     const onResume = () => {
       clearUiForNewSession();
