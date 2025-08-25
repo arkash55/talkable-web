@@ -1,3 +1,4 @@
+// src/app/components/home/ControlPanel.tsx
 'use client';
 
 import {
@@ -9,7 +10,7 @@ import {
   Tooltip,
   IconButton,
 } from '@mui/material';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import HearingIcon from '@mui/icons-material/Hearing';
@@ -18,13 +19,13 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import UndoIcon from '@mui/icons-material/Undo';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import PowerOffIcon from '@mui/icons-material/PowerOff';
-// NEW ICONS
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import SubtitlesIcon from '@mui/icons-material/Subtitles';
 import HistoryIcon from '@mui/icons-material/History';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { useAdvancedMode } from '@/app/context/AdvancedModeContext';
 
 export type ActionType =
   | 'conv_start'
@@ -38,7 +39,8 @@ export type ActionType =
   | 'rewind'
   | 'begun listening'
   | 'ended listening'
-  | 'final transcript';
+  | 'final transcript'
+  | 'Chat Message';     // <- ensure this matches what you log in HomeClient
 
 export type ActionLogEntry = {
   id: string;
@@ -65,6 +67,7 @@ function iconFor(type: ActionType) {
     case 'begun listening': return <MicIcon fontSize="small" />;
     case 'ended listening': return <MicOffIcon fontSize="small" />;
     case 'final transcript': return <SubtitlesIcon fontSize="small" />;
+    case 'Chat Message': return <HistoryIcon fontSize="small" />;
     default: return null;
   }
 }
@@ -77,6 +80,15 @@ interface ControlPanelProps {
 
 export default function ControlPanel({ actions, collapsed = false, onToggle }: ControlPanelProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const { advanced } = useAdvancedMode();
+
+  // Filter based on mode:
+  // - Advanced: show everything
+  // - Basic: only "Chat Message"
+  const visibleActions = useMemo(
+    () => (advanced ? actions : actions.filter(a => a.type === 'Chat Message')),
+    [actions, advanced]
+  );
 
   // Auto-scroll to bottom on updates (chat-like behavior)
   useEffect(() => {
@@ -84,7 +96,7 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [actions, collapsed]);
+  }, [visibleActions, collapsed]);
 
   // Collapsed rail content (compact)
   if (collapsed) {
@@ -103,17 +115,15 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
         }}
       >
         <Tooltip title="Expand Control Panel">
-          <IconButton onClick={onToggle} size="large" >
-            <ChevronRightIcon            sx={{
-                width: 70,
-                height: 70,
-                fontSize: 70, 
-            }}/>
+          <IconButton onClick={onToggle} size="large">
+            <ChevronRightIcon
+              sx={{ width: 70, height: 70, fontSize: 70 }}
+            />
           </IconButton>
         </Tooltip>
         <Chip
           size="small"
-          label={actions.length}
+          label={visibleActions.length}
           sx={{ mt: 'auto' }}
         />
       </Box>
@@ -137,15 +147,11 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
     >
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
-          Control Panel · History
+          Control Panel · History {advanced ? '' : '· Basic'}
         </Typography>
         <Tooltip title="Collapse">
           <IconButton onClick={onToggle} size="small">
-            <ChevronLeftIcon            sx={{
-                width: 70,
-                height: 70,
-                fontSize: 70, 
-            }}/>
+            <ChevronLeftIcon sx={{ width: 70, height: 70, fontSize: 70 }} />
           </IconButton>
         </Tooltip>
       </Stack>
@@ -166,12 +172,14 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
           },
         }}
       >
-        {actions.length === 0 ? (
+        {visibleActions.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            No actions yet. Start a conversation to populate this panel.
+            {advanced
+              ? 'No actions yet. Start a conversation to populate this panel.'
+              : 'No chat messages yet. Start a conversation to populate this panel.'}
           </Typography>
         ) : (
-          actions.map((a) => {
+          visibleActions.map((a) => {
             const isClickable = a.type === 'ai_message' && a.clickable;
             const card = (
               <Box
@@ -190,7 +198,7 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
                   '&:hover': isClickable ? { backgroundColor: theme => theme.palette.action.hover } : undefined,
                 }}
                 onClick={() => {
-                  
+                  // reserved for future “rewind” behaviors
                 }}
               >
                 <Stack direction="row" alignItems="center" gap={1}>
