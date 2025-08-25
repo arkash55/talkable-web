@@ -89,7 +89,6 @@ export default function HomeClient() {
         });
       }
       if (e.type === 'history_reset') {
-        sessionWasResumedRef.current = true;
         logAction({ type: 'history_reset', label: `Loaded conversation ${e.payload.cid}` });
       }
     },
@@ -181,9 +180,11 @@ export default function HomeClient() {
       loggedMsgIdsRef.current.clear();
       lastCidSeenRef.current = null;
       resumeTargetCidRef.current = null; 
+      sessionWasResumedRef.current = false;
     };
     const onResume = () => {
       clearUiForNewSession();
+       sessionWasResumedRef.current = true;
     };
     const onEnd = () => {
       clearUiForNewSession();
@@ -210,6 +211,7 @@ export default function HomeClient() {
   useEffect(() => {
     const onConvStart = () => {
       logAction({ type: 'conv_start', label: sessionWasResumedRef.current ? 'Resumed conversation.' : 'New conversation started.' });
+      sessionWasResumedRef.current = false;
     };
     const onConvEnd = () => {
       logAction({ type: 'conv_end', label: 'Conversation ended.' });
@@ -346,7 +348,7 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
   useEffect(() => {
     const qcid = searchParams.get('cid');
     if (!qcid) return;
-    sessionWasResumedRef.current = true; // future start is a RESUME
+    sessionWasResumedRef.current = true; 
     window.dispatchEvent(new CustomEvent('conversation:load', { detail: { cid: qcid } }));
   }, [searchParams]);
 
