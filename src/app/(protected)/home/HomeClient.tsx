@@ -48,6 +48,7 @@ export default function HomeClient() {
   const lastCidSeenRef = useRef<string | null>(null);
 
 
+  const resumeTargetCidRef = useRef<string | null>(null);
 
   // Helper: push action to panel
    const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
@@ -97,10 +98,13 @@ export default function HomeClient() {
   });
 
   useEffect(() => {
-  if (cid && cid !== lastCidSeenRef.current) {
+  if (cid) {
     // new conversation loaded -> allow logging its history once
-    loggedMsgIdsRef.current.clear();
-    lastCidSeenRef.current = cid;
+      resumeTargetCidRef.current = cid;
+    if (cid !== lastCidSeenRef.current) {
+      loggedMsgIdsRef.current.clear();
+      lastCidSeenRef.current = cid;
+    }
   }
   // If cid becomes null (stop), leave the set intact so resume doesn't re-log
 }, [cid]);
@@ -176,6 +180,7 @@ export default function HomeClient() {
       stripCidFromUrlIfPresent();
       loggedMsgIdsRef.current.clear();
       lastCidSeenRef.current = null;
+      resumeTargetCidRef.current = null; 
     };
     const onResume = () => {
       clearUiForNewSession();
@@ -385,8 +390,9 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
 
   // Can we resume? yes if URL has ?cid OR we created a convo in this page session
   const canResume =
-    !!searchParams.get('cid') ||
-    !!lastCreatedCidRef.current;
+  !!searchParams.get('cid') ||
+  !!lastCreatedCidRef.current ||
+  !!resumeTargetCidRef.current;
 
   return (
     <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'row' }}>
