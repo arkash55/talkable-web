@@ -255,7 +255,7 @@ export default function ConversationsSidebar() {
           </Typography>
 
           <Button
-            sx={{ ...REFRESH_BUTTON_SX, ml: 'auto' }}
+            sx={REFRESH_BUTTON_SX}
             onClick={() => {
               fetchUsers();
               setOpenDialog(true);
@@ -341,8 +341,6 @@ export default function ConversationsSidebar() {
                   : '';
 
               const other = item.mode === 'online' ? otherByCid[item.id] : undefined;
-              const namePrefix =
-                item.mode === 'online' && other?.name ? `${other.name} — ` : '';
 
               const go = () => {
                 if (item.mode === 'online') {
@@ -395,6 +393,7 @@ export default function ConversationsSidebar() {
                       />
 
                       <Stack sx={{ minWidth: 0, flex: 1 }}>
+                        {/* Date / time */}
                         <Stack direction="row" alignItems="center" spacing={0.75}>
                           <ScheduleIcon fontSize="small" />
                           <Tooltip title={primaryTime}>
@@ -404,8 +403,24 @@ export default function ConversationsSidebar() {
                           </Tooltip>
                         </Stack>
 
-                        <Typography variant="body1" color="text.secondary" noWrap sx={{ mt: 0.5 }}>
-                          {namePrefix}
+                        {/* NEW: Other user's name for ONLINE conversations */}
+                        {item.mode === 'online' && other?.name ? (
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 600, mt: 0.25 }}
+                            noWrap
+                          >
+                            {other.name}
+                          </Typography>
+                        ) : null}
+
+                        {/* Last message preview */}
+                        <Typography
+                          variant="body1"
+                          color="text.secondary"
+                          noWrap
+                          sx={{ mt: 0.5 }}
+                        >
                           {lastSender ? `${lastSender}: ` : ''}
                           {secondary}
                         </Typography>
