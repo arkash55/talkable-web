@@ -1,7 +1,7 @@
 // src/app/components/general/ConversationsSidebar.tsx
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -12,6 +12,8 @@ import {
   CardActionArea,
   CircularProgress,
   Button,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
@@ -92,10 +94,15 @@ type OtherDetails = {
   email?: string;
 };
 
+type FilterMode = 'all' | 'online' | 'live';
+
 export default function ConversationsSidebar() {
   const router = useRouter();
   const [uid, setUid] = useState<string | null>(null);
   const [history, setHistory] = useState<Array<{ id: string } & InboxItem>>([]);
+
+  // filter state
+  const [filter, setFilter] = useState<FilterMode>('all');
 
   // dialog state
   const [openDialog, setOpenDialog] = useState(false);
@@ -220,6 +227,13 @@ export default function ConversationsSidebar() {
     }
   };
 
+  // ---- filtering ----
+  const filteredHistory = useMemo(() => {
+    if (filter === 'online') return history.filter(h => h.mode === 'online');
+    if (filter === 'live') return history.filter(h => h.mode !== 'online'); // treat anything else as live
+    return history; // all
+  }, [history, filter]);
+
   return (
     <>
       <Box
@@ -233,15 +247,15 @@ export default function ConversationsSidebar() {
           gap: 1.5,
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+        {/* Title row */}
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5, flexWrap: 'wrap' }}>
           <ChatBubbleOutlineIcon fontSize="small" />
           <Typography variant="h6" fontWeight={700}>
             Conversations
           </Typography>
-          <Chip size="small" label={history.length} sx={{ ml: 'auto' }} variant="outlined" />
 
           <Button
-            sx={REFRESH_BUTTON_SX}
+            sx={{ ...REFRESH_BUTTON_SX, ml: 'auto' }}
             onClick={() => {
               fetchUsers();
               setOpenDialog(true);
@@ -258,7 +272,43 @@ export default function ConversationsSidebar() {
           </Button>
         </Stack>
 
-        {history.length === 0 ? (
+        {/* Filter + Count UNDER the title */}
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={2}
+          sx={{ mt: -0.5, mb: 1, flexWrap: 'wrap' }}
+        >
+          <ToggleButtonGroup
+            exclusive
+            value={filter}
+            onChange={(_, v) => v && setFilter(v)}
+            aria-label="Filter conversations"
+            sx={{
+              // make the buttons larger and more clickable
+              '& .MuiToggleButton-root': {
+                px: 3,
+                py: 1.2,
+                fontSize: '0.95rem',
+                borderRadius: 2,
+                textTransform: 'none',
+              },
+            }}
+          >
+            <ToggleButton value="all">All</ToggleButton>
+            <ToggleButton value="online">Online</ToggleButton>
+            <ToggleButton value="live">Live</ToggleButton>
+          </ToggleButtonGroup>
+
+          <Chip
+            size="medium"
+            label={`${filteredHistory.length}${filter === 'all' ? ` / ${history.length}` : ''}`}
+            variant="outlined"
+            sx={{ fontSize: '0.9rem', fontWeight: 600 }}
+          />
+        </Stack>
+
+        {filteredHistory.length === 0 ? (
           <Paper
             variant="outlined"
             sx={{
@@ -269,12 +319,14 @@ export default function ConversationsSidebar() {
             }}
           >
             <Typography variant="body2">
-              No conversations yet. Start one from the button above.
+              {filter === 'all'
+                ? 'No conversations yet. Start one from the button above.'
+                : `No ${filter} conversations.`}
             </Typography>
           </Paper>
         ) : (
           <Box component="div" sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {history.map((item) => {
+            {filteredHistory.map((item) => {
               const primaryTime = formatWhen(item.lastMessageAt);
               const secondary =
                 item.lastMessagePreview && item.lastMessagePreview.trim().length
@@ -346,22 +398,13 @@ export default function ConversationsSidebar() {
                         <Stack direction="row" alignItems="center" spacing={0.75}>
                           <ScheduleIcon fontSize="small" />
                           <Tooltip title={primaryTime}>
-                            <Typography
-                              variant="subtitle1"
-                              sx={{ fontWeight: 700 }}
-                              noWrap
-                            >
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }} noWrap>
                               {primaryTime}
                             </Typography>
                           </Tooltip>
                         </Stack>
 
-                        <Typography
-                          variant="body1"
-                          color="text.secondary"
-                          noWrap
-                          sx={{ mt: 0.5 }}
-                        >
+                        <Typography variant="body1" color="text.secondary" noWrap sx={{ mt: 0.5 }}>
                           {namePrefix}
                           {lastSender ? `${lastSender}: ` : ''}
                           {secondary}
