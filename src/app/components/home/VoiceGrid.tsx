@@ -55,19 +55,27 @@ function layoutForCount(n: number): Pos[] {
       ];
     case 3:
       return [
-        { col: 1, row: 1, colSpan: 3, rowSpan: 4 },
-        { col: 4, row: 1, colSpan: 3, rowSpan: 4 },
-        { col: 1, row: 5, colSpan: 6, rowSpan: 2 },
-      ];
-    case 4:
-      return [
-        { col: 1, row: 1, colSpan: 3, rowSpan: 4 },
-        { col: 1, row: 5, colSpan: 3, rowSpan: 2 },
+        { col: 1, row: 1, colSpan: 3, rowSpan: 6 },
         { col: 4, row: 1, colSpan: 3, rowSpan: 3 },
         { col: 4, row: 4, colSpan: 3, rowSpan: 3 },
       ];
+    case 4:
+
+      return [
+        { col: 1, row: 1, colSpan: 4, rowSpan: 4 },
+        { col: 1, row: 5, colSpan: 6, rowSpan: 2 }, 
+        { col: 5, row: 1, colSpan: 2, rowSpan: 2 },
+        { col: 5, row: 3, colSpan: 2, rowSpan: 2 },
+      ];
+
     case 5:
-      return original.slice(0, 5);
+      return [
+        { col: 1, row: 1, colSpan: 2, rowSpan: 6 },
+        { col: 3, row: 1, colSpan: 2, rowSpan: 3 },
+        { col: 3, row: 4, colSpan: 2, rowSpan: 3 },
+        { col: 5, row: 1, colSpan: 2, rowSpan: 3 },
+        { col: 5, row: 4, colSpan: 2, rowSpan: 3 },
+      ];
     case 6:
     default:
       return original;
