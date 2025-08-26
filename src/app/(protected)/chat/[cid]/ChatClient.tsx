@@ -48,6 +48,11 @@ export default function ChatClient() {
           <VoiceGrid
             type="chatPage"
             activeConversation={blocks.length > 0}
+              chatMeta={{
+    hasMessages: messages.length > 0,
+    waitingForOther: messages.length > 0 && messages[messages.length - 1].senderId === myUid,
+    otherName: otherName || '', // optional
+  }}
             blocks={blocks}
             disabled={false}
             activeIndex={null}

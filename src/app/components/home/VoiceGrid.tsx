@@ -3,6 +3,8 @@
 
 import { Box, Typography, Stack } from '@mui/material';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
+import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
+import MarkChatUnreadIcon from '@mui/icons-material/MarkChatUnread';
 import { useAdvancedMode } from '@/app/context/AdvancedModeContext';
 
 interface FlowDebug {
@@ -25,14 +27,26 @@ interface VoiceGridBlock {
 
 type VoiceGridType = 'homePage' | 'chatPage';
 
+interface ChatMeta {
+  /** True if the thread already has at least one message */
+  hasMessages: boolean;
+  /** True if we’re waiting for the other user (i.e., last message was from me). */
+  waitingForOther?: boolean;
+  /** Optional display name for “waiting for X” copy. */
+  otherName?: string;
+}
+
 interface VoiceGridProps {
   blocks: VoiceGridBlock[];
   disabled?: boolean;
   activeIndex?: number | null;
   type?: VoiceGridType;
 
-  /** NEW: when false, show the "Listen for more" empty state */
+  /** When false (and no chatMeta override), show the empty state. */
   activeConversation: boolean;
+
+  /** NEW (optional): chat-specific state to refine empty-state rendering on chat pages. */
+  chatMeta?: ChatMeta;
 }
 
 type Pos = { col: number; row: number; colSpan: number; rowSpan: number };
@@ -108,15 +122,80 @@ function hoverBlue(color: string) {
   return `color-mix(in oklab, ${color} 84%, white)`;
 }
 
+function EmptyCard({
+  icon,
+  title,
+  subtitle,
+  onClick,
+  cta,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  onClick?: () => void;
+  cta?: string;
+}) {
+  return (
+    <Box
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : -1}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (!onClick) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      sx={(theme) => ({
+        maxWidth: 560,
+        width: '100%',
+        border: `2px dashed ${theme.palette.divider}`,
+        borderRadius: 2,
+        p: 3,
+        textAlign: 'center',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'background-color 0.15s ease, transform 0.15s ease',
+        '&:hover': onClick
+          ? {
+              backgroundColor: theme.palette.action.hover,
+              transform: 'translateY(-1px)',
+            }
+          : undefined,
+        outline: 'none',
+      })}
+    >
+      <Stack spacing={1.25} alignItems="center">
+        {icon}
+        <Typography variant="h6" fontWeight={700}>
+          {title}
+        </Typography>
+        {subtitle && (
+          <Typography variant="body2" color="text.secondary">
+            {subtitle}
+          </Typography>
+        )}
+        {cta && (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            {cta}
+          </Typography>
+        )}
+      </Stack>
+    </Box>
+  );
+}
+
 export default function VoiceGrid({
   blocks,
   disabled = false,
   activeIndex = null,
   type = 'homePage',
   activeConversation,
+  chatMeta,
 }: VoiceGridProps) {
-  // Empty state if no active conversation
-  if (!activeConversation) {
+  // ---- Empty states routing -------------------------------------------------
+  // HOME: if not activeConversation → show "Start a Conversation" CTA
+  if (type === 'homePage' && !activeConversation) {
     return (
       <Box
         sx={{
@@ -128,51 +207,91 @@ export default function VoiceGrid({
           p: 3,
         }}
       >
-        <Box
-          role="button"
-          tabIndex={0}
+        <EmptyCard
+          icon={<GraphicEqIcon sx={{ fontSize: 56, opacity: 0.8 }} />}
+          title="Start A Conversation"
+          subtitle="Start speaking or click to begin listening and we’ll surface options here."
           onClick={() => {
-            const evtName = type === 'homePage' ? 'home:stt:requestStart' : 'chat:stt:requestStart';
+            const evtName = 'home:stt:requestStart';
             window.dispatchEvent(new CustomEvent(evtName));
           }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              const evtName = type === 'homePage' ? 'home:stt:requestStart' : 'chat:stt:requestStart';
-              window.dispatchEvent(new CustomEvent(evtName));
-            }
-          }}
-          sx={(theme) => ({
-            maxWidth: 560,
-            width: '100%',
-            border: `2px dashed ${theme.palette.divider}`,
-            borderRadius: 2,
-            p: 3,
-            textAlign: 'center',
-            cursor: 'pointer',
-            transition: 'background-color 0.15s ease, transform 0.15s ease',
-            '&:hover': {
-              backgroundColor: theme.palette.action.hover,
-              transform: 'translateY(-1px)',
-            },
-            outline: 'none',
-          })}
-        >
-          <Stack spacing={1.25} alignItems="center">
-            <GraphicEqIcon sx={{ fontSize: 56, opacity: 0.8 }} />
-            <Typography variant="h6" fontWeight={700}>
-              Start A Conversation
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Start speaking or click to begin listening and we’ll surface options here.
-            </Typography>
-          </Stack>
-        </Box>
+          cta="Press to start listening"
+        />
       </Box>
     );
   }
 
-  // Normal grid
+  // CHAT: refine empty states using chatMeta when provided
+  if (type === 'chatPage' && (!blocks?.length || !activeConversation)) {
+    // 1) No messages in this chat yet
+    if (chatMeta && chatMeta.hasMessages === false) {
+      return (
+        <Box
+          sx={{
+            height: '100%',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: 3,
+          }}
+        >
+          <EmptyCard
+            icon={<MarkChatUnreadIcon sx={{ fontSize: 56, opacity: 0.8 }} />}
+            title="No messages yet"
+            subtitle="Send a custom message to kick things off."
+          />
+        </Box>
+      );
+    }
+
+    // 2) Waiting for the other user’s reply (last message was from me)
+    if (chatMeta && chatMeta.waitingForOther) {
+      return (
+        <Box
+          sx={{
+            height: '100%',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: 3,
+          }}
+        >
+          <EmptyCard
+            icon={<HourglassBottomIcon sx={{ fontSize: 56, opacity: 0.8 }} />}
+            title={`Waiting for ${chatMeta.otherName ? chatMeta.otherName : 'a reply'}…`}
+            subtitle="We’ll show smart suggestions when they respond."
+          />
+        </Box>
+      );
+    }
+
+    // 3) If it's our turn (blocks should be present), fall through to grid;
+    // if not, keep a neutral placeholder.
+    if (!blocks?.length) {
+      return (
+        <Box
+          sx={{
+            height: '100%',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: 3,
+          }}
+        >
+          <EmptyCard
+            icon={<GraphicEqIcon sx={{ fontSize: 56, opacity: 0.8 }} />}
+            title="Suggestions will appear here"
+            subtitle="Send a custom message or wait for a message to get options."
+          />
+        </Box>
+      );
+    }
+  }
+
+  // ---- Normal grid ----------------------------------------------------------
   const count = Math.max(0, Math.min(blocks.length, 6));
   const positions = layoutForCount(count);
   const { advanced } = useAdvancedMode();
