@@ -1,50 +1,114 @@
-// src/app/components/header/AdvancedToggle.tsx
 'use client';
 
-import { FormControlLabel, Switch, Tooltip, Typography, useTheme } from '@mui/material';
+import {
+  FormControlLabel,
+  Tooltip,
+  Typography,
+  useTheme,
+  styled,
+  Switch,
+} from '@mui/material';
 import { useAdvancedMode } from '@/app/context/AdvancedModeContext';
+
+const CoolSwitch = styled(Switch)(({ theme }) => ({
+  width: 80,
+  height: 44,
+  padding: 0,
+  '& .MuiSwitch-switchBase': {
+    top: 6,
+    left: 6,
+    padding: 0,
+    transition: theme.transitions.create(['transform'], {
+      duration: 300,
+      easing: theme.transitions.easing.easeInOut,
+    }),
+    // remove focus outline box
+    '&.Mui-focusVisible': {
+      outline: 'none',
+      boxShadow: 'none',
+    },
+    '&.Mui-checked': {
+      transform: 'translateX(36px)',
+      color: '#fff',
+      '& + .MuiSwitch-track': {
+        // soft radial glow instead of a "box" shadow
+        background: 'linear-gradient(135deg, #3f51b5, #9c27b0)',
+        opacity: 1,
+        boxShadow: '0 0 0 0 rgba(0,0,0,0)', // kill rectangular shadow
+      },
+    },
+  },
+  '& .MuiSwitch-thumb': {
+    width: 32,
+    height: 32,
+    borderRadius: '50%',
+    backgroundColor: '#fff',
+    boxShadow: '0 3px 6px rgba(0,0,0,0.35)',
+    transition: theme.transitions.create(['box-shadow', 'transform', 'background-color'], {
+      duration: 300,
+    }),
+  },
+  '& .MuiSwitch-track': {
+    borderRadius: 30,
+    backgroundColor:
+      theme.palette.mode === 'light'
+        ? theme.palette.grey[400]
+        : theme.palette.grey[800],
+    opacity: 1,
+    // add an inner glow via inset shadow (no outer box effect)
+    boxShadow: 'inset 0 0 12px rgba(0,0,0,0.15)',
+    transition: theme.transitions.create(['background-color', 'box-shadow'], {
+      duration: 400,
+    }),
+  },
+  '&:hover .MuiSwitch-thumb': {
+    transform: 'scale(1.08)',
+    boxShadow: '0 4px 10px rgba(0,0,0,0.4)',
+  },
+}));
 
 export default function AdvancedToggle() {
   const { advanced, setAdvanced } = useAdvancedMode();
   const theme = useTheme();
 
   return (
-    <Tooltip title={advanced ? 'Advanced mode: show math details' : 'Basic mode'} arrow>
+    <Tooltip
+      title={advanced ? 'Advanced mode: show math details' : 'Basic mode'}
+      arrow
+    >
       <FormControlLabel
         control={
-          <Switch
+          <CoolSwitch
             checked={advanced}
             onChange={(_, v) => setAdvanced(v)}
-            color="primary"
             inputProps={{ 'aria-label': 'Advanced mode' }}
-            size="medium"
+            disableRipple
+            focusVisibleClassName="" // make sure no visible outline class sticks
           />
         }
-        // Force a high-contrast label in light mode
+        // Plain text label (no background "box")
         label={
           <Typography
-            variant="body2"
+            variant="body1"
             sx={{
+              fontWeight: 700,
+              fontSize: '1rem',
+              ml: 1,
               color:
                 theme.palette.mode === 'light'
                   ? theme.palette.text.primary
                   : theme.palette.text.secondary,
-              fontWeight: 600,
-              letterSpacing: 0.2,
             }}
           >
-            Advanced
+            User Mode
           </Typography>
         }
         sx={{
           m: 0,
-          '& .MuiFormControlLabel-label': {
-            // fallback if someone removes the Typography wrapper later
-            color:
-              theme.palette.mode === 'light'
-                ? theme.palette.text.primary
-                : theme.palette.text.secondary,
-          },
+          // also ensure no unexpected outline on the wrapper
+          outline: 'none',
+          '&:focus-within': { outline: 'none' },
+          '& .MuiFormControlLabel-label': { cursor: 'pointer' },
         }}
       />
     </Tooltip>
