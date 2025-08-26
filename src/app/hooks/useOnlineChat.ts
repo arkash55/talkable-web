@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { onMessages, sendMessage } from '@/services/firestoreService';
-import { getCandidates, type Candidate } from '@/services/graniteClient';
-
+import { getCandidates } from '@/services/graniteClient';
 import {
   appendWithSlidingWindow,
   buildContextWindow,
   type MessageHistoryItem,
 } from '@/app/utils/contextWindow';
+import { Candidate } from '@/services/graniteService';
 
 type UseOnlineChatReturn = {
   aiResponses: Candidate[];
