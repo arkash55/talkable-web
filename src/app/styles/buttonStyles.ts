@@ -131,3 +131,22 @@ export const TRENDING_TILE_SX = (theme: Theme) => {
    
   } as SxProps<Theme>;
 };
+
+export const TOGGLE_BUTTON_SX = (theme: Theme, opts?: { fullWidth?: boolean; danger?: boolean }): SxProps<Theme> => ({
+  px: 3,
+  py: 1.2,
+  fontSize: '0.95rem',
+  borderRadius: 2,
+  textTransform: 'none',
+  width: 120,
+  height: 56,
+  color: theme.palette.text.primary,
+  borderColor: theme.palette.divider,
+  '&.Mui-selected': {
+    backgroundColor: opts?.danger ? theme.palette.error.main : theme.palette.primary.main,
+    color: opts?.danger ? theme.palette.error.contrastText : theme.palette.primary.contrastText,
+    '&:hover': {
+      backgroundColor: opts?.danger ? theme.palette.error.dark : theme.palette.primary.dark,
+    },
+  },
+});

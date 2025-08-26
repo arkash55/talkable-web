@@ -37,7 +37,7 @@ import {
 
 import { onInbox, type InboxItem, createOnlineConversation } from '@/services/firestoreService';
 import { db } from '../../../../lib/fireBaseConfig';
-import { REFRESH_BUTTON_SX } from '@/app/styles/buttonStyles';
+import { REFRESH_BUTTON_SX, TOGGLE_BUTTON_SX } from '@/app/styles/buttonStyles';
 import NewOnlineChatDialogue from './NewOnlineChatDialogue';
 
 // ---- helpers ----
@@ -332,9 +332,9 @@ export default function ConversationsSidebar() {
               },
             }}
           >
-            <ToggleButton value="all">All</ToggleButton>
-            <ToggleButton value="online">Online</ToggleButton>
-            <ToggleButton value="live">Live</ToggleButton>
+            <ToggleButton value="all" sx={TOGGLE_BUTTON_SX}>All</ToggleButton>
+            <ToggleButton value="online" sx={TOGGLE_BUTTON_SX}>Online</ToggleButton>
+            <ToggleButton value="live" sx={TOGGLE_BUTTON_SX}>Live</ToggleButton>
           </ToggleButtonGroup>
 
           <Chip
@@ -373,7 +373,13 @@ export default function ConversationsSidebar() {
                 </InputAdornment>
               ) : null,
             }}
-            sx={{ mb: 1 }}
+            sx={{
+              mb: 1,
+              // Increase vertical padding of the input to make it taller
+              '& .MuiOutlinedInput-input': { py: 3.5 }, // ~12px vertical padding
+              // Or enforce a fixed control height instead:
+              // '& .MuiOutlinedInput-root': { height: 48 },
+            }}
           />
         )}
 
