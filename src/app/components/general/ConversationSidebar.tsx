@@ -14,11 +14,16 @@ import {
   Button,
   ToggleButtonGroup,
   ToggleButton,
+  TextField,
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import { useRouter } from 'next/navigation';
 
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -103,6 +108,10 @@ export default function ConversationsSidebar() {
 
   // filter state
   const [filter, setFilter] = useState<FilterMode>('all');
+
+  // search (only active when filter === 'online')
+  const [search, setSearch] = useState('');
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
   // dialog state
   const [openDialog, setOpenDialog] = useState(false);
@@ -227,12 +236,36 @@ export default function ConversationsSidebar() {
     }
   };
 
+  // Autofocus the search box when switching to "online"
+  useEffect(() => {
+    if (filter === 'online') {
+      // small timeout to ensure element is in the tree
+      const t = setTimeout(() => searchRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [filter]);
+
   // ---- filtering ----
-  const filteredHistory = useMemo(() => {
+  const filteredByMode = useMemo(() => {
     if (filter === 'online') return history.filter(h => h.mode === 'online');
     if (filter === 'live') return history.filter(h => h.mode !== 'online'); // treat anything else as live
     return history; // all
   }, [history, filter]);
+
+  // When Online is selected, apply name/email search
+  const visibleHistory = useMemo(() => {
+    if (filter !== 'online') return filteredByMode;
+
+    const q = search.trim().toLowerCase();
+    if (!q) return filteredByMode;
+
+    return filteredByMode.filter(item => {
+      if (item.mode !== 'online') return false;
+      const other = otherByCid[item.id];
+      const hay = `${other?.name || ''} ${other?.email || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [filteredByMode, filter, search, otherByCid]);
 
   return (
     <>
@@ -282,10 +315,14 @@ export default function ConversationsSidebar() {
           <ToggleButtonGroup
             exclusive
             value={filter}
-            onChange={(_, v) => v && setFilter(v)}
+            onChange={(_, v) => {
+              if (v) {
+                setFilter(v);
+                if (v !== 'online') setSearch('');
+              }
+            }}
             aria-label="Filter conversations"
             sx={{
-              // make the buttons larger and more clickable
               '& .MuiToggleButton-root': {
                 px: 3,
                 py: 1.2,
@@ -302,13 +339,45 @@ export default function ConversationsSidebar() {
 
           <Chip
             size="medium"
-            label={`${filteredHistory.length}${filter === 'all' ? ` / ${history.length}` : ''}`}
+            label={
+              filter === 'all'
+                ? `${visibleHistory.length} / ${history.length}`
+                : `${visibleHistory.length}`
+            }
             variant="outlined"
             sx={{ fontSize: '0.9rem', fontWeight: 600 }}
           />
         </Stack>
 
-        {filteredHistory.length === 0 ? (
+        {/* Online search bar (only when Online filter is selected) */}
+        {filter === 'online' && (
+          <TextField
+            inputRef={searchRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or email…"
+            size="small"
+            fullWidth
+            variant="outlined"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+              endAdornment: search ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearch('')} aria-label="Clear search">
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            }}
+            sx={{ mb: 1 }}
+          />
+        )}
+
+        {visibleHistory.length === 0 ? (
           <Paper
             variant="outlined"
             sx={{
@@ -321,12 +390,16 @@ export default function ConversationsSidebar() {
             <Typography variant="body2">
               {filter === 'all'
                 ? 'No conversations yet. Start one from the button above.'
-                : `No ${filter} conversations.`}
+                : filter === 'online'
+                ? (search
+                    ? 'No matching online conversations.'
+                    : 'No online conversations.')
+                : 'No live conversations.'}
             </Typography>
           </Paper>
         ) : (
           <Box component="div" sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {filteredHistory.map((item) => {
+            {visibleHistory.map((item) => {
               const primaryTime = formatWhen(item.lastMessageAt);
               const secondary =
                 item.lastMessagePreview && item.lastMessagePreview.trim().length
@@ -403,7 +476,7 @@ export default function ConversationsSidebar() {
                           </Tooltip>
                         </Stack>
 
-                        {/* NEW: Other user's name for ONLINE conversations */}
+                        {/* Other user's name for ONLINE conversations */}
                         {item.mode === 'online' && other?.name ? (
                           <Typography
                             variant="body2"

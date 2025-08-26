@@ -5,12 +5,13 @@ import ChatVoiceBar from '@/app/components/chat/ChatVoiceBar';
 import ChatHistoryPanel from '@/app/components/chat/ChatHistoryPanel';
 import VoiceGrid from '@/app/components/home/VoiceGrid';
 import { useOnlineChat } from '@/app/hooks/useOnlineChat';
+import { getAuth } from 'firebase/auth';
 
 export default function ChatClient() {
   const { cid } = useParams<{ cid: string }>();
   const qs = useSearchParams();
   const otherName  = qs.get('otherName');
-
+  const myUid = getAuth().currentUser?.uid ?? null;
   const { aiResponses, messages, sendTextMessage, regenerate } = useOnlineChat(cid ?? null);
 
   const blocks = aiResponses.slice(0, 6).map((c) => ({
