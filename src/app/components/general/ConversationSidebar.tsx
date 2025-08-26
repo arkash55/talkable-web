@@ -287,67 +287,72 @@ export default function ConversationsSidebar() {
             Conversations
           </Typography>
 
-          <Button
-            sx={REFRESH_BUTTON_SX}
-            onClick={() => {
-              fetchUsers();
-              setOpenDialog(true);
-            }}
-          >
-            {loadingUsers ? (
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <CircularProgress size={16} />
-                <span>Loading…</span>
-              </Stack>
-            ) : (
-              'Create New Online Chat'
-            )}
-          </Button>
         </Stack>
 
-        {/* Filter + Count UNDER the title */}
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={2}
-          sx={{ mt: -0.5, mb: 1, flexWrap: 'wrap' }}
-        >
-          <ToggleButtonGroup
-            exclusive
-            value={filter}
-            onChange={(_, v) => {
-              if (v) {
-                setFilter(v);
-                if (v !== 'online') setSearch('');
-              }
-            }}
-            aria-label="Filter conversations"
-            sx={{
-              '& .MuiToggleButton-root': {
-                px: 3,
-                py: 1.2,
-                fontSize: '0.95rem',
-                borderRadius: 2,
-                textTransform: 'none',
-              },
-            }}
-          >
-            <ToggleButton value="all" sx={TOGGLE_BUTTON_SX}>All</ToggleButton>
-            <ToggleButton value="online" sx={TOGGLE_BUTTON_SX}>Online</ToggleButton>
-            <ToggleButton value="live" sx={TOGGLE_BUTTON_SX}>Live</ToggleButton>
-          </ToggleButtonGroup>
+ {/* Filter + Count UNDER the title */}
+<Stack
+  direction="row"
+  alignItems="center"
+  spacing={2}
+  sx={{ mt: -0.5, mb: 1, flexWrap: 'wrap' }}
+>
+  <ToggleButtonGroup
+    exclusive
+    value={filter}
+    onChange={(_, v) => {
+      if (v) {
+        setFilter(v);
+        if (v !== 'online') setSearch('');
+      }
+    }}
+    aria-label="Filter conversations"
+    sx={{
+      '& .MuiToggleButton-root': {
+        px: 3,
+        py: 1.2,
+        fontSize: '0.95rem',
+        borderRadius: 2,
+        textTransform: 'none',
+      },
+    }}
+  >
+    <ToggleButton value="all" sx={TOGGLE_BUTTON_SX}>All</ToggleButton>
+    <ToggleButton value="online" sx={TOGGLE_BUTTON_SX}>Online</ToggleButton>
+    <ToggleButton value="live" sx={TOGGLE_BUTTON_SX}>Live</ToggleButton>
+  </ToggleButtonGroup>
 
-          <Chip
-            size="medium"
-            label={
-              filter === 'all'
-                ? `${visibleHistory.length} / ${history.length}`
-                : `${visibleHistory.length}`
-            }
-            variant="outlined"
-            sx={{ fontSize: '0.9rem', fontWeight: 600 }}
-          />
-        </Stack>
+  <Chip
+    size="medium"
+    label={
+      filter === 'all'
+        ? `${visibleHistory.length} / ${history.length}`
+        : `${visibleHistory.length}`
+    }
+    variant="outlined"
+    sx={{ fontSize: '0.9rem', fontWeight: 600 }}
+  />
+
+  {/* 👇 This pushes the button all the way right */}
+  <Box sx={{ flexGrow: 1 }} />
+
+  <Button
+    sx={REFRESH_BUTTON_SX}
+    onClick={() => {
+      fetchUsers();
+      setOpenDialog(true);
+    }}
+  >
+    {loadingUsers ? (
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <CircularProgress size={16} />
+        <span>Loading…</span>
+      </Stack>
+    ) : (
+      'Create New Online Chat'
+    )}
+  </Button>
+</Stack>
+
 
         {/* Online search bar (only when Online filter is selected) */}
         {filter === 'online' && (

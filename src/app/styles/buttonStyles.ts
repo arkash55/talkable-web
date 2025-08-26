@@ -126,7 +126,7 @@ export const TRENDING_TILE_SX = (theme: Theme) => {
    return {
     ...SETTINGS_TILE_SX(theme),
     borderRadius: 2,
-    width: 520,
+    width: 553,
     height: 210,
    
   } as SxProps<Theme>;
