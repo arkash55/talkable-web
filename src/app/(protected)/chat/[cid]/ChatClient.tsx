@@ -6,22 +6,17 @@ import ChatHistoryPanel from '@/app/components/chat/ChatHistoryPanel';
 import VoiceGrid from '@/app/components/home/VoiceGrid';
 import { useOnlineChat } from '@/app/hooks/useOnlineChat';
 
-
-
 export default function ChatClient() {
   const { cid } = useParams<{ cid: string }>();
-   const qs = useSearchParams();
-  const otherUid   = qs.get('otherUid');
+  const qs = useSearchParams();
   const otherName  = qs.get('otherName');
-  const otherEmail = qs.get('otherEmail');
+
   const { aiResponses, messages, sendTextMessage, regenerate } = useOnlineChat(cid ?? null);
-
-
 
   const blocks = aiResponses.slice(0, 6).map((c) => ({
     label: c.text.trim(),
     onClick: () => sendTextMessage(c.text),
-     debug: {
+    debug: {
       prob: c.flow?.prob ?? c.relativeProb,
       utility: c.flow?.utility,
       meanLogProb: c.avgLogProb,

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAuth } from 'firebase/auth';
-import { onMessages, sendMessage, type Message as FsMessage } from '@/services/firestoreService';
+import { onMessages, sendMessage } from '@/services/firestoreService';
 import { getCandidates, type Candidate } from '@/services/graniteClient';
 
 import {
@@ -54,19 +54,23 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
     const last = messages[messages.length - 1];
     if (lastGeneratedForMsgId.current === last.id) return;
 
+    const lastFromMe = last.senderId === myUid;
+
+    // 🔒 NEW: If the last message was from *me*, DO NOT CALL THE API.
+    // Also clear any stale suggestions and mark this message as handled.
+    if (lastFromMe) {
+      setAiResponses([]);
+      lastGeneratedForMsgId.current = last.id;
+      return;
+    }
+
     generating.current = true;
     try {
       const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
 
-      const lastFromMe = last.senderId === myUid;
-      const system =
-        lastFromMe
-          ? 'You are helping craft brief follow-ups. Suggest concise continuations or short add-ons (1–2 sentences). Provide diverse tones.'
-          : 'You are a helpful, concise chat assistant. Suggest short, natural replies (1–2 sentences). Provide diverse but relevant tones.';
-
-      const prompt = lastFromMe
-        ? `Continue or add a brief follow-up to my previous message:\n"${last.text}"`
-        : last.text;
+      // For other-user last message → normal assistant suggestions
+      const system = 'You are a helpful, concise chat assistant. Suggest short, natural replies (1–2 sentences). Provide diverse but relevant tones.';
+      const prompt = last.text;
 
       const resp = await getCandidates(prompt, system, ctx, {
         k: 6,
@@ -117,10 +121,17 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
     const clean = (text ?? '').trim();
     if (!clean || !cid || !myUid) return;
     await sendMessage({ cid, senderId: myUid, text: clean });
-    // history/subscription will update and re-trigger generation automatically
+    // subscription will update and will *not* generate suggestions until the other user replies
   };
 
   const regenerate = async () => {
+    if (!messages.length) return;
+    const last = messages[messages.length - 1];
+    // Only regenerate if the last message is from the *other user*.
+    if (last.senderId === myUid) {
+      setAiResponses([]);
+      return;
+    }
     lastGeneratedForMsgId.current = null;
     await generateForLast();
   };
