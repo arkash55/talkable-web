@@ -9,6 +9,8 @@ import {
   Chip,
   Tooltip,
   IconButton,
+  Paper,
+  alpha,
 } from '@mui/material';
 import { useEffect, useMemo, useRef } from 'react';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -23,6 +25,7 @@ import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import SubtitlesIcon from '@mui/icons-material/Subtitles';
 import HistoryIcon from '@mui/icons-material/History';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useAdvancedMode } from '@/app/context/AdvancedModeContext';
@@ -116,16 +119,10 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
       >
         <Tooltip title="Expand Control Panel">
           <IconButton onClick={onToggle} size="large">
-            <ChevronRightIcon
-              sx={{ width: 70, height: 70, fontSize: 70 }}
-            />
+            <ChevronRightIcon sx={{ width: 70, height: 70, fontSize: 70 }} />
           </IconButton>
         </Tooltip>
-        <Chip
-          size="small"
-          label={visibleActions.length}
-          sx={{ mt: 'auto' }}
-        />
+        <Chip size="small" label={visibleActions.length} sx={{ mt: 'auto' }} />
       </Box>
     );
   }
@@ -173,11 +170,57 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
         }}
       >
         {visibleActions.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            {advanced
-              ? 'No actions yet. Start a conversation to populate this panel.'
-              : 'No chat messages yet. Start a conversation to populate this panel.'}
-          </Typography>
+          <Paper
+            variant="outlined"
+            sx={(theme) => ({
+              p: 3,
+              borderRadius: 3,
+              textAlign: 'center',
+              borderStyle: 'dashed',
+              borderColor: alpha(theme.palette.text.primary, 0.18),
+              background: `linear-gradient(180deg,
+                ${alpha(theme.palette.primary.main, 0.08)} 0%,
+                ${alpha(theme.palette.primary.main, 0.02)} 100%)`,
+            })}
+          >
+            <Box
+              sx={(theme) => ({
+                width: 72,
+                height: 72,
+                borderRadius: '50%',
+                mx: 'auto',
+                display: 'grid',
+                placeItems: 'center',
+                mb: 1.5,
+                background: alpha(theme.palette.primary.main, 0.12),
+                boxShadow: `inset 0 0 0 2px ${alpha(theme.palette.primary.main, 0.18)}`,
+              })}
+            >
+              <ChatBubbleOutlineIcon sx={{ fontSize: 36, opacity: 0.9 }} />
+            </Box>
+
+            <Typography variant="h6" fontWeight={800} sx={{ mb: 0.75 }}>
+              {advanced ? 'No actions yet' : 'No messages yet'}
+            </Typography>
+
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.25 }}>
+              {advanced
+                ? 'Start speaking or send a message to populate this timeline.'
+                : 'Say something or type to start your conversation.'}
+            </Typography>
+
+            <Stack
+              direction="row"
+              spacing={1}
+              justifyContent="center"
+              useFlexGap
+              flexWrap="wrap"
+              sx={{ mt: 0.5 }}
+            >
+              <Chip size="small" label="Press the mic to start" variant="outlined" />
+              <Chip size="small" label="Your replies will appear here" variant="outlined" />
+            </Stack>
+          </Paper>
         ) : (
           visibleActions.map((a) => {
             const isClickable = a.type === 'ai_message' && a.clickable;
