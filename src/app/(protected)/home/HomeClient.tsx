@@ -84,7 +84,7 @@ export default function HomeClient() {
       if (e.type === 'history_appended') {
         console.log(`[history] ${e.payload.appended} new, total ${e.payload.total} (cid=${cid})`);
         logAction({
-          type: 'history_update',
+          type: 'history_updated',
           label: `History updated (${e.payload.appended} new, total ${e.payload.total}).`,
         });
       }

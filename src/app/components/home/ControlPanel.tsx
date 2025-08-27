@@ -28,11 +28,26 @@ import HistoryIcon from '@mui/icons-material/History';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import WhatshotIcon from '@mui/icons-material/Whatshot';
+import NewReleasesIcon from '@mui/icons-material/NewReleases';
+import RestoreIcon from '@mui/icons-material/Restore';
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
+import TuneIcon from '@mui/icons-material/Tune';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import InputIcon from '@mui/icons-material/Input';
+import ChatIcon from '@mui/icons-material/Chat';
 import { useAdvancedMode } from '@/app/context/AdvancedModeContext';
 
 export type ActionType =
   | 'conv_start'
   | 'conv_end'
+  | 'conv_created'        // new: from conversation:created
+  | 'conv_resume'         // new: when resuming a session
+  | 'trending_start'      // new: starting via trending tile
+  | 'seed'                // new: seeded starter injected
+  | 'history_reset'       // new: history cleared/loaded
+  | 'history_updated'    // new: messages appended
+  | 'context_update'      // new: context window recomputed
   | 'user_final'
   | 'generating'
   | 'responses_ready'
@@ -43,23 +58,20 @@ export type ActionType =
   | 'begun listening'
   | 'ended listening'
   | 'final transcript'
-  | 'Chat Message';     // <- ensure this matches what you log in HomeClient
-
-export type ActionLogEntry = {
-  id: string;
-  ts: number;
-  type: ActionType;
-  label: string;
-  clickable?: boolean;
-  payload?: unknown; // e.g., { index, text }
-  backgroundColor?: string;
-  textColor?: string;
-};
+  | 'Chat Message';     // chat-only timeline
 
 function iconFor(type: ActionType) {
   switch (type) {
     case 'conv_start': return <PowerSettingsNewIcon fontSize="small" />;
     case 'conv_end': return <PowerOffIcon fontSize="small" />;
+    case 'conv_created': return <NewReleasesIcon fontSize="small" />;
+    case 'conv_resume': return <PlayCircleOutlineIcon fontSize="small" />;
+    case 'trending_start': return <WhatshotIcon fontSize="small" />;
+    case 'seed': return <InputIcon fontSize="small" />;
+    case 'history_reset': return <RestoreIcon fontSize="small" />;
+    case 'history_updated': return <PlaylistAddIcon fontSize="small" />;
+    case 'context_update': return <TuneIcon fontSize="small" />;
+
     case 'user_final': return <HearingIcon fontSize="small" />;
     case 'generating': return <TimerIcon fontSize="small" />;
     case 'responses_ready': return <CheckCircleOutlineIcon fontSize="small" />;
@@ -70,7 +82,7 @@ function iconFor(type: ActionType) {
     case 'begun listening': return <MicIcon fontSize="small" />;
     case 'ended listening': return <MicOffIcon fontSize="small" />;
     case 'final transcript': return <SubtitlesIcon fontSize="small" />;
-    case 'Chat Message': return <HistoryIcon fontSize="small" />;
+    case 'Chat Message': return <ChatIcon fontSize="small" />; // changed
     default: return null;
   }
 }
@@ -144,7 +156,7 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
     >
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
-          Control Panel · History {advanced ? '' : '· Basic'}
+          {!advanced ? 'Chat History' : 'Control Panel'}
         </Typography>
         <Tooltip title="Collapse">
           <IconButton onClick={onToggle} size="small">
@@ -256,9 +268,21 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
                     sx={{ ml: 'auto', textTransform: 'capitalize', color: a.textColor || 'text.secondary' }}
                   />
                 </Stack>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {a.label}
-                </Typography>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+              {a.type === 'Chat Message' ? (
+                <>
+                  <span style={{ fontWeight: 600 }}>
+                    {a.label.split(' ')[0].charAt(0).toUpperCase() +
+                      a.label.split(' ')[0].slice(1)}
+                  </span>
+                  {a.label.includes(' ')
+                    ? ' ' + a.label.split(' ').slice(1).join(' ')
+                    : ''}
+                </>
+              ) : (
+                a.label
+              )}
+            </Typography>
               </Box>
             );
             return isClickable ? (

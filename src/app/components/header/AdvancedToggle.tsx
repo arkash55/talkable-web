@@ -32,7 +32,7 @@ const CoolSwitch = styled(Switch)(({ theme }) => ({
       color: '#fff',
       '& + .MuiSwitch-track': {
         // soft radial glow instead of a "box" shadow
-        background: 'linear-gradient(135deg, #3f51b5, #9c27b0)',
+        background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 60%)`,
         opacity: 1,
         boxShadow: '0 0 0 0 rgba(0,0,0,0)', // kill rectangular shadow
       },
@@ -73,7 +73,7 @@ export default function AdvancedToggle() {
 
   return (
     <Tooltip
-      title={advanced ? 'Advanced mode: show math details' : 'Basic mode'}
+      title={advanced ? 'Advanced mode: show underlying details' : 'Basic mode: For the normal user'}
       arrow
     >
       <FormControlLabel
@@ -83,10 +83,10 @@ export default function AdvancedToggle() {
             onChange={(_, v) => setAdvanced(v)}
             inputProps={{ 'aria-label': 'Advanced mode' }}
             disableRipple
-            focusVisibleClassName="" // make sure no visible outline class sticks
+            focusVisibleClassName="" 
           />
         }
-        // Plain text label (no background "box")
+  
         label={
           <Typography
             variant="body1"
@@ -100,7 +100,7 @@ export default function AdvancedToggle() {
                   : theme.palette.text.secondary,
             }}
           >
-            User Mode
+            {advanced ? 'Advanced mode' : 'Basic mode'}
           </Typography>
         }
         sx={{
