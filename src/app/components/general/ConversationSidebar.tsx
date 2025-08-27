@@ -39,6 +39,7 @@ import { onInbox, type InboxItem, createOnlineConversation } from '@/services/fi
 import { db } from '../../../../lib/fireBaseConfig';
 import { REFRESH_BUTTON_SX, TOGGLE_BUTTON_SX } from '@/app/styles/buttonStyles';
 import NewOnlineChatDialogue from './NewOnlineChatDialogue';
+import TripleToggle from '../shared/TripleToggle';
 
 // ---- helpers ----
 function formatWhen(ts: any): string {
@@ -296,30 +297,17 @@ export default function ConversationsSidebar() {
   spacing={2}
   sx={{ mt: -0.5, mb: 1, flexWrap: 'wrap' }}
 >
-  <ToggleButtonGroup
-    exclusive
-    value={filter}
-    onChange={(_, v) => {
-      if (v) {
-        setFilter(v);
-        if (v !== 'online') setSearch('');
-      }
+<TripleToggle
+    labels={{ left: 'All', center: 'Online', right: 'Live' }}
+    value={filter === 'all' ? 'left' : filter === 'online' ? 'center' : 'right'}
+    onChange={(pos) => {
+      const next = pos === 'left' ? 'all' : pos === 'center' ? 'online' : 'live';
+      setFilter(next as FilterMode);
+      if (next !== 'online') setSearch('');
     }}
-    aria-label="Filter conversations"
-    sx={{
-      '& .MuiToggleButton-root': {
-        px: 3,
-        py: 1.2,
-        fontSize: '0.95rem',
-        borderRadius: 2,
-        textTransform: 'none',
-      },
-    }}
-  >
-    <ToggleButton value="all" sx={TOGGLE_BUTTON_SX}>All</ToggleButton>
-    <ToggleButton value="online" sx={TOGGLE_BUTTON_SX}>Online</ToggleButton>
-    <ToggleButton value="live" sx={TOGGLE_BUTTON_SX}>Live</ToggleButton>
-  </ToggleButtonGroup>
+    height={65}      // a touch larger
+    minWidth={300}   // make it roomy, tweak as you like
+  />
 
   <Chip
     size="medium"
