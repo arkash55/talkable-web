@@ -134,64 +134,83 @@ export default function VoiceControlBar({
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
         {/* Control buttons */}
         {!isConversationActive ? (
-          <Stack direction="row" spacing={2}>
-            <Button
-              variant="contained"
-              startIcon={<AddCircleOutlineIcon />}
-              onClick={() => {
-                startNewConversation();
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('conversation:start'));
-                }
-              }}
-              sx={START_NEW_BUTTON_SX}
-            >
-              Start New Conversation
-            </Button>
-
-            <Button
-              variant="contained"
-      
-              startIcon={<PlayArrowIcon />}
-              disabled={!canResume}
-              onClick={() => {
-                // explicit RESUME
-                resumeConversation();
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('conversation:start'));
-                }
-              }}
-              sx={START_NEW_BUTTON_SX}
-            >
-              Resume Conversation
-            </Button>
-          </Stack>
-        ) : (
-          <Button
-            startIcon={<MicOffIcon />}
-            onClick={() => {
-              stopConversation();
-            }}
-            sx={STOP_BUTTON_SX}
-          >
-            Stop Conversation
-          </Button>
-        )}
-
+        <Stack direction="row" spacing={2}>
         <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
+          variant="contained"
+          startIcon={<AddCircleOutlineIcon />}
           onClick={() => {
+            startNewConversation();
             if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('ui:regenerate'));
+              window.dispatchEvent(new CustomEvent('conversation:start'));
             }
           }}
-          disabled={!transcript}
-          sx={REFRESH_BUTTON_SX}
+          sx={START_NEW_BUTTON_SX}
         >
-          Regenerate Responses
+          Start New Conversation
+        </Button>
+
+        <Button
+          variant="contained"
+          startIcon={<PlayArrowIcon />}
+          disabled={!canResume}
+          onClick={() => {
+            // explicit RESUME
+            resumeConversation();
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('conversation:start'));
+            }
+          }}
+          sx={[
+            START_NEW_BUTTON_SX,
+            (theme) => ({
+              '&.Mui-disabled': {
+                opacity: 1,
+                background: `linear-gradient(135deg, ${theme.palette.grey[300]} 0%, ${theme.palette.grey[500]} 65%)`,
+                color: theme.palette.getContrastText(theme.palette.grey[400]),
+              },
+            }),
+          ]}
+        >
+          Resume Conversation
         </Button>
       </Stack>
+      ) : (
+        <Button
+          startIcon={<MicOffIcon />}
+          onClick={() => {
+            stopConversation();
+          }}
+          sx={STOP_BUTTON_SX}
+        >
+          Stop Conversation
+        </Button>
+      )}
+
+      <Button
+        variant="contained"
+        startIcon={<RefreshIcon />}
+        onClick={() => {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('ui:regenerate'));
+          }
+        }}
+        disabled={!transcript}
+        sx={[
+          REFRESH_BUTTON_SX,
+          (theme) => ({
+            '&.Mui-disabled': {
+                opacity: 1,
+                background: `linear-gradient(135deg, ${theme.palette.grey[300]} 0%, ${theme.palette.grey[500]} 65%)`,
+                color: theme.palette.getContrastText(theme.palette.grey[400]),
+                // border: 'none'
+            },
+          }),
+        ]}
+      >
+        Regenerate Responses
+      </Button>
+      </Stack>
+
 
       {transcript && (
         <Typography
