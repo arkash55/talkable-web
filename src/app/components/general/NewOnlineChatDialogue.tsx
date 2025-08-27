@@ -129,48 +129,43 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
           forcePopupIcon
           popupIcon={<SearchIcon />}
           renderOption={(props, u) => {
-            const name =
-              `${u.firstName ?? ''} ${u.lastName ?? ''}`.replace(/\s+/g, ' ').trim();
-            const initials =
-              (u.firstName?.[0] ?? '') + (u.lastName?.[0] ?? '');
-            return (
-              <li {...props}>
-                <ListItemAvatar>
-                  <Avatar>{initials || (u.email?.[0]?.toUpperCase() ?? '?')}</Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={
-                    name
-                      ? `${name}${u.pronouns ? ` (${u.pronouns})` : ''}`
-                      : (u.email ?? 'Unknown user')
-                  }
-                  secondary={
-                    <Box component="span" sx={{ display: 'block' }}>
-                      {u.email ? (
-                        <Box component="span" sx={{ fontFamily: 'monospace' }}>
-                          {u.email}
-                        </Box>
-                      ) : (
-                        <Box component="span" sx={{ color: 'text.disabled' }}>
-                          No email on file
-                        </Box>
-                      )}
-                      {u.description ? (
-                        <Box
-                          component="span"
-                          sx={{ display: 'block', color: 'text.secondary' }}
-                        >
-                          {u.description}
-                        </Box>
-                      ) : null}
-                    </Box>
-                  }
-                  primaryTypographyProps={{ noWrap: true }}
-                  secondaryTypographyProps={{ noWrap: true }}
-                />
-              </li>
-            );
-          }}
+          const name = `${u.firstName ?? ''} ${u.lastName ?? ''}`.replace(/\s+/g, ' ').trim();
+          const initials = (u.firstName?.[0] ?? '') + (u.lastName?.[0] ?? '');
+          const { key, ...liProps } = props; // <-- pull key out
+
+          return (
+            <li key={key} {...liProps}>
+              <ListItemAvatar>
+                <Avatar>{initials || (u.email?.[0]?.toUpperCase() ?? '?')}</Avatar>
+              </ListItemAvatar>
+              <ListItemText
+                primary={
+                  name ? `${name}${u.pronouns ? ` (${u.pronouns})` : ''}` : (u.email ?? 'Unknown user')
+                }
+                secondary={
+                  <Box component="span" sx={{ display: 'block' }}>
+                    {u.email ? (
+                      <Box component="span" sx={{ fontFamily: 'monospace' }}>
+                        {u.email}
+                      </Box>
+                    ) : (
+                      <Box component="span" sx={{ color: 'text.disabled' }}>
+                        No email on file
+                      </Box>
+                    )}
+                    {u.description ? (
+                      <Box component="span" sx={{ display: 'block', color: 'text.secondary' }}>
+                        {u.description}
+                      </Box>
+                    ) : null}
+                  </Box>
+                }
+                primaryTypographyProps={{ noWrap: true }}
+                secondaryTypographyProps={{ noWrap: true }}
+              />
+            </li>
+          );
+        }}
           onChange={(_, val) => handleSelect(val)}
           inputValue={inputValue}
           onInputChange={(_, val) => setInputValue(val)}
