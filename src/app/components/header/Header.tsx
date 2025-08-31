@@ -7,19 +7,28 @@ import {
   Tab,
   Toolbar,
   Typography,
-  IconButton,
   useTheme,
   Slide,
   alpha,
 } from '@mui/material';
+import Link from 'next/link';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ThemeToggle from './ThemeToggle';
+import AdvancedToggle from './AdvancedToggle';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 
-const routes = ['/home', '/general', '/chat', '/settings'];
-const labels = ['Home', 'General', 'Chat', 'Settings'];
+const routes = ['/home', '/general', '/settings'];
+const labels = ['Home', 'General', 'Settings'];
+
+function getTabIndex(pathname: string): number {
+  // Normalize (strip trailing slash except root)
+  const norm =
+    pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+
+  return routes.findIndex((r) => norm === r || norm.startsWith(r + '/'));
+}
 
 export default function Header() {
   const pathname = usePathname();
@@ -27,12 +36,16 @@ export default function Header() {
   const theme = useTheme();
   const { user } = useAuth();
 
-  const currentTab = routes.findIndex((r) => pathname === r);
-  const [value, setValue] = useState(currentTab === -1 ? 0 : currentTab);
+  const computedIndex = useMemo(() => getTabIndex(pathname), [pathname]);
+
+  // Allow "no selection" with false when there is no match
+  const [value, setValue] = useState<number | false>(
+    computedIndex === -1 ? false : computedIndex
+  );
 
   useEffect(() => {
-    setValue(currentTab === -1 ? 0 : currentTab);
-  }, [pathname]);
+    setValue(computedIndex === -1 ? false : computedIndex);
+  }, [computedIndex]);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -40,12 +53,10 @@ export default function Header() {
   };
 
   const isLight = theme.palette.mode === 'light';
-  const background = isLight
-    ? theme.palette.grey[200]
-    : theme.palette.background.paper;
+  const background = isLight ? theme.palette.grey[200] : theme.palette.background.paper;
 
   return (
-    <Slide in={true} direction="down" timeout={400}>
+    <Slide in direction="down" timeout={400}>
       <AppBar
         position="sticky"
         elevation={0}
@@ -69,57 +80,56 @@ export default function Header() {
               fontSize="large"
               sx={{ fontSize: 40, color: theme.palette.text.primary }}
             />
-            <Typography
-              variant="h5"
-            //   fontWeight="bold"
-              sx={{
-                color: theme.palette.text.primary,
-              }}
-            >
+            <Typography variant="h5" sx={{ color: theme.palette.text.primary }}>
               Talkable
             </Typography>
           </Box>
 
           {/* Tabs */}
-          {user && (<Tabs
-            value={value}
-            onChange={handleTabChange}
-            textColor="primary"
-            indicatorColor="primary"
-            sx={{
-              minHeight: 96,
-              '& .MuiTab-root': {
+          {user && (
+            <Tabs
+              value={value}
+              onChange={handleTabChange}
+              textColor="primary"
+              indicatorColor="primary"
+              sx={{
                 minHeight: 96,
-                minWidth: 120,
-                fontSize: '1.1rem',
-                fontWeight: 'SemiBold',
-                borderRadius: 2,
-                mx: 1,
-                px: 3,
-                py: 1,
-                transition: 'background 0.3s ease',
-                color: theme.palette.text.primary,
-                fontFamily: 'var(--font-family)',
-              },
-              '& .MuiTab-root:hover': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-              },
-            //   '& .Mui-selected': {
-            //     backgroundColor: alpha(theme.palette.primary.main, 0.2),
-            //   },
-              '& .MuiTabs-indicator': {
-                height: '4px',
-              },
-              
-            }}
-          >
-            {labels.map((label, index) => (
-              <Tab key={label} label={label} disableRipple />
-            ))}
-          </Tabs>  )}
+                '& .MuiTab-root': {
+                  minHeight: 96,
+                  minWidth: 120,
+                  fontSize: '1.1rem',
+                  fontWeight: 'SemiBold',
+                  borderRadius: 2,
+                  mx: 1,
+                  px: 3,
+                  py: 1,
+                  transition: 'background 0.3s ease',
+                  color: theme.palette.text.primary,
+                  fontFamily: 'var(--font-family)',
+                },
+                '& .MuiTab-root:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                },
+                '& .MuiTabs-indicator': {
+                  height: '4px',
+                },
+              }}
+            >
+              {labels.map((label, i) => (
+                <Tab
+                  key={label}
+                  label={label}
+                  disableRipple
+                  component={Link}
+                  href={routes[i]}
+                />
+              ))}
+            </Tabs>
+          )}
 
-          {/* Theme Toggle */}
-          <Box>
+          {/* Right controls */}
+          <Box display="flex" alignItems="center" gap={2}>
+            <AdvancedToggle />
             <ThemeToggle />
           </Box>
         </Toolbar>

@@ -1,4 +1,5 @@
 import Header from './components/header/Header';
+import { AdvancedModeProvider } from './context/AdvancedModeContext';
 import { AuthProvider } from './context/AuthContext';
 import { CustomThemeProvider } from './context/ThemeContext';
 import './globals.css';
@@ -37,23 +38,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <CustomThemeProvider>
           <AuthProvider>
-            <Header />
-            <main
-              style={{
-                flex: 1,
-                overflow: 'hidden', // stop scrolling
-              }}
-            >
-    
-              <div
-                style={{
-                  height: '100%',
-                  width: '100%',
+            <AdvancedModeProvider>
+                <Header />
+                <main
+                  style={{
+                    flex: 1,
+                    overflow: 'hidden', // stop scrolling
                 }}
               >
-                {children}
-              </div>
-            </main>
+      
+                <div
+                  style={{
+                    height: '100%',
+                    width: '100%',
+                  }}
+                >
+                  {children}
+                </div>
+              </main>
+            </AdvancedModeProvider>
           </AuthProvider>
         </CustomThemeProvider>
       </body>

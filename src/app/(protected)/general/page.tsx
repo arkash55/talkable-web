@@ -10,7 +10,7 @@ export default async function GeneralPage() {
   let topics: TrendingTopic[] = [];
   try {
     topics = await getGuardianTopics(); // server-side fetch (secrets stay server-only)
-    console.log('Trending topics fetched:', topics);
+    // console.log('Trending topics fetched:', topics);
   } catch (err) {
     console.error('getGuardianTopics failed:', err);
     topics = [];
