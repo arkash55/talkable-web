@@ -1,3 +1,4 @@
+// src/app/components/home/HomeClient.tsx
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -9,11 +10,10 @@ import VoiceGrid from '@/app/components/home/VoiceGrid';
 import ControlPanel, { ActionLogEntry } from '@/app/components/home/ControlPanel';
 
 import { speakWithGoogleTTSClient } from '@/services/ttsClient';
-import { GenerateResponse } from '@/services/graniteClient';
+import { Candidate, GenerateResponse } from '@/services/graniteClient';
 import { useLiveConversationSync } from '@/app/hooks/useLiveConversation';
 import { useUserProfile } from '@/app/hooks/useUserProfile';
 import { useConversationHistory } from '@/app/hooks/useConversationHistory';
-import { Candidate } from '@/services/graniteService';
 
 type AutoStartPayload = { mode: 'new' | 'resume'; seed?: string } | null;
 
@@ -42,16 +42,8 @@ export default function HomeClient() {
   const sessionWasResumedRef = useRef<boolean>(false);
   const lastCreatedCidRef = useRef<string | null>(null); // to enable resume-in-page without URL
 
-  // Track which message ids we've already logged for the *current* conversation
-  const loggedMsgIdsRef = useRef<Set<string>>(new Set());
-  // Remember the last non-null cid we've seen, so we only clear the set when cid *changes* to a new one
-  const lastCidSeenRef = useRef<string | null>(null);
-
-
-  const resumeTargetCidRef = useRef<string | null>(null);
-
   // Helper: push action to panel
-   const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
+  const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
     setActions(prev => {
       const last = prev[prev.length - 1];
       if (last && (entry.type === 'conv_start' || entry.type === 'conv_end') && last.type === entry.type) {
@@ -66,14 +58,10 @@ export default function HomeClient() {
   const prevCtxSigRef = useRef<string>('');
   const { history, contextLines } = useConversationHistory(cid, {
     onNewMessages: (msgs) => {
-       const seen = loggedMsgIdsRef.current;
       for (const m of msgs) {
-            if (!m?.createdAt || seen.has(m.createdAt)) continue;
-            seen.add(m.createdAt);
-
         console.log(`[history:new] [${m.sender}] ${m.content}`);
         logAction({
-          type: 'Chat Message',
+          type: 'history_message',
           label: `${m.sender}: ${m.content}`,
           backgroundColor: m.sender === 'guest' ? '#2e7d32' : theme.palette.primary.main,
           textColor: 'white',
@@ -84,30 +72,19 @@ export default function HomeClient() {
       if (e.type === 'history_appended') {
         console.log(`[history] ${e.payload.appended} new, total ${e.payload.total} (cid=${cid})`);
         logAction({
-          type: 'history_updated',
+          type: 'history_update',
           label: `History updated (${e.payload.appended} new, total ${e.payload.total}).`,
         });
       }
       if (e.type === 'history_reset') {
+        // We loaded an existing conversation -> Resume path
+        sessionWasResumedRef.current = true;
         logAction({ type: 'history_reset', label: `Loaded conversation ${e.payload.cid}` });
       }
     },
     window: { maxCount: 200, maxChars: 12000 },
     context: { maxMessages: 16, maxChars: 2000 },
   });
-
-  useEffect(() => {
-  if (cid) {
-    // new conversation loaded -> allow logging its history once
-      resumeTargetCidRef.current = cid;
-    if (cid !== lastCidSeenRef.current) {
-      loggedMsgIdsRef.current.clear();
-      lastCidSeenRef.current = cid;
-    }
-  }
-  // If cid becomes null (stop), leave the set intact so resume doesn't re-log
-}, [cid]);
-
 
   // Log context changes
   useEffect(() => {
@@ -146,64 +123,22 @@ export default function HomeClient() {
     return () => window.removeEventListener('conversation:created', onCreated);
   }, []);
 
-
- useEffect(() => {
-    const onRegen = () => {
-      regenInProgressRef.current = true;
-      logAction({ type: 'regenerate', label: 'Regenerating responses…' });
+  // Listen: resume/new intent so we know how to manage logs/URL
+  useEffect(() => {
+    const onResume = () => {
+      sessionWasResumedRef.current = true;
     };
-    window.addEventListener('ui:regenerate', onRegen as EventListener);
-    return () => window.removeEventListener('ui:regenerate', onRegen as EventListener);
-  }, []);
-
-
-
-
-
-
-
-
-
-  const clearUiForNewSession = () => {
-    setAiResponses([]);      
-    setActiveIndex(null);
-    setIsLoading(false);
-  };
-
-
-    // Listen: resume/new intent so we know how to manage logs/URL
- useEffect(() => {
     const onStartNew = () => {
-      clearUiForNewSession();
+      sessionWasResumedRef.current = false;
+      // Starting NEW right now: clear panel & strip stale cid before anything else
       setActions([]);
       stripCidFromUrlIfPresent();
-      loggedMsgIdsRef.current.clear();
-      lastCidSeenRef.current = null;
-      resumeTargetCidRef.current = null; 
-      sessionWasResumedRef.current = false;
     };
-    const onResume = () => {
-      clearUiForNewSession();
-       sessionWasResumedRef.current = true;
-    };
-    const onEnd = () => {
-      clearUiForNewSession();
-    };
-    const onContextCleared = () => {
-      // defensive: if someone fires this, ensure UI is clean
-      clearUiForNewSession();
-    };
-
-    window.addEventListener('conversation:startNew', onStartNew as EventListener);
     window.addEventListener('conversation:resume', onResume as EventListener);
-    window.addEventListener('conversation:end', onEnd as EventListener);
-    window.addEventListener('context:cleared', onContextCleared as EventListener);
-
+    window.addEventListener('conversation:startNew', onStartNew as EventListener);
     return () => {
-      window.removeEventListener('conversation:startNew', onStartNew as EventListener);
       window.removeEventListener('conversation:resume', onResume as EventListener);
-      window.removeEventListener('conversation:end', onEnd as EventListener);
-      window.removeEventListener('context:cleared', onContextCleared as EventListener);
+      window.removeEventListener('conversation:startNew', onStartNew as EventListener);
     };
   }, []);
 
@@ -211,10 +146,10 @@ export default function HomeClient() {
   useEffect(() => {
     const onConvStart = () => {
       logAction({ type: 'conv_start', label: sessionWasResumedRef.current ? 'Resumed conversation.' : 'New conversation started.' });
-      sessionWasResumedRef.current = false;
     };
     const onConvEnd = () => {
       logAction({ type: 'conv_end', label: 'Conversation ended.' });
+      // If this session was a resume, clear the URL to avoid sticky cid on next start
       if (sessionWasResumedRef.current) {
         stripCidFromUrlIfPresent();
       }
@@ -256,6 +191,7 @@ export default function HomeClient() {
         type: 'final transcript',
         label: `Recipient: ${finalTranscript}`,
         payload: { transcript: finalTranscript },
+        backgroundColor: '#32CD32',
       });
     };
 
@@ -267,34 +203,14 @@ export default function HomeClient() {
     };
   }, []);
 
-
- const regenInProgressRef = useRef(false);
- const genLogTimeoutRef = useRef<number | null>(null);
-
   // Loading from VoiceControlBar
-// replace handleLoadingChange with this version
-const handleLoadingChange = (loading: boolean) => {
-  setIsLoading(loading);
+  const handleLoadingChange = (loading: boolean) => {
+    setIsLoading(loading);
+    if (loading) logAction({ type: 'generating', label: 'Generating responses…' });
+  };
 
-  // clear any pending "Generating…" log
-  if (genLogTimeoutRef.current) {
-    clearTimeout(genLogTimeoutRef.current);
-    genLogTimeoutRef.current = null;
-  }
-
-  if (loading) {
-    // defer by one tick so ui:regenerate sets the flag first
-    genLogTimeoutRef.current = window.setTimeout(() => {
-      if (!regenInProgressRef.current) {
-        logAction({ type: 'generating', label: 'Generating responses…' });
-      }
-      genLogTimeoutRef.current = null;
-    }, 0);
-  }
-};
   // Responses from VoiceControlBar
   const handleResponsesReady = (responses: GenerateResponse) => {
-    if (regenInProgressRef.current) regenInProgressRef.current = false; 
     setAiResponses(responses.candidates);
     logAction({ type: 'responses_ready', label: 'Responses ready.' });
   };
@@ -307,6 +223,13 @@ const handleLoadingChange = (loading: boolean) => {
     setActiveIndex(index);
 
     logAction({ type: 'TTS Start', label: 'User is speaking…' });
+    logAction({
+      type: 'ai_message',
+      label: `User: ${text}`,
+      payload: { index, text },
+      backgroundColor: theme.palette.primary.main,
+      textColor: 'white',
+    });
 
     try {
       await speakWithGoogleTTSClient(text, activeTone, activeVoice);
@@ -316,31 +239,15 @@ const handleLoadingChange = (loading: boolean) => {
     }
   };
 
-// Build blocks from responses (2–6) and pass flow debug info for the bottom-right panel
-const visibleCount = Math.min(Math.max(aiResponses.length, 2), 6);
-
-const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
-  const label = (c?.text ?? '').trim();
-
-  return {
-    label: label || `Option ${i + 1}`,
-    onClick: () => handleBlockClick(i),
-
-    // 👇 This powers the bottom-right “mathsy” panel in VoiceGrid
-    debug: {
-      prob: c?.flow?.prob ?? c?.relativeProb,                 // fallback to relativeProb if needed
-      utility: c?.flow?.utility,
-      meanLogProb: c?.avgLogProb,
-      simToLastUser: c?.flow?.simToLastUser,
-      lengthPenalty: c?.flow?.lengthPenalty,
-      repetitionPenalty: c?.flow?.repetitionPenalty,
-      totalPenalty:
-        c?.flow?.totalPenalty ??
-        ((c?.flow?.lengthPenalty ?? 0) + (c?.flow?.repetitionPenalty ?? 0)),
-      weights: c?.flow?.weights, // { a, b, g, tau }
-    },
-  };
-});
+  // Build blocks from responses (2–6)
+  const visibleCount = Math.min(Math.max(aiResponses.length, 2), 6);
+  const blocks = Array.from({ length: visibleCount }, (_, i) => {
+    const label = (aiResponses[i]?.text ?? '').trim();
+    return {
+      label: label || `Option ${i + 1}`,
+      onClick: () => handleBlockClick(i),
+    };
+  });
 
   // -------- Arrival integrations --------
 
@@ -348,41 +255,24 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
   useEffect(() => {
     const qcid = searchParams.get('cid');
     if (!qcid) return;
-    sessionWasResumedRef.current = true; 
+    sessionWasResumedRef.current = true; // future start is a RESUME
     window.dispatchEvent(new CustomEvent('conversation:load', { detail: { cid: qcid } }));
   }, [searchParams]);
 
-  // Autostart: ensure this fires ONCE even in Strict Mode
-  const autostartFiredRef = useRef(false);
-
+  // If we arrive with ?starter=...&autostart=1, auto start:
+  // - set autoStart for VoiceControlBar (starts STT + sends first message AS USER)
+  // - TTS the starter immediately
+  // - clean URL
   useEffect(() => {
     const starter = searchParams.get('starter');
     const auto = searchParams.get('autostart');
     if (!starter || auto !== '1') return;
 
-    if (autostartFiredRef.current) return; // local guard
-    autostartFiredRef.current = true;
-
-    // global guard (in case multiple HomeClient instances render)
-    try {
-      const w = window as any;
-      const token = `starter|${starter}`;
-      if (w.__talkableAutoStartToken === token) {
-        return; // already handled globally
-      }
-      w.__talkableAutoStartToken = token;
-    } catch {}
-
     setAutoStart({ mode: 'new', seed: starter });
 
-    // speak the starter
     speakWithGoogleTTSClient(starter, activeTone, activeVoice).catch(() => {
       if (typeof window !== 'undefined') window.dispatchEvent(new Event('tts:end'));
     });
-
-    // ensure new conversation + persist the seed as first USER message
-    window.dispatchEvent(new CustomEvent('conversation:startNew'));
-    window.dispatchEvent(new CustomEvent('conversation:seed', { detail: { text: starter, sender: 'user' } }));
 
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.delete('starter'); params.delete('topic'); params.delete('autostart');
@@ -392,9 +282,8 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
 
   // Can we resume? yes if URL has ?cid OR we created a convo in this page session
   const canResume =
-  !!searchParams.get('cid') ||
-  !!lastCreatedCidRef.current ||
-  !!resumeTargetCidRef.current;
+    !!searchParams.get('cid') ||
+    !!lastCreatedCidRef.current;
 
   return (
     <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'row' }}>
@@ -410,7 +299,7 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
           onLoadingChange={handleLoadingChange}
           modelContext={contextLines}
           canResume={canResume}
-          autoStart={autoStart}
+          autoStart={autoStart}     // <-- NEW
         />
 
         {isLoading ? (
@@ -434,8 +323,6 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
             blocks={blocks}
             disabled={isPlaying}
             activeIndex={activeIndex}
-            type={'homePage'}
-            activeConversation={Boolean(cid)}
           />
         )}
       </div>

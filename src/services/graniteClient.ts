@@ -1,11 +1,22 @@
 // services/graniteClient.ts
 // Browser helper for fetching ranked suggestions from your Granite API route.
 
-import { GenParams } from "./graniteHelper";
-import { Candidate } from "./graniteService";
+type GenParams = {
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  max_new_tokens?: number;
+  stop?: string[];
+};
 
-
-
+export type Candidate = {
+  text: string;
+  tokens: number;
+  avgLogProb: number;
+  relativeProb: number;
+  seed: number;
+  variant: "primary" | "alt";
+};
 
 export type GenerateResponse = {
   candidates: Candidate[];
@@ -65,8 +76,6 @@ export async function getCandidates(
   }
   return data;
 }
-
-
 
 
 

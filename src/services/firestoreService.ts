@@ -32,7 +32,6 @@ import {
   QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../../lib/fireBaseConfig';
-import { getAuth, signOut } from 'firebase/auth';
 
 // ---------- Types (mirror your schema) ----------
 export type ConversationMode = 'live' | 'online';
@@ -44,7 +43,6 @@ export type UserProfile = {
   tone: string;
   voice: string;
   description: string;
-  email: string;
   createdAt: Timestamp | ReturnType<typeof serverTimestamp>;
 };
 
@@ -77,17 +75,6 @@ export type InboxItem = {
   lastMessageAt: Timestamp | ReturnType<typeof serverTimestamp>;
   lastReadAt: Timestamp | null | ReturnType<typeof serverTimestamp>;
   lastMessageSenderId: string | null; // <-- single source of truth (uid or 'guest')
-};
-
-
-
-export type UserDirectoryEntry = {
-  uid: string;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
-  pronouns?: string;
-  description?: string;
 };
 
 // ---------- Path helpers ----------
@@ -128,39 +115,46 @@ export async function deleteUser(uid: string) {
   await batchDeleteCollection(userInboxCol(uid) as CollectionReference<DocumentData>);
 }
 
-export async function getUsers(options?: {
-  excludeUid?: string;
-  limit?: number;
-}): Promise<UserDirectoryEntry[]> {
-  const excludeUid = options?.excludeUid ?? '';
-  const cap = Math.max(1, Math.min(options?.limit ?? 500, 2000));
-
-  const qRef = query(usersCol(), qLimit(cap));
-  const snap = await getDocs(qRef);
-
-  const rows: UserDirectoryEntry[] = [];
-  snap.forEach((d) => {
-    if (excludeUid && d.id === excludeUid) return;
-    const data = d.data() as any;
-    rows.push({
-      uid: d.id,
-      email: data?.email ?? undefined,
-      firstName: data?.firstName ?? undefined,
-      lastName: data?.lastName ?? undefined,
-      pronouns: data?.pronouns ?? undefined,
-      description: data?.description ?? undefined,
-    });
-  });
-
-  return rows;
-}
-
-
-
 // =====================================================
 // Conversations
 // =====================================================
 
+export async function createOnlineConversation(params: {
+  creatorUid: string;
+  otherUid: string;
+  title?: string | null;
+}): Promise<string> {
+  const { creatorUid, otherUid, title = null } = params;
+
+  const cid = await runTransaction(db, async (tx) => {
+    const cRef = doc(conversationsCol());
+    const convo: Conversation = {
+      mode: 'online',
+      title,
+      createdAt: serverTimestamp(),
+      createdBy: creatorUid,
+      members: { [creatorUid]: true, [otherUid]: true },
+      memberIds: [creatorUid, otherUid],
+    };
+    tx.set(cRef, convo);
+
+    const baseInbox: InboxItem = {
+      mode: 'online',
+      title,
+      lastMessagePreview: '',
+      lastMessageAt: serverTimestamp(),
+      lastReadAt: null as any,
+      lastMessageSenderId: null, // no message yet
+    };
+
+    tx.set(userInboxDoc(creatorUid, cRef.id), baseInbox);
+    tx.set(userInboxDoc(otherUid, cRef.id), baseInbox);
+
+    return cRef.id;
+  });
+
+  return cid;
+}
 
 export async function createLiveConversation(params: { ownerUid: string; title?: string | null }): Promise<string> {
   const { ownerUid, title = null } = params;
@@ -189,80 +183,6 @@ export async function createLiveConversation(params: { ownerUid: string; title?:
 
   return ref.id;
 }
-
-export async function findOnlineConversationBetweenByMembers(
-  uidA: string,
-  uidB: string
-): Promise<string | null> {
-  const qRef = query(
-    conversationsCol(),
-    where('mode', '==', 'online'),
-    where(`members.${uidA}`, '==', true),
-    where(`members.${uidB}`, '==', true),
-    qLimit(1)
-  );
-  const snap = await getDocs(qRef);
-  return snap.empty ? null : snap.docs[0].id;
-}
-
-/** 
- * Create the conversation FIRST, then write both inbox docs.
- * This avoids the rule race where /conversations/{cid} doesn't exist yet.
- */
-export async function createOnlineConversationSafe(params: {
-  creatorUid: string;
-  otherUid: string;
-  title?: string | null;
-}): Promise<string> {
-  const { creatorUid, otherUid, title = null } = params;
-
-  // 1) create conversation first
-  const cRef = await addDoc(conversationsCol(), {
-    mode: 'online',
-    title,
-    createdAt: serverTimestamp(),
-    createdBy: creatorUid,
-    members: { [creatorUid]: true, [otherUid]: true },
-    memberIds: [creatorUid, otherUid],
-  } as Conversation);
-
-  // 2) then write both inbox entries
-  const baseInbox: InboxItem = {
-    mode: 'online',
-    title,
-    lastMessagePreview: '',
-    lastMessageAt: serverTimestamp(),
-    lastReadAt: null as any,
-    lastMessageSenderId: null,
-  };
-
-  await Promise.all([
-    setDoc(userInboxDoc(creatorUid, cRef.id), baseInbox, { merge: true }),
-    setDoc(userInboxDoc(otherUid,  cRef.id), baseInbox, { merge: true }),
-  ]);
-
-  return cRef.id;
-}
-
-/**
- * One-call helper: reuse existing convo if present, else create safely.
- */
-export async function ensureOnlineConversation(
-  uidA: string,
-  uidB: string,
-  title?: string | null
-): Promise<string> {
-  // Try to find existing by members map
-  console.log("here")
-  const existing = await findOnlineConversationBetweenByMembers(uidA, uidB);
-  if (existing) return existing;
-  // Else create safely
-  return createOnlineConversationSafe({ creatorUid: uidA, otherUid: uidB, title: title ?? null });
-}
-
-
-
-
 
 export async function deleteConversation(cid: string) {
   const cSnap = await getDoc(conversationDoc(cid));
@@ -399,28 +319,5 @@ async function batchDeleteCollection(colRef: CollectionReference<DocumentData>, 
 
     cursor = snap.docs[snap.docs.length - 1];
     if (snap.size < pageSize) break;
-  }
-}
-
-// Marks user offline (best effort) then signs out
-export async function logoutUser(): Promise<void> {
-  const auth = getAuth();
-  const user = auth.currentUser;
-
-  try {
-    if (user) {
-      try {
-        await updateDoc(doc(db, 'users', user.uid), {
-          online: false,
-          lastLogoutAt: serverTimestamp(),
-        });
-      } catch {
-        // non-fatal if user doc missing or permission denied
-      }
-    }
-    await signOut(auth);
-  } catch (err) {
-    // bubble to caller so UI can show feedback
-    throw err;
   }
 }

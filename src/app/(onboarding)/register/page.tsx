@@ -25,7 +25,6 @@ export default function RegisterPage() {
         tone     : payload.tone.trim(),
         voice    : payload.voice.trim(),
         description: payload.description.trim(),
-        email    : payload.email.trim(),
       });
 
       router.replace('/home');
