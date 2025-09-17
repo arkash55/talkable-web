@@ -1,6 +1,4 @@
-
 import { auth } from '../../lib/fireBaseConfig';
-import { error } from 'console';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -10,12 +8,12 @@ import {
   reauthenticateWithCredential,
   updatePassword,
   deleteUser as authDeleteUser,
-} from "firebase/auth";
-
+  sendPasswordResetEmail,
+} from 'firebase/auth';
 
 /**
  * AuthService provides methods for user authentication.
- * It uses Firebase Authentication to handle sign-in, sign-up, and logout functionalities.
+ * It uses Firebase Authentication to handle sign-in, sign-up, logout, and password reset.
  */
 
 export const loginUser = async (email: string, password: string) => {
@@ -31,39 +29,45 @@ export const logoutUser = async () => {
 };
 
 
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  // Trim to avoid whitespace issues and lower-case for consistency
+  const clean = (email || '').trim();
+  if (!clean) throw Object.assign(new Error('auth/invalid-email'), { code: 'auth/invalid-email' });
+
+  // Let Firebase host the reset UI; no actionCodeSettings
+  await sendPasswordResetEmail(auth, clean);
+  
+}
+
+
 export async function ensureEmailAvailable(email: string) {
   const res = await fetch('/api/auth/check-email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
   });
-  // If the route failed, surface a generic error
-  
+
   if (!res.ok) {
-    //  console.log(error);
     throw new Error('Email check failed. Please try again.');
-   
   }
   const data = await res.json();
   if (!data?.available) {
-    // Throw so your Step 1 handler can show the field error and stay on Step 1
     throw new Error('Email already in use');
   }
 }
-
-
 
 export type ChangePasswordResult =
   | { ok: true }
   | {
       ok: false;
       code:
-        | "wrong-old-password"
-        | "weak-password"
-        | "requires-recent-login"
-        | "too-many-requests"
-        | "no-current-user"
-        | "unknown";
+        | 'wrong-old-password'
+        | 'weak-password'
+        | 'requires-recent-login'
+        | 'too-many-requests'
+        | 'no-current-user'
+        | 'unknown';
       message: string;
     };
 
@@ -71,14 +75,14 @@ export async function changePassword(
   oldPassword: string,
   newPassword: string
 ): Promise<ChangePasswordResult> {
-  const auth = getAuth();
-  const user = auth.currentUser;
+  const a = getAuth();
+  const user = a.currentUser;
 
   if (!user || !user.email) {
     return {
       ok: false,
-      code: "no-current-user",
-      message: "You must be signed in to change your password.",
+      code: 'no-current-user',
+      message: 'You must be signed in to change your password.',
     };
   }
 
@@ -87,34 +91,34 @@ export async function changePassword(
     const cred = EmailAuthProvider.credential(user.email, oldPassword);
     await reauthenticateWithCredential(user, cred);
   } catch (err: any) {
-    const code = err?.code ?? "unknown";
+    const code = err?.code ?? 'unknown';
     const WRONG_SET = new Set([
-      "auth/wrong-password",
-      "auth/invalid-credential",
-      "auth/invalid-login-credentials",
+      'auth/wrong-password',
+      'auth/invalid-credential',
+      'auth/invalid-login-credentials',
     ]);
     if (WRONG_SET.has(code)) {
       return {
         ok: false,
-        code: "wrong-old-password",
-        message: "Old password is incorrect.",
+        code: 'wrong-old-password',
+        message: 'Old password is incorrect.',
       };
     }
-    if (code === "auth/too-many-requests") {
+    if (code === 'auth/too-many-requests') {
       return {
         ok: false,
-        code: "too-many-requests",
-        message: "Too many attempts. Try again later.",
+        code: 'too-many-requests',
+        message: 'Too many attempts. Try again later.',
       };
     }
-    if (code === "auth/user-mismatch" || code === "auth/user-not-found") {
+    if (code === 'auth/user-mismatch' || code === 'auth/user-not-found') {
       return {
         ok: false,
-        code: "no-current-user",
-        message: "Please sign in again and retry.",
+        code: 'no-current-user',
+        message: 'Please sign in again and retry.',
       };
     }
-    return { ok: false, code: "unknown", message: "Reauthentication failed." };
+    return { ok: false, code: 'unknown', message: 'Reauthentication failed.' };
   }
 
   // 2) Update to the NEW password
@@ -122,34 +126,32 @@ export async function changePassword(
     await updatePassword(user, newPassword);
     return { ok: true };
   } catch (err: any) {
-    const code = err?.code ?? "unknown";
-    if (code === "auth/weak-password") {
+    const code = err?.code ?? 'unknown';
+    if (code === 'auth/weak-password') {
       return {
         ok: false,
-        code: "weak-password",
-        message: "New password is too weak.",
+        code: 'weak-password',
+        message: 'New password is too weak.',
       };
     }
-    if (code === "auth/requires-recent-login") {
+    if (code === 'auth/requires-recent-login') {
       return {
         ok: false,
-        code: "requires-recent-login",
-        message: "Please sign in again and retry.",
+        code: 'requires-recent-login',
+        message: 'Please sign in again and retry.',
       };
     }
-    return { ok: false, code: "unknown", message: "Could not update password." };
+    return { ok: false, code: 'unknown', message: 'Could not update password.' };
   }
 }
-
-
 
 export type ReauthResult =
   | { ok: true }
   | { ok: false; code: 'wrong-old-password' | 'no-current-user' | 'unknown'; message: string };
 
 export async function reauthWithPassword(oldPassword: string): Promise<ReauthResult> {
-  const auth = getAuth();
-  const user = auth.currentUser;
+  const a = getAuth();
+  const user = a.currentUser;
   if (!user || !user.email) {
     return { ok: false, code: 'no-current-user', message: 'You must be signed in.' };
   }
@@ -171,8 +173,8 @@ export type DeleteAccountResult =
   | { ok: false; code: 'no-current-user' | 'requires-recent-login' | 'unknown'; message: string };
 
 export async function deleteAccount(): Promise<DeleteAccountResult> {
-  const auth = getAuth();
-  const user = auth.currentUser;
+  const a = getAuth();
+  const user = a.currentUser;
   if (!user) return { ok: false, code: 'no-current-user', message: 'You must be signed in.' };
   try {
     await authDeleteUser(user);
@@ -190,7 +192,8 @@ export async function deleteAccount(): Promise<DeleteAccountResult> {
 export async function deleteAccountWithPassword(oldPassword: string): Promise<DeleteAccountResult> {
   const r = await reauthWithPassword(oldPassword);
   if (!r.ok) {
-    return { ok: false, code: r.code === 'wrong-old-password' ? 'unknown' : 'unknown', message: r.message };
+    // Preserve the original code to allow UI-specific handling
+    return { ok: false, code: r.code === 'no-current-user' ? 'no-current-user' : 'unknown', message: r.message };
   }
   return deleteAccount();
 }
