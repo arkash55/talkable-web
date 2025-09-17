@@ -138,8 +138,7 @@ const LoginForm = ({ error, setError, handleSubmit, isLoading }: LoginFormProps)
 
 
               <Button
-                    component={Link}
-                    href="/register"
+              
                     variant="text"
                     fullWidth
                     disabled={isLoading}

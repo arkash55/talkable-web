@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import {
   FormControlLabel,
   Tooltip,
@@ -70,6 +72,15 @@ const CoolSwitch = styled(Switch)(({ theme }) => ({
 export default function AdvancedToggle() {
   const { advanced, setAdvanced } = useAdvancedMode();
   const theme = useTheme();
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    const auth = getAuth();
+    const unsub = onAuthStateChanged(auth, (user) => setSignedIn(!!user));
+    return () => unsub();
+  }, []);
+
+  if (!signedIn) return null; // hide toggle when not signed in
 
   return (
     <Tooltip
