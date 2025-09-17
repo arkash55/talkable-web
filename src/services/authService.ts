@@ -35,7 +35,6 @@ export async function requestPasswordReset(email: string): Promise<void> {
   const clean = (email || '').trim();
   if (!clean) throw Object.assign(new Error('auth/invalid-email'), { code: 'auth/invalid-email' });
 
-  // Let Firebase host the reset UI; no actionCodeSettings
   await sendPasswordResetEmail(auth, clean);
   
 }
