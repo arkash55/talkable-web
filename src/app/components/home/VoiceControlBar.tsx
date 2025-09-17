@@ -58,7 +58,7 @@ export default function VoiceControlBar({
     resumeConversation,
     stopConversation,
     browserSupportsSpeechRecognition,
-  } = useVoiceControl(onResponses, onLoadingChange);
+  } = useVoiceControl(onResponses, onLoadingChange, modelContext); // pass context when resuming
 
   // consume autoStart prop exactly once (no new event listeners)
   const consumedRef = useRef(false);

@@ -23,7 +23,8 @@ const CTX_LIMIT     = { maxMessages: 12, maxChars: 1500 };
 
 export function useVoiceControl(
   onResponses: (responses: GenerateResponse) => void,
-  onLoadingChange?: (loading: boolean) => void
+  onLoadingChange?: (loading: boolean) => void,
+  externalContext?: string[]
 ) {
   // State
   const [listening, setListening] = useState(false);
@@ -50,6 +51,16 @@ export function useVoiceControl(
     resetTranscript,
     browserSupportsSpeechRecognition,
   } = useSpeechRecognition();
+
+  const externalCtxRef = useRef<string[] | undefined>(externalContext);
+  useEffect(() => { externalCtxRef.current = externalContext; }, [externalContext]);
+
+  // helper: pick context for model (prefer external when resuming)
+  const buildCtxForModel = () => {
+    const ext = externalCtxRef.current;
+    if (ext && ext.length) return ext;
+    return buildContextWindow(historyRef.current, CTX_LIMIT);
+  };
 
   const { profile } = useUserProfile();
   const SYSTEM_PROMPT = React.useMemo(
@@ -278,7 +289,7 @@ export function useVoiceControl(
             appendWithSlidingWindow(historyRef.current, guestMsg, HISTORY_LIMIT);
 
             // 2) Build context
-            const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
+            const ctx = buildCtxForModel();  
             console.log('Context for AI:', ctx);
 
             // 3) Call model
@@ -315,7 +326,7 @@ export function useVoiceControl(
 
       safeOnLoadingChange.current(true);
       try {
-        const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
+        const ctx = buildCtxForModel();  
         const responses: GenerateResponse = await getCandidates(last.content, SYSTEM_PROMPT, ctx);
         stableOnResponses.current(responses);
       } catch (err) {
