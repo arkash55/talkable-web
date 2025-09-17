@@ -12,6 +12,7 @@ import VoiceWaveform from './VoiceWaveform';
 import { useVoiceControl } from '@/app/hooks/useVoiceControl';
 import { GenerateResponse } from '@/services/graniteClient';
 import { REFRESH_BUTTON_SX, START_NEW_BUTTON_SX, STOP_BUTTON_SX } from '@/app/styles/buttonStyles';
+import { Inter } from 'next/font/google';
 
 // Shared size/style so all control buttons match
 const CONTROL_BUTTON_SX = {
@@ -218,7 +219,9 @@ export default function VoiceControlBar({
           sx={{
             width: '100%',
             mt: 2,
-            fontStyle: 'italic',
+            fontStyle: 'Inter',
+            fontSize: 24,
+            fontWeight: 600,
             color: theme.palette.text.secondary,
             whiteSpace: 'pre-wrap',
             fontFamily: 'monospace',
