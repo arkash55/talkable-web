@@ -34,18 +34,12 @@ type Item = {
 
 const ITEMS: Item[] = [
   { key: 'account',      title: 'Account',        subtitle: 'Profile & security',            icon: <User size={22} />,         href: '/settings/profile' },
-  { key: 'audio',        title: 'Voice & Tone', Subtitle: 'TTS settings',            icon: <Volume2 size={22} />,      href: '/settings/tone-voice' },
-  { key: 'privacy',      title: 'Privacy',        subtitle: 'Permissions & telemetry',       icon: <ShieldCheck size={22} />,  href: '/settings/privacy' },
-  { key: 'about',        title: 'About',          subtitle: 'Version & credits',             icon: <Info size={22} />,         href: '/settings/about' },
-  { key: 'delete',       title: 'Delete Account', subtitle: 'Permanently remove your data',  icon: <Trash2 size={22} />,      href: '/settings/delete', danger: true,
-  },
-  {
-    key: 'logout', title: 'Log Out', subtitle: 'End your session safely', icon: <LogOut size={22} />, href: '/logout', danger: true },
-  // { key: 'input',        title: 'Input (Mic)',    subtitle: 'Recording & devices',           icon: <Mic size={22} />,          href: '/settings/input' },
-  // { key: 'appearance',   title: 'Appearance',     subtitle: 'Theme & layout',                icon: <Palette size={22} />,      href: '/settings/appearance' },
-  // { key: 'accessibility',title: 'Accessibility',  subtitle: 'Text size, contrast, captions',icon: <AccessibilityIcon size={22} />, href: '/settings/accessibility' },
-  // { key: 'integrations', title: 'Integrations',   subtitle: 'Watson/STT, TTS, APIs',         icon: <PlugZap size={22} />,      href: '/settings/integrations' },
-  // { key: 'data',         title: 'Data',           subtitle: 'Storage & reset',               icon: <Database size={22} />,     href: '/settings/data' },
+  { key: 'audio',        title: 'Voice & Tone',   subtitle: 'TTS settings',            icon: <Volume2 size={22} />,      href: '/settings/tone-voice' },
+  { key: 'change-password',      title: 'Change Password',        subtitle: 'Create a new password',       icon: <ShieldCheck size={22} />,  href: '/settings/change-password' },
+  { key: 'about-privacy',        title: 'About & Privacy',          subtitle: 'Version & credits',             icon: <Info size={22} />,         href: '/settings/about' },
+  { key: 'delete',       title: 'Delete Account', subtitle: 'Permanently remove your data',  icon: <Trash2 size={22} />,      href: '/settings/delete', danger: true,},
+  {key: 'logout', title: 'Log Out', subtitle: 'End your session safely', icon: <LogOut size={22} />, href: '/logout', danger: true },
+
   
 ];
 
