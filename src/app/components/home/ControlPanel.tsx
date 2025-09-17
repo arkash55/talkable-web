@@ -217,8 +217,8 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
 
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.25 }}>
               {advanced
-                ? 'Start speaking or send a message to populate this timeline.'
-                : 'Say something or type to start your conversation.'}
+                ? 'Start a conversation to populate this timeline.'
+                : 'Start a conversation to populate the chat history.'}
             </Typography>
 
             <Stack
@@ -229,8 +229,8 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
               flexWrap="wrap"
               sx={{ mt: 0.5 }}
             >
-              <Chip size="small" label="Press the mic to start" variant="outlined" />
-              <Chip size="small" label="Your replies will appear here" variant="outlined" />
+              <Chip size="small" label="Press start new conversation" variant="outlined" />
+              {/* <Chip size="small" label="Your replies will appear here" variant="outlined" /> */}
             </Stack>
           </Paper>
         ) : (

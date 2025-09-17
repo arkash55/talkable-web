@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AppBar, Toolbar, IconButton, Typography, Box, Container, Divider } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useSelectedLayoutSegments } from 'next/navigation';
+import { ChevronLeftIcon } from 'lucide-react';
 
 const TITLE_MAP: Record<string, string> = {
   'profile': 'Profile',
@@ -76,7 +77,9 @@ function SettingsTabsNavBar() {
             '&:hover': { bgcolor: 'action.hover' },
           }}
         >
-          <ArrowBackIcon sx={{ fontSize: BACK_ICON_SIZE }} />
+
+          
+          <ChevronLeftIcon sx={{ fontSize: BACK_ICON_SIZE }} />
         </IconButton>
         <CurrentTitle />
         <Box sx={{ flexGrow: 1 }} />

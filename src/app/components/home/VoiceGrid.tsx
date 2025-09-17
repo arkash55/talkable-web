@@ -210,12 +210,12 @@ export default function VoiceGrid({
         <EmptyCard
           icon={<GraphicEqIcon sx={{ fontSize: 56, opacity: 0.8 }} />}
           title="Start A Conversation"
-          subtitle="Start speaking or click to begin listening and we’ll surface options here."
+          subtitle="Click the start new conversation button and we’ll surface options here."
           onClick={() => {
             const evtName = 'home:stt:requestStart';
             window.dispatchEvent(new CustomEvent(evtName));
           }}
-          cta="Press to start listening"
+          cta="You can then select a generated response"
         />
       </Box>
     );
@@ -283,8 +283,8 @@ export default function VoiceGrid({
         >
           <EmptyCard
             icon={<GraphicEqIcon sx={{ fontSize: 56, opacity: 0.8 }} />}
-            title="Suggestions will appear here"
-            subtitle="Send a custom message or wait for a message to get options."
+            title="Responses will appear here"
+            subtitle="Send a custom message or wait for a message to get responses."
           />
         </Box>
       );

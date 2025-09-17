@@ -2,15 +2,23 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Box, Button, Typography, useTheme, Stack } from '@mui/material';
+import {
+  Box,
+  Button,
+  Typography,
+  useTheme,
+  Stack,
+  IconButton,
+  Tooltip,
+} from '@mui/material';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import MicOffIcon from '@mui/icons-material/MicOff';
+import { useRouter } from 'next/navigation';
 
 import VoiceWaveform from '@/app/components/home/VoiceWaveform';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import { START_NEW_BUTTON_SX, STOP_BUTTON_SX } from '@/app/styles/buttonStyles';
-
-
 
 type Props = {
   recipientName: string;
@@ -19,8 +27,6 @@ type Props = {
   keepFinalMs?: number;
   showTranscript?: boolean;
 };
-
-
 
 const EVT_START = 'chat:stt:startListening';
 const EVT_FINAL = 'chat:stt:finalTranscript';
@@ -33,19 +39,28 @@ export default function ChatVoiceBar({
   showTranscript = true,
 }: Props) {
   const theme = useTheme();
+  const router = useRouter();
+
   const [listening, setListening] = useState(false);
   const [speaking] = useState(false); // reserved for symmetry with VoiceWaveform
   const [hasSoundLeeway, setHasSoundLeeway] = useState(false);
 
-  // Live STT state from the lib
   const { transcript, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
 
-  // Local display buffer so we can show the last final result even after resetting the lib transcript
   const [displayText, setDisplayText] = useState('');
 
   const silenceTimer = useRef<NodeJS.Timeout | null>(null);
   const hideTimer = useRef<NodeJS.Timeout | null>(null);
   const processing = useRef(false);
+
+  // Back handler with safe fallback (adjust '/' to your preferred route if needed)
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/'); // fallback route
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -84,7 +99,6 @@ export default function ChatVoiceBar({
   const startListening = () => {
     if (listening) return;
 
-    // Clear any previous display + hide timers
     if (hideTimer.current) clearTimeout(hideTimer.current);
     setDisplayText('');
 
@@ -115,7 +129,6 @@ export default function ChatVoiceBar({
     setListening(false);
     setHasSoundLeeway(false);
 
-    // Show the final transcript for keepFinalMs
     if (finalText) {
       setDisplayText(finalText);
       if (typeof window !== 'undefined') {
@@ -124,16 +137,11 @@ export default function ChatVoiceBar({
       try {
         onTranscript?.(finalText);
       } finally {
-        // Clear the STT lib's internal buffer immediately,
-        // but keep our own displayText visible for keepFinalMs.
         resetTranscript();
         if (hideTimer.current) clearTimeout(hideTimer.current);
-        hideTimer.current = setTimeout(() => {
-          setDisplayText('');
-        }, keepFinalMs);
+        hideTimer.current = setTimeout(() => setDisplayText(''), keepFinalMs);
       }
     } else {
-      // Nothing captured; just reset
       resetTranscript();
       setDisplayText('');
     }
@@ -158,9 +166,23 @@ export default function ChatVoiceBar({
         gap: 2,
       }}
     >
-      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-         {`Conversation With ${recipientName}`}
-      </Typography>
+      {/* Left: Back chevron + title */}
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+        <Tooltip title="Back">
+          <IconButton
+            aria-label="Back"
+            onClick={handleBack}
+            size="large"
+            color="inherit"
+            sx={{ mr: 0.5 }}
+          >
+             <ChevronLeftIcon sx={{ fontSize: 30, mr: 2 }} />
+          </IconButton>
+        </Tooltip>
+        <Typography variant="h6" sx={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {`Conversation With ${recipientName}`}
+        </Typography>
+      </Stack>
 
       {(listening || speaking) && (
         <VoiceWaveform
@@ -170,6 +192,7 @@ export default function ChatVoiceBar({
         />
       )}
 
+      {/* Right: Control buttons */}
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
         {!listening ? (
           <Button
