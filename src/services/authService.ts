@@ -9,6 +9,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   updatePassword,
+  deleteUser as authDeleteUser,
 } from "firebase/auth";
 
 
@@ -138,4 +139,58 @@ export async function changePassword(
     }
     return { ok: false, code: "unknown", message: "Could not update password." };
   }
+}
+
+
+
+export type ReauthResult =
+  | { ok: true }
+  | { ok: false; code: 'wrong-old-password' | 'no-current-user' | 'unknown'; message: string };
+
+export async function reauthWithPassword(oldPassword: string): Promise<ReauthResult> {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  if (!user || !user.email) {
+    return { ok: false, code: 'no-current-user', message: 'You must be signed in.' };
+  }
+  try {
+    const cred = EmailAuthProvider.credential(user.email, oldPassword);
+    await reauthenticateWithCredential(user, cred);
+    return { ok: true };
+  } catch (err: any) {
+    const code = err?.code ?? 'unknown';
+    if (['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials'].includes(code)) {
+      return { ok: false, code: 'wrong-old-password', message: 'Old password is incorrect.' };
+    }
+    return { ok: false, code: 'unknown', message: 'Reauthentication failed.' };
+  }
+}
+
+export type DeleteAccountResult =
+  | { ok: true }
+  | { ok: false; code: 'no-current-user' | 'requires-recent-login' | 'unknown'; message: string };
+
+export async function deleteAccount(): Promise<DeleteAccountResult> {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  if (!user) return { ok: false, code: 'no-current-user', message: 'You must be signed in.' };
+  try {
+    await authDeleteUser(user);
+    return { ok: true };
+  } catch (err: any) {
+    const code = err?.code ?? 'unknown';
+    if (code === 'auth/requires-recent-login') {
+      return { ok: false, code: 'requires-recent-login', message: 'Please sign in again to confirm deletion.' };
+    }
+    return { ok: false, code: 'unknown', message: 'Could not delete account.' };
+  }
+}
+
+// Convenience: do both steps in one call when you have the password
+export async function deleteAccountWithPassword(oldPassword: string): Promise<DeleteAccountResult> {
+  const r = await reauthWithPassword(oldPassword);
+  if (!r.ok) {
+    return { ok: false, code: r.code === 'wrong-old-password' ? 'unknown' : 'unknown', message: r.message };
+  }
+  return deleteAccount();
 }
