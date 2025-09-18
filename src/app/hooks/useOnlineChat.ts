@@ -10,6 +10,8 @@ import {
   type MessageHistoryItem,
 } from '@/app/utils/contextWindow';
 import { Candidate } from '@/services/graniteService';
+import { buildSystemPrompt } from '../utils/systemPrompt';
+import { useUserProfile } from './useUserProfile';
 
 type UseOnlineChatReturn = {
   aiResponses: Candidate[];
@@ -29,6 +31,12 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
   const historyRef = useRef<MessageHistoryItem[]>([]);
   const lastGeneratedForMsgId = useRef<string | null>(null);
   const generating = useRef<boolean>(false);
+
+    const { profile } = useUserProfile();
+    const SYSTEM_PROMPT = useMemo(
+      () => buildSystemPrompt(profile),
+      [profile?.tone, profile?.description]
+    );
 
   // Helper: rebuild sliding history (idempotent) from Firestore messages
   const rebuildHistory = (arr: Array<{ id: string; text: string; senderId: string }>) => {
@@ -72,7 +80,7 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
       const system = 'You are a helpful, concise chat assistant. Suggest short, natural replies (1–2 sentences). Provide diverse but relevant tones.';
       const prompt = last.text;
 
-      const resp = await getCandidates(prompt, system, ctx, {
+      const resp = await getCandidates(prompt, SYSTEM_PROMPT, ctx, {
         k: 6,
         params: { temperature: 0.7, top_p: 0.95, top_k: 50, max_new_tokens: 64 },
       });

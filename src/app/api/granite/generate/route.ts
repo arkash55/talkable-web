@@ -4,6 +4,8 @@ import { generateRankedCandidates, type GenerateRequest } from "@/services/grani
 
 export const dynamic = "force-dynamic";
 
+
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Partial<GenerateRequest>;
@@ -15,10 +17,12 @@ export async function POST(req: NextRequest) {
     const result = await generateRankedCandidates({
       prompt: body.prompt,
       context: Array.isArray(body.context) ? body.context : undefined,
-      system: typeof body.system === "string" ? body.system : undefined,
+      system: typeof body.system === "string" ? body.system : "",
       k: typeof body.k === "number" ? body.k : 6,
       params: body.params,
     });
+
+    console.log(body.system)
 
     return NextResponse.json(result, { status: 200 });
   } catch (err: any) {

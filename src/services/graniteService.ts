@@ -3,15 +3,17 @@
 // then rank with FlowRank. No stance/sentiment beyond varied instructions—just answer-only generations + flow ranking.
 // Final shortlist uses an ADAPTIVE coverage selector (3–6 items) with a soft preference for 5.
 // Also strips wrapping quotes / code fences / emojis from outputs, reorders with MMR for diversity,
-// and de-dupes near-paraphrases.
+// and de-dupes near-paraphrases. The caller must provide a fully-formed `system` string
+// (e.g., from buildSystemPrompt(profile)).
 
 import { scoreFlowLevel1, type FlowSignalsInput } from '@/app/utils/flowRank';
 import { getIamToken, generateOnce, type GenParams } from './graniteHelper';
 
 export type GenerateRequest = {
   prompt: string;
+  system: string;        // ← REQUIRED: pass buildSystemPrompt(profile) from the caller
   context?: string[];
-  system?: string;
+
   /** Number of candidates to request (ignored if perCallInstructions is provided) */
   k?: number;
   params?: GenParams;
@@ -93,42 +95,29 @@ function mergeStops(userStops?: string[]) {
 function stripEmojis(s: string): string {
   let out = s;
   try {
-    // Extended Pictographic covers most emoji; also strip ZWJ/variation selectors/skin tones
     out = out.replace(/\p{Extended_Pictographic}/gu, '');
   } catch {
-    // Fallback ranges if Unicode props unavailable
     out = out.replace(
       /[\u200D\uFE0E\uFE0F]|\uD83C[\uDFFB-\uDFFF]|[\u231A-\u231B]|\u23F0|\u23F3|\u24C2|\u25FD|\u25FE|[\u2600-\u27BF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDDFF]/g,
       ''
     );
   }
-  // Remove stray joiners/variation selectors that might remain
   out = out.replace(/[\u200D\uFE0E\uFE0F]/g, '');
   return out;
 }
 
-// Remove wrapping quotes/backticks/markdown quote blocks from a single-line answer
+// Remove wrapping quotes/backticks/markdown quote blocks
 function stripWrappingQuotes(s: string): string {
   let t = s.trim();
-
-  // Remove leading Markdown quote markers ("> ...")
   t = t
     .split('\n')
     .map((line) => line.replace(/^\s*>\s?/, ''))
     .join('\n')
     .trim();
-
-  // Remove fenced code blocks ```...```
-  if (/^```/.test(t) && /```$/.test(t)) {
-    t = t.replace(/^```+/, '').replace(/```+$/, '').trim();
-  }
-
-  // Remove inline backticks if the whole text is wrapped in them
+  if (/^```/.test(t) && /```$/.test(t)) t = t.replace(/^```+/, '').replace(/```+$/, '').trim();
   if ((t.startsWith('`') && t.endsWith('`')) || (t.startsWith('``') && t.endsWith('``'))) {
     t = t.replace(/^`+/, '').replace(/`+$/, '').trim();
   }
-
-  // Remove matching wrapping quotes: ", ', “ ”, ‘ ’
   const pairs: Array<[RegExp, RegExp]> = [
     [/^"(.*)"$/s, /^"|"$/g],
     [/^'(.*)'$/s, /^'|'$/g],
@@ -136,28 +125,16 @@ function stripWrappingQuotes(s: string): string {
     [/^‘([\s\S]*)’$/s, /^‘|’$/g],
   ];
   for (const [wrap, stripRe] of pairs) {
-    if (wrap.test(t)) {
-      t = t.replace(stripRe, '').trim();
-      break;
-    }
+    if (wrap.test(t)) { t = t.replace(stripRe, '').trim(); break; }
   }
-
-  // Collapse repeated whitespace
-  t = t.replace(/\s{2,}/g, ' ').trim();
-  return t;
+  return t.replace(/\s{2,}/g, ' ').trim();
 }
 
 // Strip leading meta blocks and role labels, and cut before any later meta
 function stripMeta(text: string): string {
   let s = (text || '').trim();
-
-  // Remove leading [BLOCKS] like [SYSTEM], [CONTEXT], [INSTRUCTIONS]
   s = s.replace(/^(?:\s*\[[^\]]+\]\s*)+/i, '').trim();
-
-  // Remove leading role labels
   s = s.replace(/^(assistant|system|user)\s*:\s*/i, '').trim();
-
-  // If it starts emitting meta again later, cut there
   const cuts = [
     s.indexOf('\n['),
     s.indexOf('\nUser:'),
@@ -166,17 +143,9 @@ function stripMeta(text: string): string {
     s.indexOf('\n---'),
   ].filter((i) => i > 0);
   if (cuts.length) s = s.slice(0, Math.min(...cuts)).trim();
-
-  // Remove wrapping quotes / code fences / '>' quotes
   s = stripWrappingQuotes(s);
-
-  // Remove emojis
   s = stripEmojis(s);
-
-  // Final tidy
-  s = s.replace(/\s{2,}/g, ' ').trim();
-
-  return s;
+  return s.replace(/\s{2,}/g, ' ').trim();
 }
 
 // Small randomness helper (±pct jitter)
@@ -198,12 +167,9 @@ function paramsForIndex(idx: number, base: Required<GenParams>): Required<GenPar
   let t  = clamp((base.temperature ?? 0.6) + 0.05 * idx, 0.55, 1.05);
   let tp = clamp((base.top_p ?? 0.95) + 0.01 * idx, 0.85, 0.995);
   let tk = clamp((base.top_k ?? 60) + 10 * idx, 40, 200);
-
-  // add tiny jitter so distributions vary run-to-run
   t  = jitter(t,  0.08, 0.5,  1.1);
   tp = jitter(tp, 0.03, 0.8,  0.999);
   tk = clamp(Math.round(tk + (Math.random() * 12 - 6)), 40, 220);
-
   return { ...base, temperature: t, top_p: tp, top_k: tk };
 }
 
@@ -233,7 +199,6 @@ function composeVariantInput(
 }
 
 // Default per-call instruction variants (used if caller doesn't pass their own)
-// Tuned to produce varied, higher-quality answers and avoid platitudes.
 const DEFAULT_INSTRUCTION_VARIANTS = [
   'Be conservative and concise. Provide one clear, concrete suggestion the user can do next.',
   'Be concise and warm but precise. Offer one actionable tip with a brief reason.',
@@ -245,7 +210,6 @@ const DEFAULT_INSTRUCTION_VARIANTS = [
 
 // Create randomized seeds per request (optionally deterministic with samplingSeed)
 function randomSeedBase() {
-  // Prefer crypto if available (browser), else Math.random + time
   try {
     // @ts-ignore
     if (typeof crypto !== 'undefined' && crypto?.getRandomValues) {
@@ -256,22 +220,16 @@ function randomSeedBase() {
   } catch {}
   return (Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0;
 }
-
 function makeSeeds(k: number, samplingSeed?: number) {
   const base = typeof samplingSeed === 'number' ? samplingSeed >>> 0 : randomSeedBase();
   return Array.from({ length: k }, (_, i) => (base + i) >>> 0);
 }
-
-// Shuffle helper to vary instruction ordering (in-place Fisher–Yates)
 function shuffle<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
   return arr;
 }
 
-// Normalized entropy of a probability vector (0=peaked, 1=uniform)
+// Normalized entropy
 function normalizedEntropy(ps: number[]): number {
   const safe = ps.map((p) => Math.max(1e-12, p));
   const sum = safe.reduce((a, b) => a + b, 0) || 1;
@@ -281,142 +239,72 @@ function normalizedEntropy(ps: number[]): number {
   return Hmax > 0 ? H / Hmax : 0;
 }
 
-// --- diversity helpers: simple token Jaccard + distinct-starts ----
+// Diversity helpers
 function tok(s: string): string[] {
-  return s
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
+  return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
 }
-
 function jaccardTokens(a: string, b: string): number {
   const A = new Set(tok(a)), B = new Set(tok(b));
   if (!A.size && !B.size) return 1;
-  let inter = 0;
-  for (const w of A) if (B.has(w)) inter++;
+  let inter = 0; for (const w of A) if (B.has(w)) inter++;
   const union = A.size + B.size - inter;
   return union ? inter / union : 0;
 }
-
-/** Greedy MMR-style reordering for diversity:
- *  score = utility - lambda * max_similarity_to_selected
- */
 function mmrReorder(items: Candidate[], lambda = 0.15): Candidate[] {
   if (items.length <= 2) return items.slice();
   const remaining = items.slice().sort((a, b) => b.flow.utility - a.flow.utility);
   const selected: Candidate[] = [remaining.shift()!];
-
   while (remaining.length) {
-    let bestIdx = 0;
-    let bestScore = -Infinity;
+    let bestIdx = 0, bestScore = -Infinity;
     for (let i = 0; i < remaining.length; i++) {
       const c = remaining[i];
       let maxSim = 0;
-      for (const s of selected) {
-        const sim = jaccardTokens(c.text, s.text);
-        if (sim > maxSim) maxSim = sim;
-      }
+      for (const s of selected) maxSim = Math.max(maxSim, jaccardTokens(c.text, s.text));
       const score = c.flow.utility - lambda * maxSim;
-      if (score > bestScore) {
-        bestScore = score;
-        bestIdx = i;
-      }
+      if (score > bestScore) { bestScore = score; bestIdx = i; }
     }
     selected.push(remaining.splice(bestIdx, 1)[0]);
   }
   return selected;
 }
-
-/** Keep items that are not near-duplicates of earlier (stronger) ones.
- *  - For very short lines, use a stricter threshold (e.g., 0.97)
- *  - For normal lines, ~0.88 is a good start
- *  - Enforce distinct first N words to avoid “Same opener, different ending”
- */
-function filterNearDuplicates(
-  items: Candidate[],
-  shortThresh = 0.97,
-  longThresh = 0.88,
-  distinctStartWords = 2
-): Candidate[] {
+function filterNearDuplicates(items: Candidate[], shortThresh = 0.97, longThresh = 0.88, distinctStartWords = 2): Candidate[] {
   const kept: Candidate[] = [];
   const seenStarts = new Set<string>();
-
   for (const it of items) {
     const words = tok(it.text);
     const startKey = words.slice(0, distinctStartWords).join(' ');
     if (startKey && seenStarts.has(startKey)) continue;
-
     let dup = false;
     for (const k of kept) {
       const sim = jaccardTokens(it.text, k.text);
       const t = (it.text.length < 45 || k.text.length < 45) ? shortThresh : longThresh;
       if (sim >= t) { dup = true; break; }
     }
-    if (!dup) {
-      kept.push(it);
-      if (startKey) seenStarts.add(startKey);
-    }
+    if (!dup) { kept.push(it); if (startKey) seenStarts.add(startKey); }
   }
   return kept;
 }
-
-/** Coverage-based final slice:
- *  Keep minCount core, then add until cumulative prob ≥ coverage, up to maxCount.
- *  Also nudge to include a 4th if it's not too weak. */
-function sliceByCoverage(
-  items: Candidate[],
-  minCount: number,
-  maxCount: number,
-  coverage: number,
-  minFourthProb = 0.04 // easier to include the 4th; helps reach 5–6 overall
-): Candidate[] {
+function sliceByCoverage(items: Candidate[], minCount: number, maxCount: number, coverage: number, minFourthProb = 0.04): Candidate[] {
   if (!items.length) return [];
   const byProb = [...items].sort((a, b) => b.flow.prob - a.flow.prob);
-
   const out: Candidate[] = [];
   let cum = 0;
-
   for (let i = 0; i < byProb.length && out.length < maxCount; i++) {
-    out.push(byProb[i]);
-    cum += byProb[i].flow.prob;
-
-    // After we have the core minCount, stop once we cover the target mass
+    out.push(byProb[i]); cum += byProb[i].flow.prob;
     if (out.length >= minCount && cum >= coverage) break;
   }
-
-  // Nudge to include #4 when it's not too weak
-  if (out.length === 3 && byProb[3] && byProb[3].flow.prob >= minFourthProb && out.length < maxCount) {
-    out.push(byProb[3]);
-  }
-
-  // If there were fewer total than minCount, return whatever exists
-  if (out.length < Math.min(minCount, byProb.length)) {
-    return byProb.slice(0, Math.min(minCount, byProb.length));
-  }
+  if (out.length === 3 && byProb[3] && byProb[3].flow.prob >= minFourthProb && out.length < maxCount) out.push(byProb[3]);
+  if (out.length < Math.min(minCount, byProb.length)) return byProb.slice(0, Math.min(minCount, byProb.length));
   return out;
 }
-
-/** Softly trim to a preferred count if coverage remains satisfied. */
-function trimToPreferredCount(
-  items: Candidate[],
-  preferCount: number,
-  minCount: number,
-  coverage: number,
-  tolerance = 0.01 // small tolerance so we don't over-trim; keeps 6 more often
-): Candidate[] {
+function trimToPreferredCount(items: Candidate[], preferCount: number, minCount: number, coverage: number, tolerance = 0.01): Candidate[] {
   let out = [...items];
   while (out.length > preferCount) {
     const tail = out[out.length - 1];
     const cum = out.reduce((s, c) => s + c.flow.prob, 0);
-    if (
-      out.length - 1 >= minCount &&                         // keep >= min
-      (cum - tail.flow.prob) >= Math.max(coverage - tolerance, 0) // keep coverage
-    ) {
+    if (out.length - 1 >= minCount && (cum - tail.flow.prob) >= Math.max(coverage - tolerance, 0)) {
       out.pop();
-    } else {
-      break;
-    }
+    } else break;
   }
   return out;
 }
@@ -427,12 +315,14 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     throw new Error('Missing IBM_API_KEY, IBM_WATSON_ENDPOINT, or IBM_PROJECT_ID');
   }
 
+  const systemToUse = (req.system || '').trim();
+
   // Decide how many calls to make
   const plan = (req.perCallInstructions?.length
     ? req.perCallInstructions
-    : DEFAULT_INSTRUCTION_VARIANTS).slice(0, 8); // cap to 8 for sanity
+    : DEFAULT_INSTRUCTION_VARIANTS).slice(0, 8);
 
-  // Shuffle built-ins if using defaults to vary styles across requests
+  // Shuffle when using defaults to vary styles across requests
   const planShuffled = req.perCallInstructions?.length ? plan : shuffle([...plan]);
 
   const wantK = clamp(req.perCallInstructions?.length ?? req.k ?? 6, 1, 8);
@@ -453,8 +343,8 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
   const seeds = makeSeeds(wantK, req.samplingSeed);
 
   const calls = seeds.map((seed, idx) => {
-    const instruction = planShuffled[idx % planShuffled.length]; // cycle if wantK > plan length
-    const input = composeVariantInput(req.system, req.context, req.prompt, instruction);
+    const instruction = planShuffled[idx % planShuffled.length];
+    const input = composeVariantInput(systemToUse, req.context, req.prompt, instruction);
     const params = paramsForIndex(idx, baseParams);
 
     return generateOnce({
@@ -466,11 +356,7 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
       modelId: MODEL_ID,
       projectId: PROJECT_ID,
     })
-      .then((r) => ({
-        ...r,
-        seed,
-        variant: idx === 0 ? ('primary' as const) : ('alt' as const),
-      }))
+      .then((r) => ({ ...r, seed, variant: idx === 0 ? ('primary' as const) : ('alt' as const) }))
       .catch((e) => ({ error: String(e?.message || e), seed, variant: idx === 0 ? 'primary' : 'alt' }));
   });
 
@@ -485,7 +371,6 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     .map((r) => ({ ...r, text: stripMeta(r.text) }))
     .filter((r) => r.text.length > 0);
 
-  // If nothing valid, return early
   if (!cleaned.length) {
     return {
       candidates: [],
@@ -512,7 +397,6 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
 
   const flowRows = await scoreFlowLevel1(flowInputs, {
     lastUser: (req.prompt || '').trim(),
-    // Slightly flatter to allow more mass across candidates (helps reach 5–6)
     weights: { a: 1.0, b: 0.8, g: 0.2, tau: 0.9 },
   });
 
@@ -538,33 +422,26 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     };
   });
 
-  // Sort by flow utility (best first) for display
+  // Sort by flow utility (best first)
   ranked.sort((a, b) => b.flow.utility - a.flow.utility);
 
-  // MMR-style reordering to promote diversity
+  // Diversity (MMR) + de-dupe
   const mmrRanked = mmrReorder(ranked, 0.15);
-
-  // Drop paraphrases / same openings
   const deduped = filterNearDuplicates(mmrRanked, 0.97, 0.88, 2);
 
-  // ---- Final slice: ADAPTIVE coverage-based 3–6 selection (biased toward 5–6, sometimes 3–4) ----
+  // ---- Final slice: ADAPTIVE coverage-based 3–6 selection ----
   const minReturn = clamp(Math.round(req.minReturn ?? 3), 3, 6);
   const maxReturn = clamp(Math.round(req.maxReturn ?? 6), minReturn, 6);
-
-  // Use deduped list if it still supports minReturn; otherwise fall back
   const baseList = deduped.length >= Math.min(minReturn, mmrRanked.length) ? deduped : mmrRanked;
 
-  // If caller sets coverageTarget use it; otherwise adapt by entropy — higher band to favor 5–6
   const probs = baseList.map((c) => c.flow.prob);
-  const Hnorm = normalizedEntropy(probs); // 0..1
+  const Hnorm = normalizedEntropy(probs);
   const adaptiveCoverage = clamp(0.84 + 0.08 * Hnorm, 0.82, 0.94);
   const coverage = typeof req.coverageTarget === 'number'
     ? clamp(req.coverageTarget, 0.6, 0.98)
     : adaptiveCoverage;
 
   const selected = sliceByCoverage(baseList, minReturn, maxReturn, coverage, 0.04);
-
-  // Soft-prefer 5 when coverage is satisfied (keeps 6 if trimming would break coverage)
   const preferCount = clamp(Math.round(req.preferCount ?? 5), minReturn, maxReturn);
   const finalSelected = trimToPreferredCount(selected, preferCount, minReturn, coverage, 0.01);
 

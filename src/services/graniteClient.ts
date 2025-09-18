@@ -25,6 +25,8 @@ export type SuggestionOptions = {
   perCallInstructions?: string[]; // NEW: one instruction per generation call
 };
 
+
+
 export async function getCandidates(
   prompt: string,
   system: string,
@@ -38,6 +40,7 @@ export async function getCandidates(
     signal,
     perCallInstructions,
     padTo,
+    profile,
   } = opts;
 
   // Always ask for at least 3 when k is used (server may ignore if perCallInstructions provided)
@@ -49,6 +52,7 @@ export async function getCandidates(
     prompt,
     k: wantK,
     params,
+    profile,
     ...(perCallInstructions ? { perCallInstructions } : {}), // ← pass through variant instructions
   };
 

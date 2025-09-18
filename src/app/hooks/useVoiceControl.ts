@@ -294,7 +294,7 @@ export function useVoiceControl(
 
             // 3) Call model
             const responses: GenerateResponse = await getCandidates(
-              guestMsg.content, SYSTEM_PROMPT, ctx
+              guestMsg.content, SYSTEM_PROMPT, ctx,
             );
             console.log('AI responses:', responses);
             stableOnResponses.current(responses);
