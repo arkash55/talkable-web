@@ -35,7 +35,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 
-import { onInbox, type InboxItem, createOnlineConversation } from '@/services/firestoreService';
+import { onInbox, type InboxItem } from '@/services/firestoreService';
 import { db } from '../../../../lib/fireBaseConfig';
 import { REFRESH_BUTTON_SX, TOGGLE_BUTTON_SX } from '@/app/styles/buttonStyles';
 import NewOnlineChatDialogue from './NewOnlineChatDialogue';
@@ -222,20 +222,7 @@ export default function ConversationsSidebar() {
     }
   };
 
-  const handleCreateConversation = async (otherUid: string) => {
-    if (!currentUid) return;
-    try {
-      const cid = await createOnlineConversation({
-        creatorUid: currentUid,
-        otherUid,
-        title: null,
-      });
-      setOpenDialog(false);
-      router.push(`/chat/${cid}`);
-    } catch (err) {
-      console.error('Error creating conversation:', err);
-    }
-  };
+
 
   // Autofocus the search box when switching to "online"
   useEffect(() => {
