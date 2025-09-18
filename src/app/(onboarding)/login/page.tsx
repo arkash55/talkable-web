@@ -1,7 +1,7 @@
 'use client';
 
 import LoginForm from '@/app/forms/LoginForm';
-import { loginUser } from '@/services/authService';
+import { authErrorToMessage, loginUser } from '@/services/authService';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -19,7 +19,7 @@ export default function LoginPage() {
       await loginUser(email, password);
       router.push('/home');
     } catch (err: any) {
-      setError(err.message);
+      setError(authErrorToMessage(err));
     } finally {
       setIsLoading(false);
     }

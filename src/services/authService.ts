@@ -28,17 +28,13 @@ export const logoutUser = async () => {
   return await signOut(auth);
 };
 
-
-
 export async function requestPasswordReset(email: string): Promise<void> {
   // Trim to avoid whitespace issues and lower-case for consistency
   const clean = (email || '').trim();
   if (!clean) throw Object.assign(new Error('auth/invalid-email'), { code: 'auth/invalid-email' });
 
   await sendPasswordResetEmail(auth, clean);
-  
 }
-
 
 export async function ensureEmailAvailable(email: string) {
   const res = await fetch('/api/auth/check-email', {
@@ -195,4 +191,23 @@ export async function deleteAccountWithPassword(oldPassword: string): Promise<De
     return { ok: false, code: r.code === 'no-current-user' ? 'no-current-user' : 'unknown', message: r.message };
   }
   return deleteAccount();
+}
+
+export function authErrorToMessage(e: any): string {
+  const code = e?.code || '';
+  switch (code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+      return 'Password is incorrect.';
+    case 'auth/user-not-found':
+      return 'No account found with that email.';
+    case 'auth/invalid-email':
+      return 'Invalid email address.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Try again later.';
+    case 'auth/network-request-failed':
+      return 'Network error. Check your connection.';
+    default:
+      return 'Sign-in failed. Please try again.';
+  }
 }
