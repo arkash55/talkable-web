@@ -1,12 +1,5 @@
-// lib/graniteService.ts
-// Streamlined orchestrator: run Granite N times with per-call INSTRUCTIONS, clean output,
-// then rank with FlowRank. No stance/sentiment beyond varied instructions—just answer-only generations + flow ranking.
-// Final shortlist uses an ADAPTIVE coverage selector (3–6 items) with a soft preference for 5.
-// Also strips wrapping quotes / code fences / emojis from outputs, reorders with MMR for diversity,
-// and de-dupes near-paraphrases. The caller must provide a fully-formed `system` string
-// (e.g., from buildSystemPrompt(profile)).
 
-import { scoreFlowLevel1, type FlowSignalsInput } from '@/app/utils/flowRank';
+import { scoreFlowLevel1, type FlowSignalsInput } from '../app/utils/flowRank';
 import { getIamToken, generateOnce, type GenParams } from './graniteHelper';
 
 export type GenerateRequest = {

@@ -8,7 +8,7 @@ export const createUserWithEmailAndPassword = vi.fn();
 export const signOut = vi.fn();
 export const reauthenticateWithCredential = vi.fn();
 export const updatePassword = vi.fn();
-export const deleteUser = vi.fn();
+export const deleteUser = vi.fn(); // your service imports: `deleteUser as authDeleteUser`
 export const sendPasswordResetEmail = vi.fn();
 
 // simple currentUser holder for getAuth()

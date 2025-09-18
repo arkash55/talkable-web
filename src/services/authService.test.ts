@@ -1,38 +1,28 @@
 // src/services/authService.test.ts
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// 1) Mock FIRST — before any imports that might pull firebase/auth
-vi.mock('firebase/auth', () => {
-  const fns = {
-    signInWithEmailAndPassword: vi.fn(),
-    createUserWithEmailAndPassword: vi.fn(),
-    signOut: vi.fn(),
-    sendPasswordResetEmail: vi.fn(),
-    updatePassword: vi.fn(),
-    reauthenticateWithCredential: vi.fn(),
-    deleteUser: vi.fn(),
-  };
-  let currentUser: any = null;
-  return {
-    ...fns,
-    getAuth: vi.fn(() => ({ currentUser })),
-    EmailAuthProvider: {
-      credential: vi.fn((email: string, password: string) => ({ email, password })),
-    },
-    __setCurrentUser: (u: any) => { currentUser = u; },
-  };
-});
+// Use the manual mock in __mocks__/firebase/auth.ts
+// IMPORTANT: call vi.mock BEFORE importing the module under test or the mocked module.
+vi.mock('firebase/auth');
 
-// 2) Now import the mocked module and your service (same module instance!)
 import * as FirebaseAuth from 'firebase/auth';
 import {
-  loginUser, signupUser, logoutUser, requestPasswordReset, ensureEmailAvailable,
-  changePassword, reauthWithPassword, deleteAccount, deleteAccountWithPassword,
+  loginUser,
+  signupUser,
+  logoutUser,
+  requestPasswordReset,
+  ensureEmailAvailable,
+  changePassword,
+  reauthWithPassword,
+  deleteAccount,
+  deleteAccountWithPassword,
   authErrorToMessage,
 } from './authService';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // ensure a clean currentUser each test
+  (FirebaseAuth as any).__setCurrentUser(null);
 });
 
 // ------- TESTS -------
@@ -86,17 +76,17 @@ describe('authService (unit)', () => {
 
   describe('ensureEmailAvailable', () => {
     it('throws when /api/auth/check-email !ok', async () => {
-      global.fetch = vi.fn().mockResolvedValue({ ok: false });
+      (global as any).fetch = vi.fn().mockResolvedValue({ ok: false });
       await expect(ensureEmailAvailable('a@b.com')).rejects.toThrow(/Email check failed/i);
     });
 
     it('throws when available=false', async () => {
-      global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ available: false }) });
+      (global as any).fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ available: false }) });
       await expect(ensureEmailAvailable('a@b.com')).rejects.toThrow(/already in use/i);
     });
 
     it('resolves when available=true', async () => {
-      global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ available: true }) });
+      (global as any).fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ available: true }) });
       await expect(ensureEmailAvailable('a@b.com')).resolves.toBeUndefined();
     });
   });
