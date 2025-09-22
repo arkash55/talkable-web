@@ -41,7 +41,7 @@ const ITEMS: Item[] = [
   { key: 'account',          title: 'Account',         subtitle: 'Profile & security',     icon: <User size={22} />,        href: '/settings/profile' },
   { key: 'audio',            title: 'Voice & Tone',    subtitle: 'TTS settings',           icon: <Volume2 size={22} />,     href: '/settings/tone-voice' },
   { key: 'change-password',  title: 'Change Password', subtitle: 'Create a new password',  icon: <ShieldCheck size={22} />, href: '/settings/change-password' },
-  { key: 'about-privacy',    title: 'About & Privacy', subtitle: 'Version & credits',      icon: <Info size={22} />,        href: '/settings/about' },
+  { key: 'about-privacy',    title: 'About', subtitle: 'Version & credits',      icon: <Info size={22} />,        href: '/settings/about' },
   { key: 'delete',           title: 'Delete Account',  subtitle: 'Permanently remove your data', icon: <Trash2 size={22} />, danger: true, href: '/settings/delete' },
   { key: 'logout',           title: 'Log Out',         subtitle: 'End your session safely',     icon: <LogOut size={22} />,   danger: true, href: '/logout' },
 ];
@@ -72,6 +72,9 @@ export default function SettingsGrid({
   const [reauthPwd, setReauthPwd] = React.useState('');
   const [showPwd, setShowPwd] = React.useState(false);
 
+  // NEW: simple modal for "About & Privacy" (TBD)
+  const [tbdOpen, setTbdOpen] = React.useState(false);
+
   const openConfirm = (action: 'logout' | 'delete') => {
     setConfirmAction(action);
     setDialogError(null);
@@ -82,13 +85,17 @@ export default function SettingsGrid({
   };
 
   const closeConfirm = () => {
-    if (working) return; // prevent closing mid-action
+    if (working) return; 
     setConfirmOpen(false);
-    setConfirmAction(null);
-    setDialogError(null);
-    setNeedReauth(false);
-    setReauthPwd('');
   };
+
+  const handleDialogExited = () => {
+  setConfirmAction(null);
+  setDialogError(null);
+  setNeedReauth(false);
+  setReauthPwd('');
+  setShowPwd(false);
+};
 
   const tryDelete = async () => {
     // attempt the actual delete
@@ -156,6 +163,12 @@ export default function SettingsGrid({
       return;
     }
 
+    // NEW: intercept About & Privacy to show TBD modal
+    if (item.key === 'about-privacy') {
+      setTbdOpen(true);
+      return;
+    }
+
     // Everything else routes immediately
     if (item.href) router.push(item.href);
   };
@@ -164,6 +177,7 @@ export default function SettingsGrid({
 
   return (
     <>
+      {/* existing tiles + confirm dialog */}
       <Grid container spacing={spacing} display="flex" justifyContent="center">
         {ITEMS.map((item) => (
           <Grid item key={item.key} xs={cols.xs} sm={cols.sm} md={cols.md}>
@@ -185,6 +199,7 @@ export default function SettingsGrid({
         aria-labelledby="confirm-title"
         aria-describedby="confirm-desc"
         keepMounted
+        TransitionProps={{ onExited: handleDialogExited }}
         PaperProps={{
           sx: {
             width: 480,
@@ -220,7 +235,7 @@ export default function SettingsGrid({
         <DialogContent id="confirm-desc" dividers sx={{ borderTop: 'none', borderBottom: 'none' }}>
           <Typography align="center" color="text.secondary">
             {isDelete
-              ? 'This deletes your sign-in. App data may remain unless removed separately.'
+              ? 'This will permanently delete your account and associated data.'
               : 'You will be signed out of your current session.'}
           </Typography>
 
@@ -273,6 +288,35 @@ export default function SettingsGrid({
               {working ? <CircularProgress size={22} /> : isDelete ? (needReauth ? 'Confirm & Delete' : 'Delete') : 'Log Out'}
             </Button>
           </Stack>
+        </DialogActions>
+      </Dialog>
+
+      {/* NEW: TBD dialog */}
+      <Dialog
+        open={tbdOpen}
+        onClose={() => setTbdOpen(false)}
+        aria-labelledby="tbd-title"
+        PaperProps={{
+          sx: {
+            width: 380,
+            borderRadius: 3,
+            p: 1,
+            border: (t) => `1px solid ${t.palette.divider}`,
+          },
+        }}
+      >
+        <DialogTitle id="tbd-title" sx={{ fontWeight: 700, pb: 1 }}>
+          About
+        </DialogTitle>
+        <DialogContent dividers sx={{ borderTop: 'none', borderBottom: 'none' }}>
+          <Typography variant="body2" color="text.secondary">
+            This section is TBD. Check back soon!
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button variant="contained" onClick={() => setTbdOpen(false)} sx={BIG_BUTTON_SX}>
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
     </>

@@ -20,7 +20,7 @@ const roboto = Roboto({
 });
 
 export const metadata = {
-  title: 'My App',
+  title: 'Talkable',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
