@@ -1,4 +1,4 @@
-// src/app/components/chat/ChatVoiceBar.tsx
+﻿
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -42,7 +42,7 @@ export default function ChatVoiceBar({
   const router = useRouter();
 
   const [listening, setListening] = useState(false);
-  const [speaking] = useState(false); // reserved for symmetry with VoiceWaveform
+  const [speaking] = useState(false); 
   const [hasSoundLeeway, setHasSoundLeeway] = useState(false);
 
   const { transcript, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
@@ -53,12 +53,12 @@ export default function ChatVoiceBar({
   const hideTimer = useRef<NodeJS.Timeout | null>(null);
   const processing = useRef(false);
 
-  // Back handler with safe fallback (adjust '/' to your preferred route if needed)
+  
   const handleBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back();
     } else {
-      router.push('/'); // fallback route
+      router.push('/'); 
     }
   };
 
@@ -70,7 +70,7 @@ export default function ChatVoiceBar({
     };
   }, []);
 
-  // While listening, restart silence timer whenever transcript grows.
+  
   useEffect(() => {
     if (!listening) return;
 
@@ -83,7 +83,7 @@ export default function ChatVoiceBar({
 
       finalize(transcript.trim());
     }, silenceMs);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [transcript, listening, silenceMs]);
 
   if (!browserSupportsSpeechRecognition) {
@@ -166,7 +166,7 @@ export default function ChatVoiceBar({
         gap: 2,
       }}
     >
-      {/* Left: Back chevron + title */}
+      {}
       <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
         <Tooltip title="Back">
           <IconButton
@@ -192,7 +192,7 @@ export default function ChatVoiceBar({
         />
       )}
 
-      {/* Right: Control buttons */}
+      {}
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
         {!listening ? (
           <Button

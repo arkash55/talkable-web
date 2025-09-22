@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { generateAIResponses } from "@/services/watsonService";
 import { Message } from "../types/types";

@@ -1,4 +1,4 @@
-// src/app/components/general/NewOnlineChatDialog.tsx
+﻿
 'use client';
 
 import * as React from 'react';
@@ -84,10 +84,10 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
   const handleSelect = async (user: UserRecord | null) => {
     if (!user || !currentUid) return;
     try {
-      // Resolve or create the online conversation
+      
       const cid = await ensureOnlineConversation(currentUid, user.uid);
 
-      // Build display name and pass details to chat route
+      
       const name = `${user.firstName ?? ''} ${user.lastName ?? ''}`
         .replace(/\s+/g, ' ')
         .trim() || user.email || 'Unknown user';
@@ -131,7 +131,7 @@ export default function NewOnlineChatDialog({ open, onClose }: Props) {
           renderOption={(props, u) => {
           const name = `${u.firstName ?? ''} ${u.lastName ?? ''}`.replace(/\s+/g, ' ').trim();
           const initials = (u.firstName?.[0] ?? '') + (u.lastName?.[0] ?? '');
-          const { key, ...liProps } = props; // <-- pull key out
+          const { key, ...liProps } = props; 
 
           return (
             <li key={key} {...liProps}>

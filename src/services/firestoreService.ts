@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
-// Firestore service for Next.js + TypeScript
-// Unified schema: text-only messages, unified `senderId`, no presence.
+
+
 
 if (typeof window === 'undefined') {
   throw new Error('firestoreService is client-only. Use Admin SDK on the server.');
@@ -34,7 +34,7 @@ import {
 import { db } from '../../lib/fireBaseConfig';
 import { getAuth, signOut } from 'firebase/auth';
 
-// ---------- Types (mirror your schema) ----------
+
 export type ConversationMode = 'live' | 'online';
 
 export type UserProfile = {
@@ -52,14 +52,14 @@ export type Conversation = {
   mode: ConversationMode;
   title: string | null;
   createdAt: Timestamp | ReturnType<typeof serverTimestamp>;
-  createdBy: string; // uid
+  createdBy: string; 
   members: Record<string, true>;
   memberIds: string[];
   lastMessage?: {
     id: string;
     text: string;
     sentAt: Timestamp | ReturnType<typeof serverTimestamp>;
-    senderId: string; // uid OR "guest"
+    senderId: string; 
   };
   lastMessageAt?: Timestamp | ReturnType<typeof serverTimestamp>;
 };
@@ -67,7 +67,7 @@ export type Conversation = {
 export type Message = {
   text: string;
   sentAt: Timestamp | ReturnType<typeof serverTimestamp>;
-  senderId: string; // uid or "guest"
+  senderId: string; 
 };
 
 export type InboxItem = {
@@ -76,7 +76,7 @@ export type InboxItem = {
   lastMessagePreview: string;
   lastMessageAt: Timestamp | ReturnType<typeof serverTimestamp>;
   lastReadAt: Timestamp | null | ReturnType<typeof serverTimestamp>;
-  lastMessageSenderId: string | null; // <-- single source of truth (uid or 'guest')
+  lastMessageSenderId: string | null; 
 };
 
 
@@ -90,7 +90,7 @@ export type UserDirectoryEntry = {
   description?: string;
 };
 
-// ---------- Path helpers ----------
+
 const usersCol = () => collection(db, 'users');
 const userDoc = (uid: string) => doc(db, 'users', uid);
 
@@ -101,12 +101,12 @@ const messagesCol = (cid: string) => collection(db, 'conversations', cid, 'messa
 const userInboxCol = (uid: string) => collection(db, 'userConversations', uid, 'items');
 const userInboxDoc = (uid: string, cid: string) => doc(db, 'userConversations', uid, 'items', cid);
 
-// ---------- Small utils ----------
+
 const preview = (text: string, max = 120) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
 
-// =====================================================
-// Users
-// =====================================================
+
+
+
 
 export async function addUser(uid: string, data: Omit<UserProfile, 'createdAt'>) {
   await setDoc(
@@ -157,9 +157,9 @@ export async function getUsers(options?: {
 
 
 
-// =====================================================
-// Conversations
-// =====================================================
+
+
+
 
 
 export async function createLiveConversation(params: { ownerUid: string; title?: string | null }): Promise<string> {
@@ -182,7 +182,7 @@ export async function createLiveConversation(params: { ownerUid: string; title?:
       lastMessagePreview: '',
       lastMessageAt: serverTimestamp(),
       lastReadAt: null,
-      lastMessageSenderId: null, // no messages yet
+      lastMessageSenderId: null, 
     } as InboxItem,
     { merge: true }
   );
@@ -205,10 +205,7 @@ export async function findOnlineConversationBetweenByMembers(
   return snap.empty ? null : snap.docs[0].id;
 }
 
-/** 
- * Create the conversation FIRST, then write both inbox docs.
- * This avoids the rule race where /conversations/{cid} doesn't exist yet.
- */
+
 export async function createOnlineConversationSafe(params: {
   creatorUid: string;
   otherUid: string;
@@ -216,7 +213,7 @@ export async function createOnlineConversationSafe(params: {
 }): Promise<string> {
   const { creatorUid, otherUid, title = null } = params;
 
-  // 1) create conversation first
+  
   const cRef = await addDoc(conversationsCol(), {
     mode: 'online',
     title,
@@ -226,7 +223,7 @@ export async function createOnlineConversationSafe(params: {
     memberIds: [creatorUid, otherUid],
   } as Conversation);
 
-  // 2) then write both inbox entries
+  
   const baseInbox: InboxItem = {
     mode: 'online',
     title,
@@ -244,19 +241,17 @@ export async function createOnlineConversationSafe(params: {
   return cRef.id;
 }
 
-/**
- * One-call helper: reuse existing convo if present, else create safely.
- */
+
 export async function ensureOnlineConversation(
   uidA: string,
   uidB: string,
   title?: string | null
 ): Promise<string> {
-  // Try to find existing by members map
+  
   console.log("here")
   const existing = await findOnlineConversationBetweenByMembers(uidA, uidB);
   if (existing) return existing;
-  // Else create safely
+  
   return createOnlineConversationSafe({ creatorUid: uidA, otherUid: uidB, title: title ?? null });
 }
 
@@ -280,9 +275,7 @@ export async function deleteConversation(cid: string) {
   await deleteDoc(conversationDoc(cid));
 }
 
-/**
- * Real-time inbox for a user (new/updated conversations).
- */
+
 export function onInbox(
   uid: string,
   callback: (items: Array<{ id: string } & InboxItem>) => void,
@@ -299,9 +292,9 @@ export function onInbox(
   });
 }
 
-// =====================================================
-// Messages
-// =====================================================
+
+
+
 
 export async function sendMessage(params: { cid: string; senderId: string; text: string }) {
   const { cid, senderId, text } = params;
@@ -339,7 +332,7 @@ export async function sendMessage(params: { cid: string; senderId: string; text:
           title: convo.title ?? null,
           lastMessagePreview: pv,
           lastMessageAt: serverTimestamp(),
-          lastMessageSenderId: senderId, // uid or 'guest'
+          lastMessageSenderId: senderId, 
         } as Partial<InboxItem>,
         { merge: true }
       );
@@ -347,9 +340,9 @@ export async function sendMessage(params: { cid: string; senderId: string; text:
   });
 }
 
-// =====================================================
-// Convenience
-// =====================================================
+
+
+
 
 export async function getInboxPage(params: {
   uid: string;
@@ -379,9 +372,9 @@ export function onMessages(cid: string, callback: (msgs: Array<{ id: string } & 
   });
 }
 
-// =====================================================
-// Internal: batch delete helper
-// =====================================================
+
+
+
 
 async function batchDeleteCollection(colRef: CollectionReference<DocumentData>, pageSize = 300) {
   let cursor: QueryDocumentSnapshot<DocumentData> | undefined;
@@ -402,7 +395,7 @@ async function batchDeleteCollection(colRef: CollectionReference<DocumentData>, 
   }
 }
 
-// Marks user offline (best effort) then signs out
+
 export async function logoutUser(): Promise<void> {
   const auth = getAuth();
   const user = auth.currentUser;
@@ -415,12 +408,12 @@ export async function logoutUser(): Promise<void> {
           lastLogoutAt: serverTimestamp(),
         });
       } catch {
-        // non-fatal if user doc missing or permission denied
+        
       }
     }
     await signOut(auth);
   } catch (err) {
-    // bubble to caller so UI can show feedback
+    
     throw err;
   }
 }

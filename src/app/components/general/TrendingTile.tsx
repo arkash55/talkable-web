@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import {
@@ -48,14 +48,14 @@ export function TrendingTile({
   const [descClamp, setDescClamp] = React.useState<number>(2);
   const [isClamped, setIsClamped] = React.useState<boolean>(false);
 
-  // Helper: count rendered lines of an element
+  
   const getLineCount = (el: Element | null) => {
     if (!el) return 1;
     const style = window.getComputedStyle(el);
     const lineHeightStr = style.lineHeight;
     let lineHeight = parseFloat(lineHeightStr);
     if (Number.isNaN(lineHeight)) {
-      // fallback: 1.2 * font-size
+      
       const fontSize = parseFloat(style.fontSize) || 16;
       lineHeight = 1.2 * fontSize;
     }
@@ -63,16 +63,16 @@ export function TrendingTile({
     return Math.max(1, Math.round(h / lineHeight));
   };
 
-  // Decide desc lines based on title lines:
-  // - Title always full, no clamp.
-  // - If title takes >= 2 lines → show only 1 line of description.
-  // - Else → up to 2 lines of description.
+  
+  
+  
+  
   const recomputeLayout = React.useCallback(() => {
     const titleLines = getLineCount(titleRef.current);
     const nextClamp = titleLines >= 2 ? 1 : 2;
     setDescClamp(nextClamp);
 
-    // After clamp is applied in style, measure whether description overflows
+    
     requestAnimationFrame(() => {
       if (descRef.current) {
         const el = descRef.current;
@@ -86,7 +86,7 @@ export function TrendingTile({
     recomputeLayout();
   }, [topic.title, topic.description, recomputeLayout]);
 
-  // Recompute on resize (responsive tiles)
+  
   React.useEffect(() => {
     if (!titleRef.current && !descRef.current) return;
     const ro = new ResizeObserver(() => recomputeLayout());
@@ -95,7 +95,7 @@ export function TrendingTile({
     return () => ro.disconnect();
   }, [recomputeLayout]);
 
-  // If description is NOT clamped, append a "." (only if not already ending in punctuation)
+  
   const appendPeriodIfNeeded = (s: string) =>
     /[.!?…]$/.test(s.trim()) ? s : s.trim().length ? `${s}.` : s;
 
@@ -118,7 +118,7 @@ export function TrendingTile({
             ) : null}
           </Stack>
 
-          {/* Title: always full, multi-line allowed, no clamp */}
+          {}
           <Typography
             variant="h6"
             fontWeight={800}
@@ -129,7 +129,7 @@ export function TrendingTile({
             {topic.title}
           </Typography>
 
-          {/* Description: clamp lines dynamically based on title's line count */}
+          {}
           <Typography
             ref={descRef}
             variant="body2"

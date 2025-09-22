@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { adminAuth } from '../../../../../lib/firebaseAdmin';
 
 
@@ -11,10 +11,10 @@ export async function POST(req: Request) {
 
     try {
       await adminAuth.getUserByEmail(email);
-      // Found -> not available
+      
       return NextResponse.json({ available: false });
     } catch (e: any) {
-      // If no user, Firebase throws auth/user-not-found
+      
       if (e?.code === 'auth/user-not-found') {
         return NextResponse.json({ available: true });
       }

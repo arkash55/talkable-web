@@ -1,4 +1,4 @@
-// src/app/api/granite/trending/route.ts
+﻿
 import { NextResponse } from 'next/server';
 import { getTrendingTopics } from '@/services/graniteTrendingService';
 

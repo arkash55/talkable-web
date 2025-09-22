@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import {
@@ -20,7 +20,7 @@ import { updateUser, type UserProfile } from '@/services/firestoreService';
 import { db } from '../../../../../../lib/fireBaseConfig';
 import { BIG_BUTTON_SX } from '@/app/styles/buttonStyles';
 
-// Editable shape (email is read-only and not part of updates)
+
 type AboutProfile = Pick<UserProfile, 'firstName' | 'lastName' | 'description'>;
 
 const EMPTY: AboutProfile = {
@@ -66,7 +66,7 @@ const READONLY_INPUT_SX = {
 
 export default function AboutPage() {
   const [uid, setUid] = React.useState<string | null>(null);
-  const [email, setEmail] = React.useState<string>(''); // read-only email
+  const [email, setEmail] = React.useState<string>(''); 
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
 
@@ -83,7 +83,7 @@ export default function AboutPage() {
     severity: 'success',
   });
 
-  // Auth + live profile load
+  
   React.useEffect(() => {
     const auth = getAuth();
     const unsubAuth = onAuthStateChanged(auth, (user) => {
@@ -145,7 +145,7 @@ export default function AboutPage() {
 
     try {
       setSaving(true);
-      await updateUser(uid, changes); // updates firstName/lastName/description only
+      await updateUser(uid, changes); 
       setInitial((prev) => ({ ...prev, ...changes }));
       setBanner({ open: true, msg: 'About me updated.', severity: 'success' });
     } catch (e: any) {
@@ -157,122 +157,150 @@ export default function AboutPage() {
   };
 
   return (
-    <Box sx={{minWidth: '80%', px: { xs: 2, md: 3 }, mx: 'auto',  }}>
-      <Paper variant="outlined" sx={{  p: { xs: 2, md: 3 }, borderRadius: 3,  width: '100%', mx: 'auto' }}>
-        {loading ? (
-          <Box sx={{ py: 8, display: 'grid', placeItems: 'center' }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Stack spacing={4}>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                My Details
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                View & Update your basic information.
-              </Typography>
+    // OUTER SCROLL CONTAINER
+    <Box
+      sx={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100dvh',          // fill viewport
+        overflow: 'hidden',           // prevent double scroll on root
+      }}
+    >
+      <Box
+        sx={{
+          flex: 1,
+          overflowY: 'auto',          // enable vertical scrolling
+          WebkitOverflowScrolling: 'touch',
+          px: { xs: 2, md: 3 },
+          py: { xs: 2, md: 3 },
+          mx: 'auto',
+          width: '100%',
+          maxWidth: 1200,
+        }}
+      >
+        <Paper
+          variant="outlined"
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            width: '100%',
+            mb: 4,
+          }}
+        >
+          {loading ? (
+            <Box sx={{ py: 8, display: 'grid', placeItems: 'center' }}>
+              <CircularProgress />
             </Box>
-
-            {/* ——— THREE EXPLICIT ROWS ——— */}
-            <Stack spacing={3}>
-              {/* ROW 1: First & Last name (2 columns on sm+, stacked on xs) */}
-              <Box sx={{ display: 'flex', gap: 4, width: '100%' }}>
-                <TextField
-                  label="First name"
-                  fullWidth
-                  value={form.firstName}
-                  onChange={onChange('firstName')}
-                  autoComplete="given-name"
-                  sx={INPUT_SX}
-                />
-                <TextField
-                  label="Last name"
-                  fullWidth
-                  value={form.lastName}
-                  onChange={onChange('lastName')}
-                  autoComplete="family-name"
-                  sx={INPUT_SX}
-                />
+          ) : (
+            <Stack spacing={4}>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                  My Details
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  View & Update your basic information.
+                </Typography>
               </Box>
 
-              {/* ROW 2: Email (full width) */}
-              <TextField
-                label="Email (cannot be changed)"
-                fullWidth
-                value={email}
-                disabled
-                InputProps={{ readOnly: true, sx: { cursor: 'not-allowed' } }}
-                autoComplete="email"
-                helperText="Contact support to change your email address"
-                sx={READONLY_INPUT_SX}
-              />
+              {}
+              <Stack spacing={3}>
+                {}
+                <Box sx={{ display: 'flex', gap: 4, width: '100%' }}>
+                  <TextField
+                    label="First name"
+                    fullWidth
+                    value={form.firstName}
+                    onChange={onChange('firstName')}
+                    autoComplete="given-name"
+                    sx={INPUT_SX}
+                  />
+                  <TextField
+                    label="Last name"
+                    fullWidth
+                    value={form.lastName}
+                    onChange={onChange('lastName')}
+                    autoComplete="family-name"
+                    sx={INPUT_SX}
+                  />
+                </Box>
 
-              {/* ROW 3: Self description (full width) */}
-              <TextField
-                label="Self description"
-                placeholder="Tell us about yourself..."
-                fullWidth
-                multiline
-                minRows={6}
-                maxRows={12}
-                value={form.description}
-                onChange={onChange('description')}
-                sx={INPUT_SX}
-              />
+                {}
+                <TextField
+                  label="Email (cannot be changed)"
+                  fullWidth
+                  value={email}
+                  disabled
+                  InputProps={{ readOnly: true, sx: { cursor: 'not-allowed' } }}
+                  autoComplete="email"
+                  helperText="Contact support to change your email address"
+                  sx={READONLY_INPUT_SX}
+                />
+
+                {}
+                <TextField
+                  label="Self description"
+                  placeholder="Tell us about yourself..."
+                  fullWidth
+                  multiline
+                  minRows={6}
+                  maxRows={12}
+                  value={form.description}
+                  onChange={onChange('description')}
+                  sx={INPUT_SX}
+                />
+              </Stack>
+
+              <Divider />
+
+              {}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'flex-end' }}>
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  onClick={handleReset}
+                  disabled={!isDirty || saving}
+                  size="large"
+                  sx={BIG_BUTTON_SX}
+                >
+                  Reset
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleSave}
+                  disabled={!isDirty || saving}
+                  size="large"
+                  sx={BIG_BUTTON_SX}
+                >
+                  {saving ? <CircularProgress size={22} /> : 'Save changes'}
+                </Button>
+              </Stack>
             </Stack>
+          )}
+        </Paper>
 
-            <Divider />
-
-            {/* Bottom actions */}
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'flex-end' }}>
-              <Button
-                variant="outlined"
-                color="inherit"
-                onClick={handleReset}
-                disabled={!isDirty || saving}
-                size="large"
-                sx={BIG_BUTTON_SX}
-              >
-                Reset
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleSave}
-                disabled={!isDirty || saving}
-                size="large"
-                sx={BIG_BUTTON_SX}
-              >
-                {saving ? <CircularProgress size={22} /> : 'Save changes'}
-              </Button>
-            </Stack>
-          </Stack>
-        )}
-      </Paper>
-
-      <Snackbar
-        open={banner.open}
-        autoHideDuration={2600}
-        onClose={() => setBanner((b) => ({ ...b, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        <Snackbar
+          open={banner.open}
+          autoHideDuration={2600}
+          onClose={() => setBanner((b) => ({ ...b, open: false }))}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           sx={{
-            // give a little lift from the very bottom
             mb: { xs: 2, sm: 3 },
-            // you can also enforce width here by targeting the child
             '& .MuiAlert-root': {
-              width: { xs: 'calc(100vw - 32px)', sm: 560, md: 640 }, // wider on larger screens
+              width: { xs: 'calc(100vw - 32px)', sm: 560, md: 640 },
               maxWidth: '100%',
             },
           }}
-      >
-        <Alert
-          onClose={() => setBanner((b) => ({ ...b, open: false }))}
-          severity={banner.severity}
-          sx={{ width: '100%' }}
         >
-          {banner.msg}
-        </Alert>
-      </Snackbar>
+          <Alert
+            onClose={() => setBanner((b) => ({ ...b, open: false }))}
+            severity={banner.severity}
+            sx={{ width: '100%' }}
+          >
+            {banner.msg}
+          </Alert>
+        </Snackbar>
+      </Box>
     </Box>
   );
 }

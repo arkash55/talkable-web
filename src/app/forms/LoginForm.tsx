@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import {
@@ -19,7 +19,7 @@ import * as Yup from 'yup';
 import Link from 'next/link';
 import { BIG_BUTTON_SX } from '@/app/styles/buttonStyles';
 import { requestPasswordReset } from '@/services/authService';
-import { KeyRound } from 'lucide-react'; // icon for the header badge
+import { KeyRound } from 'lucide-react'; 
 
 interface LoginFormProps {
   error: string;
@@ -36,14 +36,14 @@ const validationSchema = Yup.object({
 const LoginForm = ({ error, setError, handleSubmit, isLoading }: LoginFormProps) => {
   const initialValues = { email: '', password: '' };
 
-  // Forgot-password dialog state
+  
   const [resetOpen, setResetOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [resetErr, setResetErr] = useState<string | null>(null);
 
-  // Helper to trigger reset (manual send from dialog)
+  
   const doSendReset = async (email: string) => {
     setResetErr(null);
     setResetMsg(null);
@@ -158,7 +158,7 @@ const LoginForm = ({ error, setError, handleSubmit, isLoading }: LoginFormProps)
         )}
       </Formik>
 
-      {/* Forgot Password Dialog — styled to match delete popup */}
+      {}
       <Dialog
         open={resetOpen}
         onClose={() => !resetLoading && setResetOpen(false)}

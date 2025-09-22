@@ -1,53 +1,53 @@
-// lib/flowRank.ts
-// Level 1 flow probability: mean log-prob + topical alignment - small penalties -> softmax.
-// Designed to be framework-agnostic and easily swappable for fancier scoring later.
+﻿
+
+
 
 export type FlowWeights = {
-  /** weight for mean log-prob (closer to 0 is better) */
+  
   a: number;
-  /** weight for topical similarity to the last user turn (cosine/Jaccard) */
+  
   b: number;
-  /** weight for penalties (length/repetition/etc.) */
+  
   g: number;
-  /** softmax temperature */
+  
   tau: number;
 };
 
 export type FlowSignalsInput = {
   text: string;
-  /** mean log-prob (avg token log-prob). Larger (closer to 0) => more likely */
+  
   meanLogProb: number;
 };
 
 export type FlowSignalsOutput = {
-  // inputs echoed
+  
   text: string;
   meanLogProb: number;
 
-  // derived
-  simToLastUser: number;       //  -1..1 (cosine) or 0..1 (Jaccard fallback) normalized to 0..1
-  lengthPenalty: number;       // 0..+ (simple overlength penalty)
-  repetitionPenalty: number;   // 0..+ (simple repetition penalty)
-  totalPenalty: number;        // length + repetition
-  flowUtility: number;         // a*meanLogProb + b*sim - g*totalPenalty
-  flowProb: number;            // softmax(flowUtility / tau) across the set
+  
+  simToLastUser: number;       
+  lengthPenalty: number;       
+  repetitionPenalty: number;   
+  totalPenalty: number;        
+  flowUtility: number;         
+  flowProb: number;            
 };
 
 export type FlowRankOptions = {
-  /** last user turn (we align to this) */
+  
   lastUser: string;
 
-  /** If provided, used to compute cosine similarity; otherwise fallback to token Jaccard */
+  
   getEmbedding?: (s: string) => Promise<number[]>;
 
-  /** Override weights (defaults below) */
+  
   weights?: Partial<FlowWeights>;
 
-  /** Optional custom penalty */
+  
   penaltyFn?: (text: string) => { lengthPenalty: number; repetitionPenalty: number };
 };
 
-// --------- utils ---------
+
 const DEFAULT_WEIGHTS: FlowWeights = { a: 1.0, b: 0.8, g: 0.2, tau: 0.9 };
 
 function softmax(vals: number[], tau = 1.0): number[] {
@@ -79,8 +79,8 @@ function jaccardTokens(a: string, b: string): number {
 
 function defaultPenalty(text: string) {
   const len = text.length;
-  const lengthPenalty = Math.max(0, len - 400) / 400; // gentle >400 chars
-  // repetition: ratio of repeated bigrams
+  const lengthPenalty = Math.max(0, len - 400) / 400; 
+  
   const words = text.toLowerCase().split(/\s+/).filter(Boolean);
   let rep = 0;
   if (words.length >= 6) {
@@ -98,9 +98,7 @@ function defaultPenalty(text: string) {
 
 function clamp01(x: number) { return Math.max(0, Math.min(1, x)); }
 
-/**
- * Rank candidates by "flow with conversation" (Level 1) and return enriched signals + probs.
- */
+
 export async function scoreFlowLevel1(
   inputs: FlowSignalsInput[],
   opts: FlowRankOptions
@@ -108,24 +106,24 @@ export async function scoreFlowLevel1(
   const w: FlowWeights = { ...DEFAULT_WEIGHTS, ...(opts?.weights || {}) };
   const last = opts.lastUser || "";
 
-  // Similarities
+  
   let sims: number[] = [];
   if (opts.getEmbedding) {
-    // embedding-based cosine
+    
     try {
       const [lastEmb, candEmbs] = await Promise.all([
         opts.getEmbedding(last),
         Promise.all(inputs.map(c => opts.getEmbedding!(c.text)))
       ]);
-      sims = candEmbs.map(e => (cosine(e, lastEmb) + 1) / 2); // normalize to 0..1
+      sims = candEmbs.map(e => (cosine(e, lastEmb) + 1) / 2); 
     } catch {
-      sims = inputs.map(c => jaccardTokens(c.text, last)); // fallback
+      sims = inputs.map(c => jaccardTokens(c.text, last)); 
     }
   } else {
-    sims = inputs.map(c => jaccardTokens(c.text, last)); // token overlap fallback
+    sims = inputs.map(c => jaccardTokens(c.text, last)); 
   }
 
-  // Penalties and utilities
+  
   const rows = inputs.map((c, i) => {
     const pen = opts.penaltyFn ? opts.penaltyFn(c.text) : defaultPenalty(c.text);
     const totalPenalty = pen.lengthPenalty + pen.repetitionPenalty;
@@ -139,11 +137,11 @@ export async function scoreFlowLevel1(
       repetitionPenalty: pen.repetitionPenalty,
       totalPenalty,
       flowUtility,
-      flowProb: 0, // filled after softmax
+      flowProb: 0, 
     };
   });
 
-  // Normalize to probabilities (set-wise)
+  
   const probs = softmax(rows.map(r => r.flowUtility), w.tau);
   rows.forEach((r, i) => (r.flowProb = probs[i]));
   return rows;

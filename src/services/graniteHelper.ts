@@ -1,5 +1,5 @@
-// lib/graniteHelpers.ts
-// All small, testable helpers for graniteService.
+﻿
+
 
 export type GenParams = {
   temperature?: number;
@@ -9,7 +9,7 @@ export type GenParams = {
   stop?: string[];
 };
 
-// ---------- stops & helpers ----------
+
 export const DEFAULT_STOPS = [
   "\nAssistant:",
   "\nUser:",
@@ -23,10 +23,10 @@ export function uniq<T>(arr: T[]): T[] { return Array.from(new Set(arr)); }
 
 export function buildStops(userStops?: string[]): string[] {
   const merged = uniq([...(userStops || []), ...DEFAULT_STOPS]);
-  return merged.slice(0, 6); // watsonx limit: ≤ 6
+  return merged.slice(0, 6); 
 }
 
-// ---------- prompt analysis, stance, extraction ----------
+
 export type PromptKind = "polar" | "offer" | "open" | "smalltalk";
 export type Stance = "YES" | "NO" | "MAYBE" | "CLARIFY" | "DEFLECT" | "BOUNDARY" | "LATER" | "";
 
@@ -47,7 +47,7 @@ export function detectPromptKind(prompt: string): PromptKind {
   return "open";
 }
 
-// activity extraction (for Y/N/M fallbacks)
+
 export function extractActivity(prompt: string): string | null {
   const p = prompt.trim().replace(/\s+/g, " ");
   const m1 = /(?:do you want|would you like|are you up for|shall we|how about)\s+(to\s+)?(.+?)(?:\?|$)/i.exec(p);
@@ -57,7 +57,7 @@ export function extractActivity(prompt: string): string | null {
   return null;
 }
 
-// ---------- sentiment model ----------
+
 export type SentimentPolarity = "POS" | "NEU" | "NEG";
 export type SentimentIntensity = "SUPER" | "PLAIN" | "SLIGHT";
 export type SentimentMode = { pol: SentimentPolarity; int: SentimentIntensity; tag: string };
@@ -74,7 +74,7 @@ export const ALL_SENTIMENTS: SentimentMode[] = [
   { pol: "NEG", int: "SUPER",  tag: "super_negative" },
 ];
 
-// Choose 6 distinct sentiment modes per wave, covering all polarities where possible.
+
 export function sentimentPlan(): SentimentMode[] {
   const pick = <T,>(arr: T[], n: number) => {
     const a = [...arr];
@@ -114,7 +114,7 @@ export function sentimentPlan(): SentimentMode[] {
   return out.filter(m => (seen.has(m.tag) ? false : (seen.add(m.tag), true))).slice(0, 6);
 }
 
-// ---------- input composition ----------
+
 export const STANCE_HINT: Record<Exclude<Stance, "">, string> = {
   YES: "Take a YES stance. Accept clearly and positively.",
   NO: "Take a NO stance. Decline politely with a brief reason or alternative.",
@@ -134,7 +134,7 @@ export function sentimentGuidance(mode: SentimentMode): string {
   const shading =
     int === "SUPER"  ? (pol === "POS" ? "Very enthusiastic, upbeat." : pol === "NEG" ? "Strongly negative; firm." : "Warm neutral; friendly.")
     : int === "PLAIN" ? (pol === "POS" ? "Clearly positive." : pol === "NEG" ? "Clearly negative." : "Even, matter-of-fact.")
-    : /* SLIGHT */     (pol === "POS" ? "Slightly positive." : pol === "NEG" ? "Slightly negative." : "Terse neutral.");
+    :      (pol === "POS" ? "Slightly positive." : pol === "NEG" ? "Slightly negative." : "Terse neutral.");
   return `${core} ${shading} 1–2 sentences, natural, concise. No emoji or role labels.`;
 }
 
@@ -167,7 +167,7 @@ export function composeInput(
   return parts.join("\n\n") + "\n\nAssistant: ";
 }
 
-// ---------- text cleanup ----------
+
 const GENERIC_OPENERS = [
   /^thanks for (the )?asking[,!.\s-]*/i,
   /^it['’]s been (a )?(busy|hectic) day[,!.\s-]*/i,
@@ -225,7 +225,7 @@ export function finalizeUtterance(text: string, kind?: PromptKind): string {
   return t;
 }
 
-// ---------- sentiment post-enforcement ----------
+
 export function enforceSentimentText(mode: SentimentMode, t: string): string {
   const s = t.trim();
 
@@ -245,7 +245,7 @@ export function enforceSentimentText(mode: SentimentMode, t: string): string {
   return s;
 }
 
-// ---------- calling watsonx ----------
+
 type RawGenResult = {
   results?: Array<{
     generated_text?: string;
@@ -324,7 +324,7 @@ export async function generateOnce(args: {
   return { text, tokens: tokensCount, avgLogProb };
 }
 
-// ---------- utilities: variety & ranking ----------
+
 export function softmaxFromAvgLogProbs(avgLogs: number[], refLength: number): number[] {
   const scores = avgLogs.map((l) => (Number.isFinite(l) ? l * refLength : -1e9));
   const maxS = Math.max(...scores);
@@ -385,7 +385,7 @@ export function pickTargetCount(k?: number) {
   return 3 + (Math.random() < 0.5 ? 0 : 1);
 }
 
-/** idx 0 conservative, others increasingly exploratory (for variety). */
+
 export function paramsForIndex(idx: number, base: Required<GenParams>): Required<GenParams> {
   if (idx === 0) {
     return {
@@ -401,7 +401,7 @@ export function paramsForIndex(idx: number, base: Required<GenParams>): Required
   return { ...base, temperature: t, top_p: tp, top_k: tk };
 }
 
-// ---------- stance helpers (legacy fallbacks) ----------
+
 export function matchesYes(t: string)   { return /\b(yes|sure|definitely|let'?s|sounds good|i'?m in)\b/i.test(t); }
 export function matchesNo(t: string)    { return /\b(no|can['’]t|cannot|won['’]t|rather not|unfortunately|sorry,? i can['’]?t)\b/i.test(t); }
 export function matchesMaybe(t: string) { return /\b(maybe|perhaps|could|another time|later|not sure)\b/i.test(t); }
@@ -423,7 +423,7 @@ export function enforceStanceText(stance: Stance, prompt: string, current: strin
   return t || (a ? `Maybe—how about ${a} another time?` : "Maybe—another time?");
 }
 
-// ---------- fallbacks ----------
+
 export function ynmFallbacks(prompt: string): string[] {
   const a = extractActivity(prompt);
   const act = a ? a.replace(/^to\s+/i, "") : null;

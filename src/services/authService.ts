@@ -1,4 +1,4 @@
-import { auth } from '../../lib/fireBaseConfig';
+﻿import { auth } from '../../lib/fireBaseConfig';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -11,10 +11,7 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 
-/**
- * AuthService provides methods for user authentication.
- * It uses Firebase Authentication to handle sign-in, sign-up, logout, and password reset.
- */
+
 
 export const loginUser = async (email: string, password: string) => {
   return await signInWithEmailAndPassword(auth, email, password);
@@ -29,7 +26,7 @@ export const logoutUser = async () => {
 };
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  // Trim to avoid whitespace issues and lower-case for consistency
+  
   const clean = (email || '').trim();
   if (!clean) throw Object.assign(new Error('auth/invalid-email'), { code: 'auth/invalid-email' });
 
@@ -81,7 +78,7 @@ export async function changePassword(
     };
   }
 
-  // 1) Reauthenticate with the OLD password
+  
   try {
     const cred = EmailAuthProvider.credential(user.email, oldPassword);
     await reauthenticateWithCredential(user, cred);
@@ -116,7 +113,7 @@ export async function changePassword(
     return { ok: false, code: 'unknown', message: 'Reauthentication failed.' };
   }
 
-  // 2) Update to the NEW password
+  
   try {
     await updatePassword(user, newPassword);
     return { ok: true };
@@ -183,11 +180,11 @@ export async function deleteAccount(): Promise<DeleteAccountResult> {
   }
 }
 
-// Convenience: do both steps in one call when you have the password
+
 export async function deleteAccountWithPassword(oldPassword: string): Promise<DeleteAccountResult> {
   const r = await reauthWithPassword(oldPassword);
   if (!r.ok) {
-    // Preserve the original code to allow UI-specific handling
+    
     return { ok: false, code: r.code === 'no-current-user' ? 'no-current-user' : 'unknown', message: r.message };
   }
   return deleteAccount();

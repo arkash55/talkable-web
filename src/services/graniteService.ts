@@ -1,38 +1,38 @@
-
+﻿
 import { scoreFlowLevel1, type FlowSignalsInput } from '../app/utils/flowRank';
 import { getIamToken, generateOnce, type GenParams } from './graniteHelper';
 
 export type GenerateRequest = {
   prompt: string;
-  system: string;        // ← REQUIRED: pass buildSystemPrompt(profile) from the caller
+  system: string;        
   context?: string[];
 
-  /** Number of candidates to request (ignored if perCallInstructions is provided) */
+  
   k?: number;
   params?: GenParams;
 
-  /** One instruction string per generation call. If provided, its length decides N calls. */
+  
   perCallInstructions?: string[];
 
-  /** Optional: shortlist controls (coverage-based) */
-  minReturn?: number;        // default 3
-  maxReturn?: number;        // default 6
-  coverageTarget?: number;   // override adaptive coverage (0..1)
-  /** Soft target for final count when coverage is satisfied; clamped to [minReturn,maxReturn]. Default 5. */
+  
+  minReturn?: number;        
+  maxReturn?: number;        
+  coverageTarget?: number;   
+  
   preferCount?: number;
 
-  /** @deprecated kept for compat; selection now uses coverage, not a hard prob threshold */
+  
   probThreshold?: number;
 
-  /** Optional: control randomness */
-  samplingSeed?: number;     // if set, seeds become deterministic per request
+  
+  samplingSeed?: number;     
 };
 
 export type Candidate = {
   text: string;
   tokens: number;
   avgLogProb: number;
-  /** kept for backward compat; equals flow.prob */
+  
   relativeProb: number;
   seed: number;
   variant: 'primary' | 'alt';
@@ -52,18 +52,18 @@ export type GenerateResponse = {
   meta: {
     model_id: string;
     usedK: number;
-    dropped: number; // includes failed generations + filtered-out items
+    dropped: number; 
     params: Required<GenParams>;
   };
 };
 
-// ---- Env ----
+
 const API_KEY    = process.env.IBM_API_KEY!;
 const PROJECT_ID = process.env.IBM_PROJECT_ID!;
 const MODEL_ID   = process.env.IBM_MODEL_ID || 'ibm/granite-3-8b-instruct';
 const BASE_URL   = (process.env.IBM_WATSON_ENDPOINT || '').replace(/\/+$/, '');
 
-// ---- Tiny IAM token cache ----
+
 let cachedToken: { token: string; expiresAt: number } | null = null;
 async function getTokenCached(): Promise<string> {
   const now = Date.now();
@@ -73,18 +73,18 @@ async function getTokenCached(): Promise<string> {
   return token;
 }
 
-// ---- Helpers ----
+
 function clamp(n: number, a: number, b: number) { return Math.max(a, Math.min(b, n)); }
 
-// Stronger stop if the model starts printing meta again
+
 const DEFAULT_STOPS = ['\n[', '\nUser:', '```', '\n#', '\n---'];
 function mergeStops(userStops?: string[]) {
   const s = new Set([...(userStops || []), ...DEFAULT_STOPS]);
-  // watsonx limit ≤ 6
+  
   return Array.from(s).slice(0, 6);
 }
 
-// Remove emojis (incl. ZWJ sequences) robustly
+
 function stripEmojis(s: string): string {
   let out = s;
   try {
@@ -99,7 +99,7 @@ function stripEmojis(s: string): string {
   return out;
 }
 
-// Remove wrapping quotes/backticks/markdown quote blocks
+
 function stripWrappingQuotes(s: string): string {
   let t = s.trim();
   t = t
@@ -123,7 +123,7 @@ function stripWrappingQuotes(s: string): string {
   return t.replace(/\s{2,}/g, ' ').trim();
 }
 
-// Strip leading meta blocks and role labels, and cut before any later meta
+
 function stripMeta(text: string): string {
   let s = (text || '').trim();
   s = s.replace(/^(?:\s*\[[^\]]+\]\s*)+/i, '').trim();
@@ -141,13 +141,13 @@ function stripMeta(text: string): string {
   return s.replace(/\s{2,}/g, ' ').trim();
 }
 
-// Small randomness helper (±pct jitter)
+
 function jitter(val: number, pct: number, min: number, max: number) {
   const j = 1 + (Math.random() * 2 - 1) * pct;
   return clamp(val * j, min, max);
 }
 
-/** idx 0 conservative; others increasingly exploratory (with tiny jitter for diversity) */
+
 function paramsForIndex(idx: number, base: Required<GenParams>): Required<GenParams> {
   if (idx === 0) {
     return {
@@ -178,7 +178,7 @@ function composeVariantInput(
     parts.push(`[CONTEXT]\n${context.map((c) => c.trim()).filter(Boolean).join('\n---\n')}`);
   }
 
-  // Universal constraints to improve quality & consistency
+  
   const guard =
     'Important: Answer only (no tags or headings). Be specific and helpful. ' +
     'Use one concrete detail or example where relevant. No emojis. No filler or rhetorical questions.';
@@ -191,7 +191,7 @@ function composeVariantInput(
   return parts.join('\n\n') + '\n\nAssistant: ';
 }
 
-// Default per-call instruction variants (used if caller doesn't pass their own)
+
 const DEFAULT_INSTRUCTION_VARIANTS = [
   'Be conservative and concise. Provide one clear, concrete suggestion the user can do next.',
   'Be concise and warm but precise. Offer one actionable tip with a brief reason.',
@@ -201,10 +201,10 @@ const DEFAULT_INSTRUCTION_VARIANTS = [
   'Be positive and direct and concise. Start with a verb and keep it under two sentences.',
 ];
 
-// Create randomized seeds per request (optionally deterministic with samplingSeed)
+
 function randomSeedBase() {
   try {
-    // @ts-ignore
+    
     if (typeof crypto !== 'undefined' && crypto?.getRandomValues) {
       const arr = new Uint32Array(1);
       crypto.getRandomValues(arr);
@@ -222,7 +222,7 @@ function shuffle<T>(arr: T[]): T[] {
   return arr;
 }
 
-// Normalized entropy
+
 function normalizedEntropy(ps: number[]): number {
   const safe = ps.map((p) => Math.max(1e-12, p));
   const sum = safe.reduce((a, b) => a + b, 0) || 1;
@@ -232,7 +232,7 @@ function normalizedEntropy(ps: number[]): number {
   return Hmax > 0 ? H / Hmax : 0;
 }
 
-// Diversity helpers
+
 function tok(s: string): string[] {
   return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
 }
@@ -302,7 +302,7 @@ function trimToPreferredCount(items: Candidate[], preferCount: number, minCount:
   return out;
 }
 
-// ---- Main ----
+
 export async function generateRankedCandidates(req: GenerateRequest): Promise<GenerateResponse> {
   if (!API_KEY || !BASE_URL || !PROJECT_ID) {
     throw new Error('Missing IBM_API_KEY, IBM_WATSON_ENDPOINT, or IBM_PROJECT_ID');
@@ -310,12 +310,12 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
 
   const systemToUse = (req.system || '').trim();
 
-  // Decide how many calls to make
+  
   const plan = (req.perCallInstructions?.length
     ? req.perCallInstructions
     : DEFAULT_INSTRUCTION_VARIANTS).slice(0, 8);
 
-  // Shuffle when using defaults to vary styles across requests
+  
   const planShuffled = req.perCallInstructions?.length ? plan : shuffle([...plan]);
 
   const wantK = clamp(req.perCallInstructions?.length ?? req.k ?? 6, 1, 8);
@@ -332,7 +332,7 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
 
   const token = await getTokenCached();
 
-  // Randomized seeds per request (or deterministic if samplingSeed provided)
+  
   const seeds = makeSeeds(wantK, req.samplingSeed);
 
   const calls = seeds.map((seed, idx) => {
@@ -359,7 +359,7 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
   }>;
   const genDropped = settled.length - ok.length;
 
-  // Clean each generation (strip meta/labels/quotes/emojis) and drop empties
+  
   const cleaned = ok
     .map((r) => ({ ...r, text: stripMeta(r.text) }))
     .filter((r) => r.text.length > 0);
@@ -382,7 +382,7 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     };
   }
 
-  // ---- FlowRank (Level 1) ----
+  
   const flowInputs: FlowSignalsInput[] = cleaned.map((r) => ({
     text: r.text,
     meanLogProb: r.avgLogProb,
@@ -393,7 +393,7 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     weights: { a: 1.0, b: 0.8, g: 0.2, tau: 0.9 },
   });
 
-  // Attach flow + expose flowProb as relativeProb
+  
   let ranked: Candidate[] = cleaned.map((r, i) => {
     const f = flowRows[i];
     return {
@@ -415,14 +415,14 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
     };
   });
 
-  // Sort by flow utility (best first)
+  
   ranked.sort((a, b) => b.flow.utility - a.flow.utility);
 
-  // Diversity (MMR) + de-dupe
+  
   const mmrRanked = mmrReorder(ranked, 0.15);
   const deduped = filterNearDuplicates(mmrRanked, 0.97, 0.88, 2);
 
-  // ---- Final slice: ADAPTIVE coverage-based 3–6 selection ----
+  
   const minReturn = clamp(Math.round(req.minReturn ?? 3), 3, 6);
   const maxReturn = clamp(Math.round(req.maxReturn ?? 6), minReturn, 6);
   const baseList = deduped.length >= Math.min(minReturn, mmrRanked.length) ? deduped : mmrRanked;
@@ -438,7 +438,7 @@ export async function generateRankedCandidates(req: GenerateRequest): Promise<Ge
   const preferCount = clamp(Math.round(req.preferCount ?? 5), minReturn, maxReturn);
   const finalSelected = trimToPreferredCount(selected, preferCount, minReturn, coverage, 0.01);
 
-  // Re-sort selected by utility for UI
+  
   finalSelected.sort((a, b) => b.flow.utility - a.flow.utility);
 
   const totalDropped = genDropped + (ranked.length - finalSelected.length);

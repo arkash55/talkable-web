@@ -1,4 +1,4 @@
-// src/app/context/AdvancedModeContext.tsx
+﻿
 'use client';
 
 import React, { createContext, useContext, useMemo, useState } from 'react';
@@ -12,7 +12,7 @@ type AdvancedCtx = {
 const Ctx = createContext<AdvancedCtx | null>(null);
 
 export function AdvancedModeProvider({ children }: { children: React.ReactNode }) {
-  const [advanced, setAdvanced] = useState(false); // default: Basic
+  const [advanced, setAdvanced] = useState(false); 
 
   const value = useMemo(
     () => ({

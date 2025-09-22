@@ -1,30 +1,26 @@
-// Small helpers for in-place sliding history + building a model context.
-// History is mutated (push/shift/splice) to avoid allocating new arrays.
+﻿
+
 
 export type Sender = 'guest' | 'user';
 
 export type MessageHistoryItem = {
   sender: Sender;
   content: string;
-  createdAt: string; // ISO
+  createdAt: string; 
 };
 
 export type HistoryWindowOpts = {
-  maxCount?: number; // hard cap on number of messages kept
-  maxChars?: number; // hard cap on approx total chars across messages
+  maxCount?: number; 
+  maxChars?: number; 
 };
 
-// internal helpers
+
 const lineLen = (m: MessageHistoryItem) =>
-  (m.sender?.length ?? 0) + 2 + (m.content?.length ?? 0); // "sender: " + content
+  (m.sender?.length ?? 0) + 2 + (m.content?.length ?? 0); 
 
 const asLine = (m: MessageHistoryItem) => `${m.sender}: ${m.content}`;
 
-/**
- * Append a message to `arr` and prune **in place** to satisfy window limits.
- * - Removes oldest items when over maxCount
- * - Trims from the front until approx char budget fits maxChars
- */
+
 export function appendWithSlidingWindow(
   arr: MessageHistoryItem[],
   msg: MessageHistoryItem,
@@ -33,19 +29,19 @@ export function appendWithSlidingWindow(
   const maxCount = opts.maxCount ?? 50;
   const maxChars = opts.maxChars ?? 8000;
 
-  // Append newest
+  
   arr.push(msg);
 
-  // Prune by count (drop oldest)
+  
   while (arr.length > maxCount) arr.shift();
 
-  // Prune by char budget (approx)
+  
   let chars = 0;
-  let keepStart = 0; // index of first item to keep
+  let keepStart = 0; 
   for (let i = arr.length - 1; i >= 0; i--) {
     const len = lineLen(arr[i]);
     if (chars + len > maxChars) {
-      keepStart = i + 1; // keep everything after i
+      keepStart = i + 1; 
       break;
     }
     chars += len;
@@ -54,15 +50,11 @@ export function appendWithSlidingWindow(
 }
 
 export type ContextWindowOpts = {
-  maxMessages?: number; // cap number of messages included
-  maxChars?: number;    // cap total chars in context
+  maxMessages?: number; 
+  maxChars?: number;    
 };
 
-/**
- * Build the model context from history (read‑only).
- * Returns oldest → newest as compact "sender: text" lines.
- * Does NOT mutate the passed `history`.
- */
+
 export function buildContextWindow(
   history: MessageHistoryItem[],
   opts: ContextWindowOpts = {}

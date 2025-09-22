@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { Box, CircularProgress, Typography, useTheme } from '@mui/material';
@@ -29,28 +29,28 @@ export default function HomeClient() {
   const { cid } = useLiveConversationSync();
   const theme = useTheme();
 
-  // URL helpers
+  
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Profile
+  
   const { profile } = useUserProfile();
   const activeVoice = profile?.voice || 'en-GB-Neural2-A';
   const activeTone  = profile?.tone  || 'friendly';
 
-  // Track mode of the current session
+  
   const sessionWasResumedRef = useRef<boolean>(false);
-  const lastCreatedCidRef = useRef<string | null>(null); // to enable resume-in-page without URL
+  const lastCreatedCidRef = useRef<string | null>(null); 
 
-  // Track which message ids we've already logged for the *current* conversation
+  
   const loggedMsgIdsRef = useRef<Set<string>>(new Set());
-  // Remember the last non-null cid we've seen, so we only clear the set when cid *changes* to a new one
+  
   const lastCidSeenRef = useRef<string | null>(null);
 
 
   const resumeTargetCidRef = useRef<string | null>(null);
 
-  // Helper: push action to panel
+  
    const logAction = (entry: Omit<ActionLogEntry, 'id' | 'ts'>) => {
     setActions(prev => {
       const last = prev[prev.length - 1];
@@ -62,7 +62,7 @@ export default function HomeClient() {
     });
   };
 
-  // Conversation history + context
+  
   const prevCtxSigRef = useRef<string>('');
   const { history, contextLines } = useConversationHistory(cid, {
     onNewMessages: (msgs) => {
@@ -98,18 +98,18 @@ export default function HomeClient() {
 
   useEffect(() => {
   if (cid) {
-    // new conversation loaded -> allow logging its history once
+    
       resumeTargetCidRef.current = cid;
     if (cid !== lastCidSeenRef.current) {
       loggedMsgIdsRef.current.clear();
       lastCidSeenRef.current = cid;
     }
   }
-  // If cid becomes null (stop), leave the set intact so resume doesn't re-log
+  
 }, [cid]);
 
 
-  // Log context changes
+  
   useEffect(() => {
     const sig = `${contextLines.length}|${contextLines[contextLines.length - 1] || ''}`;
     if (sig !== prevCtxSigRef.current) {
@@ -123,7 +123,7 @@ export default function HomeClient() {
     }
   }, [contextLines]);
 
-  // Util: strip ?cid from URL
+  
   const stripCidFromUrlIfPresent = () => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -135,7 +135,7 @@ export default function HomeClient() {
     } catch {}
   };
 
-  // Listen: someone created a new live conversation -> remember it for resume-in-page
+  
   useEffect(() => {
     const onCreated = (e: Event) => {
       const any = e as CustomEvent<string>;
@@ -171,7 +171,7 @@ export default function HomeClient() {
   };
 
 
-    // Listen: resume/new intent so we know how to manage logs/URL
+    
  useEffect(() => {
     const onStartNew = () => {
       clearUiForNewSession();
@@ -190,7 +190,7 @@ export default function HomeClient() {
       clearUiForNewSession();
     };
     const onContextCleared = () => {
-      // defensive: if someone fires this, ensure UI is clean
+      
       clearUiForNewSession();
     };
 
@@ -207,7 +207,7 @@ export default function HomeClient() {
     };
   }, []);
 
-  // Conversation lifecycle panel entries + Stop cleanup
+  
   useEffect(() => {
     const onConvStart = () => {
       logAction({ type: 'conv_start', label: sessionWasResumedRef.current ? 'Resumed conversation.' : 'New conversation started.' });
@@ -228,7 +228,7 @@ export default function HomeClient() {
     };
   }, []);
 
-  // TTS lifecycle
+  
   useEffect(() => {
     const onStart = () => setIsPlaying(true);
     const onEnd = () => {
@@ -244,7 +244,7 @@ export default function HomeClient() {
     };
   }, []);
 
-  // STT lifecycle (panel log)
+  
   useEffect(() => {
     const onStartListening = () => {
       logAction({ type: 'begun listening', label: 'Listening for recipient speech...' });
@@ -271,19 +271,19 @@ export default function HomeClient() {
  const regenInProgressRef = useRef(false);
  const genLogTimeoutRef = useRef<number | null>(null);
 
-  // Loading from VoiceControlBar
-// replace handleLoadingChange with this version
+  
+
 const handleLoadingChange = (loading: boolean) => {
   setIsLoading(loading);
 
-  // clear any pending "Generating…" log
+  
   if (genLogTimeoutRef.current) {
     clearTimeout(genLogTimeoutRef.current);
     genLogTimeoutRef.current = null;
   }
 
   if (loading) {
-    // defer by one tick so ui:regenerate sets the flag first
+    
     genLogTimeoutRef.current = window.setTimeout(() => {
       if (!regenInProgressRef.current) {
         logAction({ type: 'generating', label: 'Generating responses…' });
@@ -292,14 +292,14 @@ const handleLoadingChange = (loading: boolean) => {
     }, 0);
   }
 };
-  // Responses from VoiceControlBar
+  
   const handleResponsesReady = (responses: GenerateResponse) => {
     if (regenInProgressRef.current) regenInProgressRef.current = false; 
     setAiResponses(responses.candidates);
     logAction({ type: 'responses_ready', label: 'Responses ready.' });
   };
 
-  // Click a grid cell -> speak with *current profile* voice & tone
+  
   const handleBlockClick = async (index: number) => {
     if (isPlaying) return;
 
@@ -316,7 +316,7 @@ const handleLoadingChange = (loading: boolean) => {
     }
   };
 
-// Build blocks from responses (2–6) and pass flow debug info for the bottom-right panel
+
 const visibleCount = Math.min(Math.max(aiResponses.length, 2), 6);
 
 const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
@@ -326,9 +326,9 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
     label: label || `Option ${i + 1}`,
     onClick: () => handleBlockClick(i),
 
-    // 👇 This powers the bottom-right “mathsy” panel in VoiceGrid
+    
     debug: {
-      prob: c?.flow?.prob ?? c?.relativeProb,                 // fallback to relativeProb if needed
+      prob: c?.flow?.prob ?? c?.relativeProb,                 
       utility: c?.flow?.utility,
       meanLogProb: c?.avgLogProb,
       simToLastUser: c?.flow?.simToLastUser,
@@ -337,14 +337,14 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
       totalPenalty:
         c?.flow?.totalPenalty ??
         ((c?.flow?.lengthPenalty ?? 0) + (c?.flow?.repetitionPenalty ?? 0)),
-      weights: c?.flow?.weights, // { a, b, g, tau }
+      weights: c?.flow?.weights, 
     },
   };
 });
 
-  // -------- Arrival integrations --------
+  
 
-  // If we arrive with ?cid=..., mark as a resume target and load it
+  
   useEffect(() => {
     const qcid = searchParams.get('cid');
     if (!qcid) return;
@@ -352,7 +352,7 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
     window.dispatchEvent(new CustomEvent('conversation:load', { detail: { cid: qcid } }));
   }, [searchParams]);
 
-  // Autostart: ensure this fires ONCE even in Strict Mode
+  
   const autostartFiredRef = useRef(false);
 
   useEffect(() => {
@@ -360,37 +360,37 @@ const blocks = aiResponses.slice(0, visibleCount).map((c, i) => {
     const auto = searchParams.get('autostart');
     if (!starter || auto !== '1') return;
 
-    if (autostartFiredRef.current) return; // local guard
+    if (autostartFiredRef.current) return; 
     autostartFiredRef.current = true;
 
-    // global guard (in case multiple HomeClient instances render)
+    
     try {
       const w = window as any;
       const token = `starter|${starter}`;
       if (w.__talkableAutoStartToken === token) {
-        return; // already handled globally
+        return; 
       }
       w.__talkableAutoStartToken = token;
     } catch {}
 
     setAutoStart({ mode: 'new', seed: starter });
 
-    // speak the starter
+    
     speakWithGoogleTTSClient(starter, activeTone, activeVoice).catch(() => {
       if (typeof window !== 'undefined') window.dispatchEvent(new Event('tts:end'));
     });
 
-    // ensure new conversation + persist the seed as first USER message
+    
     window.dispatchEvent(new CustomEvent('conversation:startNew'));
     window.dispatchEvent(new CustomEvent('conversation:seed', { detail: { text: starter, sender: 'user' } }));
 
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.delete('starter'); params.delete('topic'); params.delete('autostart');
     router.replace(`/home${params.size ? `?${params.toString()}` : ''}`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // once
+    
+  }, []); 
 
-  // Can we resume? yes if URL has ?cid OR we created a convo in this page session
+  
   const canResume =
   !!searchParams.get('cid') ||
   !!lastCreatedCidRef.current ||

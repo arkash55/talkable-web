@@ -1,4 +1,4 @@
-import Header from './components/header/Header';
+﻿import Header from './components/header/Header';
 import { AdvancedModeProvider } from './context/AdvancedModeContext';
 import { AuthProvider } from './context/AuthContext';
 import { CustomThemeProvider } from './context/ThemeContext';
@@ -43,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <main
                   style={{
                     flex: 1,
-                    overflow: 'hidden', // stop scrolling
+                    overflow: 'hidden', 
                 }}
               >
       

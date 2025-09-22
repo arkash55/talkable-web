@@ -1,8 +1,8 @@
-// src/services/authService.test.ts
+﻿
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// Use the manual mock in __mocks__/firebase/auth.ts
-// IMPORTANT: call vi.mock BEFORE importing the module under test or the mocked module.
+
+
 vi.mock('firebase/auth');
 
 import * as FirebaseAuth from 'firebase/auth';
@@ -21,11 +21,11 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // ensure a clean currentUser each test
+  
   (FirebaseAuth as any).__setCurrentUser(null);
 });
 
-// ------- TESTS -------
+
 describe('authService (unit)', () => {
   describe('loginUser', () => {
     it('calls signInWithEmailAndPassword with auth + credentials', async () => {

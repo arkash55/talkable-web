@@ -1,13 +1,13 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 
-// --- Types (mirror the API route shapes) ---
+
  type Candidate = {
   text: string;
   tokens: number;
-  avgLogProb: number; // closer to 0 is better
-  relativeProb: number; // 0..1
+  avgLogProb: number; 
+  relativeProb: number; 
   seed: number;
   variant: "primary" | "alt";
 };
@@ -34,7 +34,7 @@ function fmtLogProb(lp: number) {
 }
 
 export default function WatsonGraniteTestPage() {
-  // Inputs
+  
   const [system, setSystem] = useState(
     "You are Talkable, a concise, supportive AAC assistant. Keep replies short, polite, and easy to speak aloud."
   );
@@ -44,13 +44,13 @@ export default function WatsonGraniteTestPage() {
   const [prompt, setPrompt] = useState("Could you please repeat that more slowly?");
   const [k, setK] = useState(6);
 
-  // Generation params
+  
   const [temperature, setTemperature] = useState(0.5);
   const [topP, setTopP] = useState(0.9);
   const [topK, setTopK] = useState(50);
   const [maxNewTokens, setMaxNewTokens] = useState(50);
 
-  // State
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<GenerateResponse | null>(null);
@@ -107,7 +107,7 @@ export default function WatsonGraniteTestPage() {
         <div className="text-sm text-gray-500">/api/granite/generate</div>
       </header>
 
-      {/* Controls */}
+      {}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card title="System Instructions">
           <textarea
@@ -157,7 +157,7 @@ export default function WatsonGraniteTestPage() {
         </Card>
       </section>
 
-      {/* Parameters */}
+      {}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <ParamCard label="Temperature" value={temperature} min={0} max={1} step={0.05}
           onChange={setTemperature} hint="0=deterministic, 0.5=variety" />
@@ -169,7 +169,7 @@ export default function WatsonGraniteTestPage() {
           onNumberChange={setMaxNewTokens} hint="cap reply length" />
       </section>
 
-      {/* Results */}
+      {}
       {data && (
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -216,7 +216,7 @@ export default function WatsonGraniteTestPage() {
   );
 }
 
-// --- UI bits ---
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border rounded-xl p-4 shadow-sm bg-white">
@@ -293,9 +293,9 @@ function ParamCard({
   );
 }
 
-// --- helpers ---
+
 function splitContextBlocks(raw: string): string[] {
-  // Split on blank lines or lines containing only ---
+  
   const lines = raw.split(/\r?\n/);
   const blocks: string[] = [];
   let buf: string[] = [];

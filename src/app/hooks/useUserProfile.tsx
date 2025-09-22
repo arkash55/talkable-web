@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -8,10 +8,10 @@ import type { UserProfile } from '@/services/firestoreService';
 import { db } from '../../../lib/fireBaseConfig';
 
 export type SlimProfile = Pick<UserProfile, 'firstName' | 'lastName' | 'description' | 'tone' | 'voice'> & {
-  _updatedAt?: number; // millis (for cache freshness)
+  _updatedAt?: number; 
 };
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; 
 
 function cacheKey(uid: string) {
   return `tp.userProfile.${uid}`;
@@ -24,7 +24,7 @@ function loadCache(uid: string): SlimProfile | null {
     const data = JSON.parse(raw) as SlimProfile;
     if (!data?._updatedAt) return data;
     const fresh = Date.now() - data._updatedAt < CACHE_TTL_MS;
-    return fresh ? data : data; // we still return; Firestore will revalidate
+    return fresh ? data : data; 
   } catch {
     return null;
   }
@@ -43,7 +43,7 @@ export function useUserProfile() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // watch auth
+  
   React.useEffect(() => {
     const auth = getAuth();
     return onAuthStateChanged(auth, (user) => {
@@ -52,18 +52,18 @@ export function useUserProfile() {
       setLoading(true);
       setProfile(null);
 
-      // seed from cache quickly
+      
       if (user?.uid) {
         const cached = loadCache(user.uid);
         if (cached) {
           setProfile(cached);
-          setLoading(false); // show UI immediately; snapshot will refine
+          setLoading(false); 
         }
       }
     });
   }, []);
 
-  // subscribe to profile doc when uid is present
+  
   React.useEffect(() => {
     if (!uid) {
       setLoading(false);

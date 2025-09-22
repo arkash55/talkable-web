@@ -1,4 +1,4 @@
-// app/api/granite/generate/route.ts
+﻿
 import { NextRequest, NextResponse } from "next/server";
 import { generateRankedCandidates, type GenerateRequest } from "@/services/graniteService";
 

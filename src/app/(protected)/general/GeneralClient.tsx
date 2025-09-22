@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import {
@@ -27,7 +27,7 @@ import ConversationSidebar from '@/app/components/general/ConversationSidebar';
 
 type Props = { initialTopics: TrendingTopic[] };
 
-// ---- helpers ----
+
 function formatWhen(ts: any): string {
   try {
     const d: Date =
@@ -87,21 +87,21 @@ export default function GeneralClient({ initialTopics }: Props) {
   const [trending, setTrending] = useState<TrendingTopic[]>(initialTopics || []);
   const [loadingTrending, setLoadingTrending] = useState(false);
 
-  // Always display only the top 6 in UI
+  
   const visibleTopics = useMemo(() => (trending || []).slice(0, 6), [trending]);
 
-  // hydrate trending from server props if they change (e.g., RSC nav)
+  
   useEffect(() => {
     setTrending(initialTopics || []);
   }, [initialTopics]);
 
-  // auth -> uid
+  
   useEffect(() => {
     const auth = getAuth();
     return onAuthStateChanged(auth, (user) => setUid(user?.uid ?? null));
   }, []);
 
-  // live inbox for LIVE conversations only
+  
   useEffect(() => {
     if (!uid) return;
     const unsub = onInbox(
@@ -115,7 +115,7 @@ export default function GeneralClient({ initialTopics }: Props) {
     return () => unsub?.();
   }, [uid]);
 
-  // refresh trending via API route (bypasses service cache)
+  
   async function refreshTrending() {
     setLoadingTrending(true);
     try {
@@ -147,7 +147,7 @@ export default function GeneralClient({ initialTopics }: Props) {
         p: 2,
       }}
     >
-      {/* Left: Trending Topics (2 columns × 3 rows) */}
+      {}
       <Box sx={{ overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
         <Box
           sx={{
@@ -186,7 +186,7 @@ export default function GeneralClient({ initialTopics }: Props) {
           </Stack>
         </Box>
 
-        {/* 2 columns on sm+; 3 rows since we show 6 items */}
+        {}
         <Grid container spacing={2}>
           {visibleTopics.map((t) => (
             <Grid key={t.id} item xs={12} sm={6}>
@@ -206,7 +206,7 @@ export default function GeneralClient({ initialTopics }: Props) {
         </Grid>
       </Box>
 
-      {/* Right: Past live conversations (≈40%) */}
+      {}
       <ConversationSidebar />
     </Box>
   );
