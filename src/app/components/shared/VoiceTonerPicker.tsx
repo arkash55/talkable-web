@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import { Box, Stack, Typography, TextField, Button } from '@mui/material';
@@ -11,8 +11,8 @@ import {
 } from '@/app/forms/constants/voiceToneOptions';
 
 const CONTROL_HEIGHT = 80;
-const CONTROL_RADIUS = 3;     // matches MUI default-ish rounded look
-const CONTROL_BORDER = 1;     // make both use the same border thickness
+const CONTROL_RADIUS = 3;     
+const CONTROL_BORDER = 1;     
 
 export type VoiceTonePickerProps = {
   tone: string;
@@ -89,7 +89,7 @@ export default function VoiceTonePicker({
 
   return (
     <Stack spacing={2} sx={{ width: '100%', overflow: 'visible', px: { xs: 0, sm: 1 } }}>
-      {/* Preview row */}
+      {}
       <Box sx={{ width: '100%', mt: 1 }}>
         <Stack
           direction={{ xs: 'column', lg: 'row' }}
@@ -129,7 +129,7 @@ export default function VoiceTonePicker({
             }}
           />
 
-          {/* IMPORTANT: no BIG_BUTTON_SX here to avoid padding overrides */}
+          {}
           <Button
             variant="outlined"
             onClick={handleListen}
@@ -141,12 +141,12 @@ export default function VoiceTonePicker({
               borderRadius: CONTROL_RADIUS,
               width: 190,
               lineHeight: 1,
-              px: 2,                 // make padding match input’s px
-              py: 0,                 // kill vertical padding
+              px: 2,                 
+              py: 0,                 
               fontSize: '1rem',
               borderWidth: CONTROL_BORDER,
               borderStyle: 'solid',
-              borderColor: 'divider', // visually closer to TextField outline
+              borderColor: 'divider', 
               textTransform: 'none',
               display: 'inline-flex',
               alignItems: 'center',
@@ -158,7 +158,7 @@ export default function VoiceTonePicker({
         </Stack>
       </Box>
 
-      {/* Voice & Tone sections */}
+      {}
       <Box
         sx={{
           display: 'flex',
@@ -171,7 +171,7 @@ export default function VoiceTonePicker({
           pb: 0.5,
         }}
       >
-        {/* Voice */}
+        {}
         <Stack spacing={1.25} sx={{ flex: 1, minWidth: 0, '@media (max-width:600px)': { minWidth: '100%' } }}>
           <Typography variant="subtitle1" textAlign="center">Voice Selection</Typography>
           {voiceCols ? (
@@ -209,7 +209,7 @@ export default function VoiceTonePicker({
           {!!voiceError && <Typography color="error" variant="caption" textAlign="center">{voiceError}</Typography>}
         </Stack>
 
-        {/* Tone */}
+        {}
         <Stack spacing={1.25} sx={{ flex: 1, minWidth: 0, '@media (max-width:600px)': { minWidth: '100%' } }}>
           <Typography variant="subtitle1" textAlign="center">Preferred tone</Typography>
           {toneCols ? (

@@ -1,4 +1,4 @@
-// src/app/settings/SettingsGrid.tsx
+﻿
 'use client';
 
 import * as React from 'react';
@@ -22,8 +22,8 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useRouter } from 'next/navigation';
 import SettingsTile from './SettingsGridTiles';
-import { logoutUser } from '@/services/firestoreService'; // your existing logout
-import { deleteAccount, reauthWithPassword } from '@/services/authService'; // <-- add these
+import { logoutUser } from '@/services/firestoreService'; 
+import { deleteAccount, reauthWithPassword } from '@/services/authService'; 
 import { User, Volume2, ShieldCheck, Info, LogOut, Trash2 } from 'lucide-react';
 import { BIG_BUTTON_SX } from '@/app/styles/buttonStyles';
 
@@ -32,7 +32,7 @@ type Item = {
   title: string;
   subtitle: string;
   icon: React.ReactNode;
-  href?: string; // routes on click (except logout/delete which confirm first)
+  href?: string; 
   'data-testid'?: string;
   danger?: boolean;
 };
@@ -61,18 +61,18 @@ export default function SettingsGrid({
 }: Props) {
   const router = useRouter();
 
-  // Confirmation dialog state
+  
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [confirmAction, setConfirmAction] = React.useState<null | 'logout' | 'delete'>(null);
   const [working, setWorking] = React.useState(false);
   const [dialogError, setDialogError] = React.useState<string | null>(null);
 
-  // Reauth (only shown when delete requires recent login)
+  
   const [needReauth, setNeedReauth] = React.useState(false);
   const [reauthPwd, setReauthPwd] = React.useState('');
   const [showPwd, setShowPwd] = React.useState(false);
 
-  // NEW: simple modal for "About & Privacy" (TBD)
+  
   const [tbdOpen, setTbdOpen] = React.useState(false);
 
   const openConfirm = (action: 'logout' | 'delete') => {
@@ -98,13 +98,13 @@ export default function SettingsGrid({
 };
 
   const tryDelete = async () => {
-    // attempt the actual delete
+    
     const res = await deleteAccount();
     if (!res.ok) {
       if (res.code === 'requires-recent-login') {
         setNeedReauth(true);
         setDialogError('For your security, please confirm your password to continue.');
-        return false; // keep dialog open
+        return false; 
       }
       setDialogError('Something went wrong. Please try again later.');
       return false;
@@ -124,7 +124,7 @@ export default function SettingsGrid({
         return;
       }
 
-      // DELETE
+      
       if (needReauth) {
         if (!reauthPwd) {
           setDialogError('Please enter your password.');
@@ -153,7 +153,7 @@ export default function SettingsGrid({
   const handleClick = (item: Item) => async () => {
     onOpenSection?.(item.key);
 
-    // Intercept logout/delete to show confirmation popup
+    
     if (item.key === 'logout') {
       openConfirm('logout');
       return;
@@ -163,13 +163,13 @@ export default function SettingsGrid({
       return;
     }
 
-    // NEW: intercept About & Privacy to show TBD modal
+    
     if (item.key === 'about-privacy') {
       setTbdOpen(true);
       return;
     }
 
-    // Everything else routes immediately
+    
     if (item.href) router.push(item.href);
   };
 
@@ -177,7 +177,7 @@ export default function SettingsGrid({
 
   return (
     <>
-      {/* existing tiles + confirm dialog */}
+      {}
       <Grid container spacing={spacing} display="flex" justifyContent="center">
         {ITEMS.map((item) => (
           <Grid item key={item.key} xs={cols.xs} sm={cols.sm} md={cols.md}>
@@ -220,7 +220,7 @@ export default function SettingsGrid({
                 alignItems: 'center',
                 justifyContent: 'center',
                 bgcolor: (t) => (isDelete ? t.palette.error.main : t.palette.primary.main),
-                color: (t) => t.palette.common.white, // white icon
+                color: (t) => t.palette.common.white, 
               }}
             >
               {isDelete ? <Trash2 size={28} /> : <LogOut size={28} />}
@@ -291,7 +291,7 @@ export default function SettingsGrid({
         </DialogActions>
       </Dialog>
 
-      {/* NEW: TBD dialog */}
+      {}
       <Dialog
         open={tbdOpen}
         onClose={() => setTbdOpen(false)}

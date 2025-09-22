@@ -1,4 +1,4 @@
-'use client'; // needed for client-side context
+﻿'use client'; 
 
 import React, { createContext, useContext, useMemo, useState, useEffect } from 'react';
 import { ThemeProvider, CssBaseline } from '@mui/material';

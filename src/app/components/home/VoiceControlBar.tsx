@@ -1,4 +1,4 @@
-// src/app/components/home/VoiceControlBar.tsx
+﻿
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -14,7 +14,7 @@ import { GenerateResponse } from '@/services/graniteClient';
 import { REFRESH_BUTTON_SX, START_NEW_BUTTON_SX, STOP_BUTTON_SX } from '@/app/styles/buttonStyles';
 import { Inter } from 'next/font/google';
 
-// Shared size/style so all control buttons match
+
 const CONTROL_BUTTON_SX = {
   fontWeight: 700,
   px: 3,
@@ -36,7 +36,7 @@ interface VoiceControlBarProps {
   onLoadingChange?: (loading: boolean) => void;
   modelContext?: string[];
   canResume?: boolean;
-  autoStart?: AutoStartPayload;           // <-- NEW
+  autoStart?: AutoStartPayload;           
 }
 
 export default function VoiceControlBar({
@@ -44,7 +44,7 @@ export default function VoiceControlBar({
   onLoadingChange,
   modelContext,
   canResume = false,
-  autoStart = null,                        // <-- NEW
+  autoStart = null,                        
 }: VoiceControlBarProps) {
   const theme = useTheme();
 
@@ -58,14 +58,14 @@ export default function VoiceControlBar({
     resumeConversation,
     stopConversation,
     browserSupportsSpeechRecognition,
-  } = useVoiceControl(onResponses, onLoadingChange, modelContext); // pass context when resuming
+  } = useVoiceControl(onResponses, onLoadingChange, modelContext); 
 
-  // consume autoStart prop exactly once (no new event listeners)
+  
   const consumedRef = useRef(false);
   useEffect(() => {
     if (!autoStart || consumedRef.current || !browserSupportsSpeechRecognition) return;
 
-    // 1) Flip UI into active mode & start STT
+    
     if (!isConversationActive) {
       if (autoStart.mode === 'resume') {
         resumeConversation();
@@ -77,7 +77,7 @@ export default function VoiceControlBar({
       }
     }
 
-    // 2) Send the opener AS USER through existing pipeline (saves to Firestore + context)
+    
     if (autoStart.seed) {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
@@ -133,7 +133,7 @@ export default function VoiceControlBar({
       )}
 
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-        {/* Control buttons */}
+        {}
         {!isConversationActive ? (
         <Stack direction="row" spacing={2}>
         <Button
@@ -155,7 +155,7 @@ export default function VoiceControlBar({
           startIcon={<PlayArrowIcon />}
           disabled={!canResume}
           onClick={() => {
-            // explicit RESUME
+            
             resumeConversation();
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('conversation:start'));
@@ -203,7 +203,7 @@ export default function VoiceControlBar({
                 opacity: 1,
                 background: `linear-gradient(135deg, ${theme.palette.grey[300]} 0%, ${theme.palette.grey[500]} 65%)`,
                 color: theme.palette.getContrastText(theme.palette.grey[400]),
-                // border: 'none'
+                
             },
           }),
         ]}

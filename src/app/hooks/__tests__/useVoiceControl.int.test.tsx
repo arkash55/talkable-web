@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React, { useEffect, useState } from 'react';
 import { render, act } from '@testing-library/react';
 
-// ────────────────────────────
-// Hoisted mocks
-// ────────────────────────────
+
+
+
 const speech = vi.hoisted(() => ({
   startListening: vi.fn(),
   stopListening: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('react-speech-recognition', () => ({
   }),
 }));
 
-// Avoid real Firebase init
+
 vi.mock('@/lib/fireBaseConfig', () => {
   const auth = { currentUser: { uid: 'test_uid' } };
   const db = { __isDb: true };
@@ -37,7 +37,7 @@ vi.mock('@/lib/fireBaseConfig', () => {
   return { auth, db, app };
 });
 
-// Stable system prompt + profile
+
 vi.mock('@/app/hooks/useUserProfile', () => ({
   useUserProfile: () => ({
     profile: { tone: 'warm', description: 'Test user' },
@@ -47,19 +47,19 @@ vi.mock('@/app/utils/systemPrompt', () => ({
   buildSystemPrompt: () => 'SYSTEM_PROMPT_TEST',
 }));
 
-// Granite client
+
 const getCandidatesMock = vi.hoisted(() => vi.fn());
 vi.mock('@/services/graniteClient', () => ({
   getCandidates: getCandidatesMock,
 }));
 
-// SUT
+
 import { useVoiceControl } from '../useVoiceControl';
 import type { GenerateResponse } from '@/services/graniteClient';
 
-// ────────────────────────────
-// Test harness
-// ────────────────────────────
+
+
+
 function Harness({
   onResponses,
   onLoading,
@@ -72,7 +72,7 @@ function Harness({
   const hook = useVoiceControl(onResponses, onLoading, context ?? []);
   const [tick, setTick] = useState(0);
 
-  // Expose helpers (and force re-render when we update transcript)
+  
   useEffect(() => {
     (window as any).__seed = (txt: string, sender: 'guest' | 'user' = 'guest') => {
       hook.messageHistory.push({
@@ -87,16 +87,16 @@ function Harness({
     (window as any).__stop = () => (hook as any).stopConversation?.();
     (window as any).__setTranscript = (t: string) => {
       speech.state.transcript = t;
-      setTick((x) => x + 1); // force re-render so the hook sees the new transcript
+      setTick((x) => x + 1); 
     };
   }, [hook]);
 
   return <div data-testid="harness" data-tick={tick} />;
 }
 
-// ────────────────────────────
-// Tests
-// ────────────────────────────
+
+
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
@@ -117,31 +117,31 @@ describe('useVoiceControl – finalize on silence integration', () => {
 
     render(<Harness onResponses={onResponses} onLoading={onLoading} />);
 
-    // Start new conversation (activates listening)
+    
     act(() => {
       (window as any).__start();
     });
 
-    // Simulate speech (and force re-render so effect sees it)
+    
     act(() => {
       (window as any).__setTranscript('Hello there from mic');
     });
 
-    // Advance past the 2s silence window
+    
     await act(async () => {
       vi.advanceTimersByTime(2100);
-      await Promise.resolve(); // let microtasks flush
+      await Promise.resolve(); 
     });
 
-    // Loading toggled while calling the model
+    
     expect(onLoading).toHaveBeenCalledWith(true);
 
-    // Let getCandidates resolve
+    
     await act(async () => {
       await Promise.resolve();
     });
 
-    // Responses propagated and loading ended
+    
     expect(onResponses).toHaveBeenCalledWith(
       expect.objectContaining({
         candidates: expect.any(Array),
@@ -150,7 +150,7 @@ describe('useVoiceControl – finalize on silence integration', () => {
     );
     expect(onLoading).toHaveBeenLastCalledWith(false);
 
-    // STT should stop
+    
     expect(speech.stopListening).toHaveBeenCalled();
   });
 
@@ -179,7 +179,7 @@ describe('useVoiceControl – finalize on silence integration', () => {
     expect(onLoading).not.toHaveBeenCalled();
     expect(speech.startListening).not.toHaveBeenCalled();
 
-    // restore
+    
     speech.state.browserSupportsSpeechRecognition = true;
   });
 });
@@ -191,7 +191,7 @@ describe('useVoiceControl – regenerate flow', () => {
 
     render(<Harness onResponses={onResponses} onLoading={onLoading} />);
 
-    // Seed a last message (prefer guest over user)
+    
     act(() => {
       (window as any).__seed('Most recent guest message', 'guest');
     });
@@ -202,11 +202,11 @@ describe('useVoiceControl – regenerate flow', () => {
 
     await Promise.resolve();
 
-    // Loading toggled
+    
     expect(onLoading).toHaveBeenCalledWith(true);
     expect(onLoading).toHaveBeenLastCalledWith(false);
 
-    // Model call
+    
     expect(getCandidatesMock).toHaveBeenCalledTimes(1);
     const [contentArg, systemArg, ctxArg] = (getCandidatesMock as any).mock.calls[0];
 
@@ -214,7 +214,7 @@ describe('useVoiceControl – regenerate flow', () => {
     expect(systemArg).toBe('SYSTEM_PROMPT_TEST');
     expect(Array.isArray(ctxArg)).toBe(true);
 
-    // Responses bubbled up
+    
     expect(onResponses).toHaveBeenCalledWith(
       expect.objectContaining({
         candidates: expect.any(Array),

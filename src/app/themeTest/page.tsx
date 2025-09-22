@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Box, Typography, Button, Card, CardContent, Alert, Divider, Stack } from '@mui/material';
 
@@ -17,7 +17,7 @@ export default function ThemeDemoPage() {
         padding: 4,
       }}
     >
-      {/* Top Bar */}
+      {}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4">MUI Theme Showcase</Typography>
         <ThemeToggle />
@@ -25,7 +25,7 @@ export default function ThemeDemoPage() {
 
       <Divider sx={{ mb: 4 }} />
 
-      {/* Typography */}
+      {}
       <Stack spacing={2} mb={4}>
         <Typography variant="h1">h1 Heading</Typography>
         <Typography variant="h2">h2 Heading</Typography>
@@ -36,7 +36,7 @@ export default function ThemeDemoPage() {
         </Typography>
       </Stack>
 
-      {/* Buttons */}
+      {}
       <Stack direction="row" spacing={2} mb={4}>
         <Button variant="contained" color="primary">
           Primary
@@ -55,7 +55,7 @@ export default function ThemeDemoPage() {
         </Button>
       </Stack>
 
-      {/* Alerts */}
+      {}
       <Stack spacing={2} mb={4}>
         <Alert severity="success">This is a success alert!</Alert>
         <Alert severity="info">This is an info alert!</Alert>
@@ -63,7 +63,7 @@ export default function ThemeDemoPage() {
         <Alert severity="error">This is an error alert!</Alert>
       </Stack>
 
-      {/* Card */}
+      {}
       <Card sx={{ maxWidth: 400, mb: 4 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
@@ -76,7 +76,7 @@ export default function ThemeDemoPage() {
         </CardContent>
       </Card>
 
-      {/* Theme info */}
+      {}
       <Typography variant="body2" color="text.secondary">
         Current Theme: <strong>{theme.palette.mode}</strong>
       </Typography>

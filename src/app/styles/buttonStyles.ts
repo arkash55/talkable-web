@@ -1,13 +1,13 @@
-export const BIG_BUTTON_SX = {
-  py: { xs: 1.75, sm: 2 },            // taller tap target
-  px: { xs: 2.75, sm: 3.25 },         // wider surface
-  minHeight: { xs: 56, sm: 64 },      // >= 48px is recommended; 56–64 feels big
+﻿export const BIG_BUTTON_SX = {
+  py: { xs: 1.75, sm: 2 },            
+  px: { xs: 2.75, sm: 3.25 },         
+  minHeight: { xs: 56, sm: 64 },      
   fontSize: { xs: '1rem', sm: '1.1rem' },
   borderRadius: 2.5,
   letterSpacing: 0.2,
 };
 
-// Optional: Add other button variants
+
 export const MEDIUM_BUTTON_SX = {
   py: { xs: 1.25, sm: 1.5 },
   px: { xs: 2, sm: 2.5 },
@@ -19,7 +19,7 @@ export const MEDIUM_BUTTON_SX = {
 
 
 
-// src/app/settings/styles.ts
+
 import { SxProps, Theme } from '@mui/material/styles';
 
 export const CONTROL_BUTTON_SX: SxProps<Theme> = {
@@ -33,7 +33,7 @@ export const CONTROL_BUTTON_SX: SxProps<Theme> = {
   px: 2,
 };
 
-// Extra styling just for the “Start New” button
+
 export const START_NEW_BUTTON_SX = (theme: any) => ({
   ...CONTROL_BUTTON_SX,
   position: 'relative',
@@ -75,7 +75,7 @@ export const START_NEW_BUTTON_SX = (theme: any) => ({
 });
 
 
-// New: styling for “Stop Conversation” (same look, red theme)
+
 export const STOP_BUTTON_SX = (theme: any) => ({
   ...START_NEW_BUTTON_SX(theme),
   background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 65%)`,
@@ -86,7 +86,7 @@ export const REFRESH_BUTTON_SX = (theme: any) => ({
   background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.dark} 65%)`,
 });
 
-// Variant for ALL settings tiles – same look, small tweaks for states/selection
+
 export const SETTINGS_TILE_SX = (theme: Theme, opts?: { selected?: boolean; danger?: boolean }) => {
   const isSelected = !!opts?.selected;
   const isDanger = !!opts?.danger;
@@ -97,17 +97,17 @@ export const SETTINGS_TILE_SX = (theme: Theme, opts?: { selected?: boolean; dang
 
   return {
     ...START_NEW_BUTTON_SX(theme),
-    // borderRadius: 2,
+    
     width: 350,
     height: 120,
     background: baseGradient,
     border: isSelected ? `2px solid ${theme.palette.common.white}` : '2px solid transparent',
     outline: 'none',
-    // Better focus ring for keyboard users
+    
     '&:focus-visible': {
       boxShadow: `${theme.shadows[8]}, 0 0 0 3px rgba(255,255,255,0.35)`,
     },
-    // Disabled look
+    
     '&.Mui-disabled': {
       opacity: 0.7,
       filter: 'grayscale(14%)',

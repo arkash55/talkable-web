@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -24,7 +24,7 @@ const CoolSwitch = styled(Switch)(({ theme }) => ({
       duration: 300,
       easing: theme.transitions.easing.easeInOut,
     }),
-    // remove focus outline box
+    
     '&.Mui-focusVisible': {
       outline: 'none',
       boxShadow: 'none',
@@ -33,10 +33,10 @@ const CoolSwitch = styled(Switch)(({ theme }) => ({
       transform: 'translateX(36px)',
       color: '#fff',
       '& + .MuiSwitch-track': {
-        // soft radial glow instead of a "box" shadow
+        
         background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 60%)`,
         opacity: 1,
-        boxShadow: '0 0 0 0 rgba(0,0,0,0)', // kill rectangular shadow
+        boxShadow: '0 0 0 0 rgba(0,0,0,0)', 
       },
     },
   },
@@ -57,7 +57,7 @@ const CoolSwitch = styled(Switch)(({ theme }) => ({
         ? theme.palette.grey[400]
         : theme.palette.grey[800],
     opacity: 1,
-    // add an inner glow via inset shadow (no outer box effect)
+    
     boxShadow: 'inset 0 0 12px rgba(0,0,0,0.15)',
     transition: theme.transitions.create(['background-color', 'box-shadow'], {
       duration: 400,
@@ -80,7 +80,7 @@ export default function AdvancedToggle() {
     return () => unsub();
   }, []);
 
-  if (!signedIn) return null; // hide toggle when not signed in
+  if (!signedIn) return null; 
 
   return (
     <Tooltip
@@ -116,7 +116,7 @@ export default function AdvancedToggle() {
         }
         sx={{
           m: 0,
-          // also ensure no unexpected outline on the wrapper
+          
           outline: 'none',
           '&:focus-within': { outline: 'none' },
           '& .MuiFormControlLabel-label': { cursor: 'pointer' },

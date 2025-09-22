@@ -1,8 +1,8 @@
-// services/graniteClient.ts
-// Browser helper for fetching ranked suggestions from your Granite API route.
+﻿
 
-import type { GenParams } from './graniteHelper';        // adjust path if your files are in /lib
-import type { Candidate } from './graniteService';        // type-only import to avoid bundling server code
+
+import type { GenParams } from './graniteHelper';        
+import type { Candidate } from './graniteService';        
 
 export type GenerateResponse = {
   candidates: Candidate[];
@@ -17,12 +17,12 @@ export type GenerateResponse = {
 export type SuggestionOptions = {
   system?: string;
   context?: string[];
-  k?: number;                     // default 6 (ignored by server if perCallInstructions is provided)
+  k?: number;                     
   params?: GenParams;
-  padTo?: number;                 // pad output texts to N slots (default: no padding)
+  padTo?: number;                 
   signal?: AbortSignal;
-  route?: string;                 // default "/api/granite/generate"
-  perCallInstructions?: string[]; // NEW: one instruction per generation call
+  route?: string;                 
+  perCallInstructions?: string[]; 
 };
 
 
@@ -43,7 +43,7 @@ export async function getCandidates(
     profile,
   } = opts;
 
-  // Always ask for at least 3 when k is used (server may ignore if perCallInstructions provided)
+  
   const wantK = Math.max(2, k);
 
   const body = {
@@ -53,7 +53,7 @@ export async function getCandidates(
     k: wantK,
     params,
     profile,
-    ...(perCallInstructions ? { perCallInstructions } : {}), // ← pass through variant instructions
+    ...(perCallInstructions ? { perCallInstructions } : {}), 
   };
 
   const res = await fetch(route, {
@@ -71,7 +71,7 @@ export async function getCandidates(
         ? JSON.stringify(await res.json())
         : await res.text();
     } catch {
-      /* ignore */
+      
     }
     throw new Error(
       `Granite route error: ${res.status} ${res.statusText}${
@@ -85,7 +85,7 @@ export async function getCandidates(
     throw new Error('Malformed Granite response');
   }
 
-  // Optional client-side padding to a fixed number of slots
+  
   if (padTo && data.candidates.length < padTo) {
     const missing = padTo - data.candidates.length;
     const blanks: Candidate[] = Array.from({ length: missing }, () => ({

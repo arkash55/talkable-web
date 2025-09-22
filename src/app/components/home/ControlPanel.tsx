@@ -1,4 +1,4 @@
-// src/app/components/home/ControlPanel.tsx
+﻿
 'use client';
 
 import {
@@ -41,24 +41,24 @@ import { useAdvancedMode } from '@/app/context/AdvancedModeContext';
 export type ActionType =
   | 'conv_start'
   | 'conv_end'
-  | 'conv_created'        // new: from conversation:created
-  | 'conv_resume'         // new: when resuming a session
-  | 'trending_start'      // new: starting via trending tile
-  | 'seed'                // new: seeded starter injected
-  | 'history_reset'       // new: history cleared/loaded
-  | 'history_updated'    // new: messages appended
-  | 'context_update'      // new: context window recomputed
+  | 'conv_created'        
+  | 'conv_resume'         
+  | 'trending_start'      
+  | 'seed'                
+  | 'history_reset'       
+  | 'history_updated'    
+  | 'context_update'      
   | 'user_final'
   | 'generating'
   | 'responses_ready'
   | 'TTS Start'
   | 'TTS End'
-  | 'ai_message'       // CLICKABLE
+  | 'ai_message'       
   | 'rewind'
   | 'begun listening'
   | 'ended listening'
   | 'final transcript'
-  | 'Chat Message';     // chat-only timeline
+  | 'Chat Message';     
 
 function iconFor(type: ActionType) {
   switch (type) {
@@ -82,7 +82,7 @@ function iconFor(type: ActionType) {
     case 'begun listening': return <MicIcon fontSize="small" />;
     case 'ended listening': return <MicOffIcon fontSize="small" />;
     case 'final transcript': return <SubtitlesIcon fontSize="small" />;
-    case 'Chat Message': return <ChatIcon fontSize="small" />; // changed
+    case 'Chat Message': return <ChatIcon fontSize="small" />; 
     default: return null;
   }
 }
@@ -97,15 +97,15 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const { advanced } = useAdvancedMode();
 
-  // Filter based on mode:
-  // - Advanced: show everything
-  // - Basic: only "Chat Message"
+  
+  
+  
   const visibleActions = useMemo(
     () => (advanced ? actions : actions.filter(a => a.type === 'Chat Message')),
     [actions, advanced]
   );
 
-  // Auto-scroll to bottom on updates (chat-like behavior)
+  
   useEffect(() => {
     if (collapsed) return;
     const el = scrollRef.current;
@@ -113,7 +113,7 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [visibleActions, collapsed]);
 
-  // Collapsed rail content (compact)
+  
   if (collapsed) {
     return (
       <Box
@@ -139,7 +139,7 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
     );
   }
 
-  // Expanded full panel
+  
   return (
     <Box
       sx={{
@@ -230,7 +230,7 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
               sx={{ mt: 0.5 }}
             >
               <Chip size="small" label="Press start new conversation" variant="outlined" />
-              {/* <Chip size="small" label="Your replies will appear here" variant="outlined" /> */}
+              {}
             </Stack>
           </Paper>
         ) : (
@@ -253,7 +253,7 @@ export default function ControlPanel({ actions, collapsed = false, onToggle }: C
                   '&:hover': isClickable ? { backgroundColor: theme => theme.palette.action.hover } : undefined,
                 }}
                 onClick={() => {
-                  // reserved for future “rewind” behaviors
+                  
                 }}
               >
                 <Stack direction="row" alignItems="center" gap={1}>

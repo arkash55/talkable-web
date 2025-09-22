@@ -1,4 +1,4 @@
-// src/app/components/home/VoiceGrid.tsx
+﻿
 'use client';
 
 import { Box, Typography, Stack } from '@mui/material';
@@ -8,31 +8,31 @@ import MarkChatUnreadIcon from '@mui/icons-material/MarkChatUnread';
 import { useAdvancedMode } from '@/app/context/AdvancedModeContext';
 
 interface FlowDebug {
-  prob?: number;               // 0..1
+  prob?: number;               
   utility?: number;
   meanLogProb?: number;
-  simToLastUser?: number;      // 0..1
-  lengthPenalty?: number;      // >= 0
-  repetitionPenalty?: number;  // >= 0
-  totalPenalty?: number;       // >= 0
+  simToLastUser?: number;      
+  lengthPenalty?: number;      
+  repetitionPenalty?: number;  
+  totalPenalty?: number;       
   weights?: { a: number; b: number; g: number; tau: number };
 }
 
 interface VoiceGridBlock {
   label: string;
   onClick: () => void;
-  /** optional: flow debug info to render bottom-right */
+  
   debug?: FlowDebug;
 }
 
 type VoiceGridType = 'homePage' | 'chatPage';
 
 interface ChatMeta {
-  /** True if the thread already has at least one message */
+  
   hasMessages: boolean;
-  /** True if we’re waiting for the other user (i.e., last message was from me). */
+  
   waitingForOther?: boolean;
-  /** Optional display name for “waiting for X” copy. */
+  
   otherName?: string;
 }
 
@@ -42,10 +42,10 @@ interface VoiceGridProps {
   activeIndex?: number | null;
   type?: VoiceGridType;
 
-  /** When false (and no chatMeta override), show the empty state. */
+  
   activeConversation: boolean;
 
-  /** NEW (optional): chat-specific state to refine empty-state rendering on chat pages. */
+  
   chatMeta?: ChatMeta;
 }
 
@@ -98,27 +98,21 @@ function formatNum(n: number | undefined, digits = 3) {
   return typeof n === 'number' && isFinite(n) ? n.toFixed(digits) : undefined;
 }
 
-/**
- * Map a block's surface area to a dark-mode-friendly blue.
- * Larger area => brighter (higher lightness). Smaller => darker.
- * We keep saturation high so it stays vivid against dark surfaces.
- *
- * We also clamp lightness to keep white text (forced) readable.
- */
+
 function blueForArea(area: number, minArea: number, maxArea: number) {
   const range = Math.max(1, maxArea - minArea);
-  const t = (area - minArea) / range; // 0..1 (small..large)
-  const hue = 215;          // deep blue
-  const sat = 92;           // vivid
-  const Lmin = 32;          // darkest for smallest area
-  const Lmax = 54;          // brightest for largest area (still OK with white text)
+  const t = (area - minArea) / range; 
+  const hue = 215;          
+  const sat = 92;           
+  const Lmin = 32;          
+  const Lmax = 54;          
   const light = Lmin + t * (Lmax - Lmin);
   return `hsl(${hue} ${sat}% ${light}%)`;
 }
 
-/** Slight hover lift on the same hue but a touch brighter */
+
 function hoverBlue(color: string) {
-  // crude lighten: rely on CSS color-mix if supported, fallback via filter-like effect
+  
   return `color-mix(in oklab, ${color} 84%, white)`;
 }
 
@@ -193,8 +187,8 @@ export default function VoiceGrid({
   activeConversation,
   chatMeta,
 }: VoiceGridProps) {
-  // ---- Empty states routing -------------------------------------------------
-  // HOME: if not activeConversation → show "Start a Conversation" CTA
+  
+  
   if (type === 'homePage' && !activeConversation) {
     return (
       <Box
@@ -221,9 +215,9 @@ export default function VoiceGrid({
     );
   }
 
-  // CHAT: refine empty states using chatMeta when provided
+  
   if (type === 'chatPage' && (!blocks?.length || !activeConversation)) {
-    // 1) No messages in this chat yet
+    
     if (chatMeta && chatMeta.hasMessages === false) {
       return (
         <Box
@@ -245,7 +239,7 @@ export default function VoiceGrid({
       );
     }
 
-    // 2) Waiting for the other user’s reply (last message was from me)
+    
     if (chatMeta && chatMeta.waitingForOther) {
       return (
         <Box
@@ -267,8 +261,8 @@ export default function VoiceGrid({
       );
     }
 
-    // 3) If it's our turn (blocks should be present), fall through to grid;
-    // if not, keep a neutral placeholder.
+    
+    
     if (!blocks?.length) {
       return (
         <Box
@@ -291,12 +285,12 @@ export default function VoiceGrid({
     }
   }
 
-  // ---- Normal grid ----------------------------------------------------------
+  
   const count = Math.max(0, Math.min(blocks.length, 6));
   const positions = layoutForCount(count);
   const { advanced } = useAdvancedMode();
 
-  // Precompute areas → min/max for color scaling
+  
   const areas = positions.map((p) => p.colSpan * p.rowSpan);
   const minArea = Math.min(...areas);
   const maxArea = Math.max(...areas);
@@ -319,7 +313,7 @@ export default function VoiceGrid({
 
         const area = pos.colSpan * pos.rowSpan;
         const baseBg = blueForArea(area, minArea, maxArea);
-        const baseColor = '#fff'; // force white text for visibility
+        const baseColor = '#fff'; 
 
         const d = block.debug;
         const hasDebug =
@@ -381,7 +375,7 @@ export default function VoiceGrid({
               '&:hover': {
                 backgroundColor: hoverBlue(baseBg),
               },
-              // improve legibility if text wraps onto multiple lines
+              
               textShadow: '0 1px 2px rgba(0,0,0,0.35)',
             }}
           >
@@ -397,7 +391,7 @@ export default function VoiceGrid({
               {block.label}
             </Typography>
 
-            {/* Bottom-right debug panel */}
+            {}
             {advanced && hasDebug && (
               <Box
                 sx={{

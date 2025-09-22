@@ -1,5 +1,5 @@
+﻿
 
-// src/services/guardianTrendingService.ts
 import 'server-only';
 
 
@@ -12,29 +12,19 @@ export type TrendingTopic = {
 };
 
 
-/**
- * Guardian Trending Service (with caching + variation)
- * - Pulls headlines from the last N days (default 14)
- * - Maps to your TrendingTopic shape
- * - Starter: "Let's talk about {title}"
- * - 5-minute fresh cache + durable lastGood fallback
- * - Variants:
- *    - newest  : ordered, deterministic
- *    - shuffle : seeded shuffle of a larger pool
- *    - sample  : seeded sample across multiple pages
- */
+
 
 const GU_API_KEY = process.env.GU_API_KEY || process.env.GUARDIAN_API_KEY;
 if (!GU_API_KEY) {
   console.warn('[guardian] Missing GU_API_KEY (or GUARDIAN_API_KEY) env var');
 }
 
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 5 * 60 * 1000; 
 
 type CacheBucket = {
   ts: number;
-  data: TrendingTopic[]; // cached pool (not just the sliced subset)
-  key: string;           // cache namespace (variant|page|days|sections|key)
+  data: TrendingTopic[]; 
+  key: string;           
 };
 
 let freshCache: CacheBucket | null = null;
@@ -56,7 +46,7 @@ function mapSectionToTag(sectionName?: string, sectionId?: string): TrendingTopi
   return 'news';
 }
 
-// ---- variation helpers ----
+
 function mulberry32(a: number) {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -76,18 +66,18 @@ function seededShuffle<T>(arr: T[], seed = Date.now()): T[] {
   return a;
 }
 
-// ---- options ----
+
 export type GuardianGetOpts = {
   force?: boolean;
-  key?: string;                           // extra cache namespace
+  key?: string;                           
   variant?: 'newest' | 'shuffle' | 'sample';
-  seed?: number;                          // deterministic per-click shuffles
-  page?: number;                          // 1-based
-  days?: number;                          // window size; default 14
-  sections?: string;                      // comma list e.g. "sport,politics,world"
+  seed?: number;                          
+  page?: number;                          
+  days?: number;                          
+  sections?: string;                      
 };
 
-// ---- core fetching ----
+
 async function fetchGuardianPool(limit: number, opts?: GuardianGetOpts): Promise<TrendingTopic[]> {
   const days = opts?.days && opts.days > 0 ? opts.days : 14;
   const now = new Date();
@@ -98,7 +88,7 @@ async function fetchGuardianPool(limit: number, opts?: GuardianGetOpts): Promise
   const basePageSize =
     opts?.variant === 'newest' ? Math.max(limit * 2, 12) :
     opts?.variant === 'shuffle' ? Math.max(limit * 6, 30) :
-    /* sample */                 Math.max(limit * 10, 50);
+                     Math.max(limit * 10, 50);
 
   const params = new URLSearchParams({
     'order-by': 'newest',
@@ -106,7 +96,7 @@ async function fetchGuardianPool(limit: number, opts?: GuardianGetOpts): Promise
     'show-fields': 'trailText',
     'from-date': fromDate,
     'to-date': toDate,
-    'api-key': String(GU_API_KEY || 'test'), // use a real key in prod
+    'api-key': String(GU_API_KEY || 'test'), 
   });
 
   if (opts?.sections) params.set('section', opts.sections);
@@ -135,18 +125,11 @@ async function fetchGuardianPool(limit: number, opts?: GuardianGetOpts): Promise
     return { id, title, description, starter, tag };
   });
 
-  // Deduplicate by title
+  
   return mapped.filter((t, i, arr) => arr.findIndex(x => x.title === t.title) === i);
 }
 
-/**
- * Public API: getGuardianTopics
- * - limit: number of items to return (default 6)
- * - opts: variation/caching params
- *
- * Caching: we cache the *pool* keyed by (variant|page|days|sections|key)
- * so subsequent requests can reorder locally (via seed) without refetching.
- */
+
 export async function getGuardianTopics(
   limit = 6,
   opts?: GuardianGetOpts
@@ -160,41 +143,41 @@ export async function getGuardianTopics(
     opts?.key || 'default',
   ].join('|');
 
-  // Serve from cache if valid and not forced
+  
   if (!opts?.force && freshCache && freshCache.key === key && now - freshCache.ts < CACHE_TTL_MS) {
     const pool = freshCache.data;
     if (opts?.variant === 'shuffle') {
       return seededShuffle(pool, opts.seed ?? now).slice(0, limit);
     }
     if (opts?.variant === 'sample') {
-      // For sample, reshuffle the cached pool each time by seed
+      
       return seededShuffle(pool, opts.seed ?? now).slice(0, limit);
     }
-    // newest
+    
     return pool.slice(0, limit);
   }
 
   try {
     let pool = await fetchGuardianPool(limit, opts);
 
-    // Variant-specific enrichment
+    
     if (opts?.variant === 'shuffle') {
       pool = seededShuffle(pool, opts.seed ?? now);
     } else if (opts?.variant === 'sample') {
-      // Pull a second page to widen pool, then seeded shuffle
+      
       const page2 = (opts?.page || 1) + 1;
       const extra = await fetchGuardianPool(limit, { ...opts, page: page2 });
       pool = seededShuffle([...pool, ...extra], opts.seed ?? now);
     }
-    // else newest: keep order as returned
+    
 
-    // Update caches on success (cache the full pool)
+    
     freshCache = { ts: now, data: pool, key };
     lastGood   = { ts: now, data: pool, key };
 
     return pool.slice(0, limit);
   } catch (err) {
-    // Fallback to lastGood if available for this key
+    
     if (lastGood && lastGood.key === key) {
       const pool = lastGood.data;
       if (opts?.variant === 'shuffle' || opts?.variant === 'sample') {

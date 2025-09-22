@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -17,9 +17,9 @@ const TITLE_MAP: Record<string, string> = {
   'about-me': 'About Me',
 };
 
-// Adjustable sizes
-const BACK_ICON_SIZE = 80;            // change this to resize icon
-const TITLE_FONT_RATIO = 0.38;        // fraction of icon size for title
+
+const BACK_ICON_SIZE = 80;            
+const TITLE_FONT_RATIO = 0.38;        
 const TITLE_FONT_SIZE = Math.round(BACK_ICON_SIZE * TITLE_FONT_RATIO);
 
 function CurrentTitle() {

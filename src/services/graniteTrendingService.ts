@@ -1,4 +1,4 @@
-// src/services/graniteTrendingService.ts
+﻿
 import 'server-only';
 
 import { assertIBMEnv, BASE_URL, MODEL_ID, PROJECT_ID, getIamToken } from '@/services/ibmClient';
@@ -13,7 +13,7 @@ export type TrendingTopic = {
 
 const DEBUG = process.env.DEBUG_TRENDING === '1';
 
-// Keep output compact to avoid truncation; model budget is generous but tight JSON helps.
+
 const NUM_TOPICS = 6;
 const CURR_YEAR = new Date().getFullYear();
 
@@ -36,9 +36,9 @@ Do not include any explanations or markdown.`;
 }
 
 const ALLOWED_TAGS = new Set(['sports', 'news', 'politics', 'trend']);
-const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL_MS = 3 * 60 * 1000; 
 
-// Short-lived “fresh” cache (last success within TTL) and a durable last-good cache.
+
 let freshCache: { ts: number; data: TrendingTopic[]; key: string } | null = null;
 let lastGood:   { ts: number; data: TrendingTopic[]; key: string } | null = null;
 
@@ -71,14 +71,14 @@ function sanitize(raw: any): TrendingTopic[] {
   return out;
 }
 
-/* ---------- tolerant parsing helpers ---------- */
+
 
 function preclean(s: string): string {
   return s
-    .replace(/^\uFEFF/, '')      // BOM
+    .replace(/^\uFEFF/, '')      
     .replace(/```(?:json)?/gi, '```')
-    .replace(/^\s*```/m, '')     // leading fence
-    .replace(/```[\s\S]*$/m, '') // trailing fence + anything after
+    .replace(/^\s*```/m, '')     
+    .replace(/```[\s\S]*$/m, '') 
     .trim();
 }
 
@@ -111,19 +111,19 @@ function extractBalancedObject(s: string, i: number): { text: string; end: numbe
       if (depth === 0) return { text: s.slice(start, p + 1), end: p + 1 };
     }
   }
-  return null; // truncated mid-object
+  return null; 
 }
 
 function extractTopicsLenient(raw: string): any[] {
   const src = preclean(String(raw));
 
-  // Strict parse first
+  
   try {
     const j = JSON.parse(src);
     if (Array.isArray(j?.topics)) return j.topics;
-  } catch { /* ignore */ }
+  } catch {  }
 
-  // Find the "topics": [ ... ] array
+  
   const m = /"topics"\s*:/.exec(src);
   let idx = -1;
   if (m) {
@@ -132,13 +132,13 @@ function extractTopicsLenient(raw: string): any[] {
     if (openArr !== -1) idx = openArr;
   }
 
-  // Or fallback to the first array
+  
   if (idx === -1) idx = src.indexOf('[');
   if (idx === -1) throw new Error('No JSON array found.');
 
   const arrText = src.slice(idx);
   const items: any[] = [];
-  let p = 1; // position after '['
+  let p = 1; 
 
   while (p < arrText.length) {
     while (p < arrText.length && /[\s,]/.test(arrText[p])) p++;
@@ -149,7 +149,7 @@ function extractTopicsLenient(raw: string): any[] {
 
     if (ch === '{') {
       const obj = extractBalancedObject(arrText, p);
-      if (!obj) break; // truncated
+      if (!obj) break; 
       try {
         items.push(parseObjectLenient(obj.text));
       } catch (e) {
@@ -159,13 +159,13 @@ function extractTopicsLenient(raw: string): any[] {
       continue;
     }
 
-    p++; // skip unexpected char defensively
+    p++; 
   }
 
   return items;
 }
 
-/* ---------- helpers: shuffle + pad ---------- */
+
 
 function shuffleInPlace<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -193,7 +193,7 @@ function padAndLimit(base: TrendingTopic[], n: number): TrendingTopic[] {
   return merged;
 }
 
-/* ---------- fetch + retries ---------- */
+
 
 type GenParamOverrides = Partial<{
   temperature: number;
@@ -240,27 +240,27 @@ async function fetchFromGranite(overrides?: GenParamOverrides): Promise<Trending
   const topicItems = extractTopicsLenient(String(raw));
   let topics = sanitize({ topics: topicItems });
 
-  // If the model returned fewer than requested, keep what we have and pad later.
+  
   topics = shuffleInPlace(topics);
   return topics;
 }
 
 async function fetchWithRetry(): Promise<TrendingTopic[]> {
   try {
-    return await fetchFromGranite(); // attempt 1
+    return await fetchFromGranite(); 
   } catch (e) {
     if (DEBUG) console.error('[trending] attempt 1 failed:', (e as Error).message);
   }
-  // attempt 2: slightly different sampling / bigger budget
+  
   return await fetchFromGranite({ temperature: 0.3, top_p: 0.92, max_new_tokens: 560 });
 }
 
-/** Public: getTrendingTopics. Returns 6 items, uses fresh cache if present, never caches fallback. */
+
 export async function getTrendingTopics(opts?: { force?: boolean; key?: string }): Promise<TrendingTopic[]> {
   const now = Date.now();
   const key = opts?.key || 'default';
 
-  // Serve fresh cache if valid and not forced
+  
   if (!opts?.force && freshCache && freshCache.key === key && now - freshCache.ts < CACHE_TTL_MS) {
     return freshCache.data;
   }
@@ -273,19 +273,19 @@ export async function getTrendingTopics(opts?: { force?: boolean; key?: string }
       topics = topics.slice(0, NUM_TOPICS);
     }
 
-    // Cache only on success
+    
     freshCache = { ts: now, data: topics, key };
     lastGood   = { ts: now, data: topics, key };
     return topics;
   } catch (e: any) {
     if (DEBUG) console.error('[trending] graceful failure:', e?.message || e);
 
-    // If we have a last good set, return it (even if TTL expired).
+    
     if (lastGood && lastGood.key === key) {
       return lastGood.data;
     }
 
-    // As a final resort, return curated fallback — but DO NOT cache it.
+    
     return padAndLimit([], NUM_TOPICS);
   }
 }

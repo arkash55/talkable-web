@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -21,7 +21,7 @@ export default function RegisterPage() {
       await addUser(uid, {
         firstName: payload.firstName.trim(),
         lastName : payload.lastName.trim(),
-        pronouns : '', // optional
+        pronouns : '', 
         tone     : payload.tone.trim(),
         voice    : payload.voice.trim(),
         description: payload.description.trim(),

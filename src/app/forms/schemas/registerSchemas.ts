@@ -1,4 +1,4 @@
-import * as Yup from 'yup';
+﻿import * as Yup from 'yup';
 import { TONES, VOICES } from '../constants/voiceToneOptions';
 
 export const step1Schema = Yup.object({

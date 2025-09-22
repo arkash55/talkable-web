@@ -1,4 +1,4 @@
-export const CARD_HEIGHT = { xs: 84, sm: 96, md: 100 };
+﻿export const CARD_HEIGHT = { xs: 84, sm: 96, md: 100 };
 export const GRID_GAP = 2;
 export const VOICE_MIN_COL = 160;
 export const TONE_MIN_COL  = 140;

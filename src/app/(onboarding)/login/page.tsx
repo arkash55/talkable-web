@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import LoginForm from '@/app/forms/LoginForm';
 import { authErrorToMessage, loginUser } from '@/services/authService';

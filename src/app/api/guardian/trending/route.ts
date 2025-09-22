@@ -1,4 +1,4 @@
-// src/app/api/guardian/trending/route.ts
+﻿
 import { NextResponse } from 'next/server';
 import { getGuardianTopics, type GuardianGetOpts } from '@/services/guardianTrendingService';
 
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     const d = Number(searchParams.get('days') || '');
     return Number.isFinite(d) && d > 0 ? d : undefined;
   })();
-  const sections = searchParams.get('sections') || undefined; // e.g. "sport,politics,world"
+  const sections = searchParams.get('sections') || undefined; 
 
   try {
     const topics = await getGuardianTopics(limit, {

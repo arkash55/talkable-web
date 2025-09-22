@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import {
   AppBar,
@@ -23,7 +23,7 @@ const routes = ['/home', '/general', '/settings'];
 const labels = ['Home', 'General', 'Settings'];
 
 function getTabIndex(pathname: string): number {
-  // Normalize (strip trailing slash except root)
+  
   const norm =
     pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
 
@@ -38,7 +38,7 @@ export default function Header() {
 
   const computedIndex = useMemo(() => getTabIndex(pathname), [pathname]);
 
-  // Allow "no selection" with false when there is no match
+  
   const [value, setValue] = useState<number | false>(
     computedIndex === -1 ? false : computedIndex
   );
@@ -74,7 +74,7 @@ export default function Header() {
             px: 4,
           }}
         >
-          {/* Logo & Title */}
+          {}
           <Box display="flex" alignItems="center" gap={2}>
             <RecordVoiceOverIcon
               fontSize="large"
@@ -85,7 +85,7 @@ export default function Header() {
             </Typography>
           </Box>
 
-          {/* Tabs */}
+          {}
           {user && (
             <Tabs
               value={value}
@@ -127,7 +127,7 @@ export default function Header() {
             </Tabs>
           )}
 
-          {/* Right controls */}
+          {}
           <Box display="flex" alignItems="center" gap={2}>
             <AdvancedToggle />
             <ThemeToggle />

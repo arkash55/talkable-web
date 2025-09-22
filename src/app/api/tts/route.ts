@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -9,8 +9,8 @@ type ToneKey =
 
 type TonePreset = {
   rate: number;
-  pitch: number;         // semitones
-  volume: number;        // dB
+  pitch: number;         
+  volume: number;        
   emphasis?: 'reduced' | 'moderate' | 'strong';
 };
 
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
   const preset: TonePreset = TONE_PRESETS[(tone as ToneKey)] ?? TONE_PRESETS.calm;
 
-  // Prefer client-provided SSML, else build ours with emphasis
+  
   const ssml = clientSSML || buildSSML(text, preset, name);
 
   const voice = {
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     languageCode: languageFromVoice(voiceName),
   };
 
-  // Merge numeric prosody (has strong audible effect) with any client overrides
+  
   const audioConfig = {
     audioEncoding: 'MP3',
     speakingRate: preset.rate,

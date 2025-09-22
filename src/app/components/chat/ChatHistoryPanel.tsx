@@ -1,4 +1,4 @@
-// src/app/components/chat/ChatHistoryPanel.tsx
+﻿
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -50,7 +50,7 @@ export default function ChatHistoryPanel({ cid, advanced = false }: Props) {
   const myUid = useMemo(() => getAuth().currentUser?.uid ?? null, []);
   const endRef = useRef<HTMLDivElement | null>(null);
 
-  // Subscribe to messages
+  
   useEffect(() => {
     if (!cid) return;
     const unsub = onMessages(
@@ -69,7 +69,7 @@ export default function ChatHistoryPanel({ cid, advanced = false }: Props) {
     return () => unsub?.();
   }, [cid]);
 
-  // Scroll to latest
+  
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [rows.length, cid]);
@@ -85,7 +85,7 @@ export default function ChatHistoryPanel({ cid, advanced = false }: Props) {
         flexDirection: 'column',
       }}
     >
-      {/* Header */}
+      {}
       <Box
         sx={(theme) => ({
           position: 'sticky',
@@ -102,7 +102,7 @@ export default function ChatHistoryPanel({ cid, advanced = false }: Props) {
         </Typography>
       </Box>
 
-      {/* Scrollable area */}
+      {}
       <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
         {rows.length === 0 ? (
           <Box
@@ -196,7 +196,7 @@ export default function ChatHistoryPanel({ cid, advanced = false }: Props) {
                           wordBreak: 'break-word',
                         };
                       }
-                      const bg = '#2e7d32'; // other user bubble
+                      const bg = '#2e7d32'; 
                       return {
                         maxWidth: '80%',
                         p: 1.25,

@@ -1,13 +1,13 @@
-// Prosody-aware client: tone -> speakingRate/pitch/volume + SSML emphasis.
+﻿
 
 type ToneKey =
   | 'friendly' | 'confident' | 'cheerful' | 'calm'
   | 'enthusiastic' | 'serious' | 'sad' | 'angry';
 
 type TonePreset = {
-  rate: number;           // 0.25..4.0 (1.0 = normal)
-  pitch: number;          // semitones (-20..+20)
-  volume: number;         // dB (-96..+16)
+  rate: number;           
+  pitch: number;          
+  volume: number;         
   emphasis?: 'reduced' | 'moderate' | 'strong';
 };
 

@@ -1,4 +1,4 @@
-// src/app/components/home/VoiceWaveform.tsx
+﻿
 'use client';
 
 import { Box } from '@mui/material';
@@ -12,7 +12,7 @@ interface VoiceWaveformProps {
 export default function VoiceWaveform({ listening, speaking, hasSound }: VoiceWaveformProps) {
   if (!listening && !speaking) return null;
 
-  // Animate if TTS is speaking or we're in a "listening" leeway state
+  
   const animate = speaking || (listening && hasSound);
 
   return (

@@ -1,4 +1,4 @@
-import { Paper, Box, Typography, IconButton, useTheme } from '@mui/material';
+﻿import { Paper, Box, Typography, IconButton, useTheme } from '@mui/material';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import React from 'react';
 import { CARD_HEIGHT } from '../constants/voiceToneOptions';
@@ -47,7 +47,7 @@ export function SelectCard({
               pointerEvents: 'none',
             },
             '&:hover': {
-              // borderColor removed to keep original divider color
+              
               boxShadow: theme.shadows[8],
               transform: 'translateY(-2px)',
             },

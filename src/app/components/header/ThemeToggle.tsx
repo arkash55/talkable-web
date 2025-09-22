@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { IconButton } from '@mui/material';
@@ -12,7 +12,7 @@ export default function ThemeToggle() {
   const { mode, toggleMode } = useThemeMode();
   const theme = useTheme();
 
-  // Snap to Material grid-friendly sizes
+  
   const iconSize = 36;                 
   const buttonSize = 56;              
 
@@ -47,7 +47,7 @@ export default function ThemeToggle() {
             : '0 4px 14px rgba(0,0,0,0.35)',
         color: theme.palette.text.primary,
         transition: 'background-color 180ms ease, box-shadow 180ms ease',
-        // No scale transforms to avoid sub-pixel blur
+        
         '&:hover': {
           backgroundColor: bgHover,
           boxShadow:
@@ -55,7 +55,7 @@ export default function ThemeToggle() {
               ? '0 8px 22px rgba(0,0,0,0.12)'
               : '0 8px 22px rgba(0,0,0,0.5)',
         },
-        // Click ring effect (no scaling)
+        
         '&::after': {
           content: '""',
           position: 'absolute',

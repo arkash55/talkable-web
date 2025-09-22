@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAuth } from 'firebase/auth';
@@ -38,9 +38,9 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
       [profile?.tone, profile?.description]
     );
 
-  // Helper: rebuild sliding history (idempotent) from Firestore messages
+  
   const rebuildHistory = (arr: Array<{ id: string; text: string; senderId: string }>) => {
-    historyRef.current.length = 0; // clear
+    historyRef.current.length = 0; 
     for (const m of arr) {
       appendWithSlidingWindow(
         historyRef.current,
@@ -54,7 +54,7 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
     }
   };
 
-  // Generate suggestions based on last message
+  
   const generateForLast = async () => {
     if (!cid || generating.current) return;
     if (!messages.length) return;
@@ -64,8 +64,8 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
 
     const lastFromMe = last.senderId === myUid;
 
-    // 🔒 NEW: If the last message was from *me*, DO NOT CALL THE API.
-    // Also clear any stale suggestions and mark this message as handled.
+    
+    
     if (lastFromMe) {
       setAiResponses([]);
       lastGeneratedForMsgId.current = last.id;
@@ -76,7 +76,7 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
     try {
       const ctx = buildContextWindow(historyRef.current, CTX_LIMIT);
 
-      // For other-user last message → normal assistant suggestions
+      
       const system = 'You are a helpful, concise chat assistant. Suggest short, natural replies (1–2 sentences). Provide diverse but relevant tones.';
       const prompt = last.text;
 
@@ -94,13 +94,13 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
     }
   };
 
-  // Real-time subscription to messages
+  
   useEffect(() => {
     if (!cid) return;
     const unsub = onMessages(
       cid,
       (fsMsgs) => {
-        // Normalize and keep time as Date if available
+        
         const norm = fsMsgs.map((m) => ({
           id: m.id,
           text: m.text,
@@ -113,29 +113,29 @@ export function useOnlineChat(cid: string | null): UseOnlineChatReturn {
       200
     );
     return () => unsub?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [cid, myUid]);
 
-  // Whenever messages change, try generating
+  
   useEffect(() => {
     if (!cid) return;
     if (!messages.length) return;
     generateForLast();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [cid, messages.map(m => m.id).join('|')]);
 
-  // Send text (user typed or STT transcript or clicked candidate)
+  
   const sendTextMessage = async (text: string) => {
     const clean = (text ?? '').trim();
     if (!clean || !cid || !myUid) return;
     await sendMessage({ cid, senderId: myUid, text: clean });
-    // subscription will update and will *not* generate suggestions until the other user replies
+    
   };
 
   const regenerate = async () => {
     if (!messages.length) return;
     const last = messages[messages.length - 1];
-    // Only regenerate if the last message is from the *other user*.
+    
     if (last.senderId === myUid) {
       setAiResponses([]);
       return;

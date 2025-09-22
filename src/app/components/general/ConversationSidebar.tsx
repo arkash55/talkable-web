@@ -1,4 +1,4 @@
-// src/app/components/general/ConversationsSidebar.tsx
+﻿
 'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
@@ -41,7 +41,7 @@ import { REFRESH_BUTTON_SX, TOGGLE_BUTTON_SX } from '@/app/styles/buttonStyles';
 import NewOnlineChatDialogue from './NewOnlineChatDialogue';
 import TripleToggle from '../shared/TripleToggle';
 
-// ---- helpers ----
+
 function formatWhen(ts: any): string {
   try {
     const d: Date =
@@ -96,7 +96,7 @@ function isUnread(item: InboxItem): boolean {
 
 type OtherDetails = {
   otherUid: string;
-  name: string;       // "First Last" or email or "Unknown user"
+  name: string;       
   email?: string;
 };
 
@@ -107,54 +107,54 @@ export default function ConversationsSidebar() {
   const [uid, setUid] = useState<string | null>(null);
   const [history, setHistory] = useState<Array<{ id: string } & InboxItem>>([]);
 
-  // filter state
+  
   const [filter, setFilter] = useState<FilterMode>('all');
 
-  // search (only active when filter === 'online')
+  
   const [search, setSearch] = useState('');
   const searchRef = useRef<HTMLInputElement | null>(null);
 
-  // dialog state
+  
   const [openDialog, setOpenDialog] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   const currentUid = getAuth().currentUser?.uid ?? null;
 
-  // Map: cid -> details for the OTHER participant (for online convos)
+  
   const [otherByCid, setOtherByCid] = useState<Record<string, OtherDetails>>({});
 
-  // Keep unsubscribers so we can clean up as the list changes
+  
   const convUnsubsRef = useRef<Record<string, Unsubscribe>>({});
   const userUnsubsRef = useRef<Record<string, Unsubscribe>>({});
 
-  // auth -> uid
+  
   useEffect(() => {
     const auth = getAuth();
     return onAuthStateChanged(auth, (user) => setUid(user?.uid ?? null));
   }, []);
 
-  // all inbox items (live + online)
+  
   useEffect(() => {
     if (!uid) return;
     const unsub = onInbox(uid, (items) => setHistory(items), { pageSize: 100 });
     return () => unsub?.();
   }, [uid]);
 
-  // Resolve/display other user's details for ONLINE conversations and keep them fresh
+  
   useEffect(() => {
     const me = getAuth().currentUser?.uid ?? null;
     if (!me) return;
 
     const onlineCids = new Set(history.filter(h => h.mode === 'online').map(h => h.id));
 
-    // Unsubscribe stale listeners for conversations not in the list anymore
+    
     for (const cid of Object.keys(convUnsubsRef.current)) {
       if (!onlineCids.has(cid)) {
         convUnsubsRef.current[cid]?.();
         delete convUnsubsRef.current[cid];
       }
     }
-    // Unsubscribe stale user profile listeners (keyed as `${cid}:${uid}`)
+    
     for (const key of Object.keys(userUnsubsRef.current)) {
       const [cidFromKey] = key.split(':');
       if (!onlineCids.has(cidFromKey)) {
@@ -163,10 +163,10 @@ export default function ConversationsSidebar() {
       }
     }
 
-    // For each online conversation, attach a listener to find the other participant uid,
-    // then attach a listener to that user's profile to resolve name/email.
+    
+    
     onlineCids.forEach((cid) => {
-      if (convUnsubsRef.current[cid]) return; // already listening
+      if (convUnsubsRef.current[cid]) return; 
 
       const cRef = doc(db, 'conversations', cid);
       convUnsubsRef.current[cid] = onSnapshot(cRef, async (snap) => {
@@ -177,7 +177,7 @@ export default function ConversationsSidebar() {
         if (!otherUid) return;
 
         const userKey = `${cid}:${otherUid}`;
-        if (userUnsubsRef.current[userKey]) return; // already listening to user
+        if (userUnsubsRef.current[userKey]) return; 
 
         const uRef = doc(db, 'users', otherUid);
         userUnsubsRef.current[userKey] = onSnapshot(uRef, (uSnap) => {
@@ -201,7 +201,7 @@ export default function ConversationsSidebar() {
       });
     });
 
-    // Cleanup on unmount
+    
     return () => {
       Object.values(convUnsubsRef.current).forEach((u) => u?.());
       convUnsubsRef.current = {};
@@ -210,7 +210,7 @@ export default function ConversationsSidebar() {
     };
   }, [history]);
 
-  // (Optional spinner trigger you had)
+  
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
@@ -224,23 +224,23 @@ export default function ConversationsSidebar() {
 
 
 
-  // Autofocus the search box when switching to "online"
+  
   useEffect(() => {
     if (filter === 'online') {
-      // small timeout to ensure element is in the tree
+      
       const t = setTimeout(() => searchRef.current?.focus(), 0);
       return () => clearTimeout(t);
     }
   }, [filter]);
 
-  // ---- filtering ----
+  
   const filteredByMode = useMemo(() => {
     if (filter === 'online') return history.filter(h => h.mode === 'online');
-    if (filter === 'live') return history.filter(h => h.mode !== 'online'); // treat anything else as live
-    return history; // all
+    if (filter === 'live') return history.filter(h => h.mode !== 'online'); 
+    return history; 
   }, [history, filter]);
 
-  // When Online is selected, apply name/email search
+  
   const visibleHistory = useMemo(() => {
     if (filter !== 'online') return filteredByMode;
 
@@ -268,7 +268,7 @@ export default function ConversationsSidebar() {
           gap: 1.5,
         }}
       >
-        {/* Title row */}
+        {}
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5, flexWrap: 'wrap' }}>
           <ChatBubbleOutlineIcon fontSize="small" />
           <Typography variant="h6" fontWeight={700}>
@@ -277,7 +277,7 @@ export default function ConversationsSidebar() {
 
         </Stack>
 
- {/* Filter + Count UNDER the title */}
+ {}
 <Stack
   direction="row"
   alignItems="center"
@@ -292,8 +292,8 @@ export default function ConversationsSidebar() {
       setFilter(next as FilterMode);
       if (next !== 'online') setSearch('');
     }}
-    height={65}      // a touch larger
-    minWidth={300}   // make it roomy, tweak as you like
+    height={65}      
+    minWidth={300}   
   />
 
   <Chip
@@ -307,7 +307,7 @@ export default function ConversationsSidebar() {
     sx={{ fontSize: '0.9rem', fontWeight: 600 }}
   />
 
-  {/* 👇 This pushes the button all the way right */}
+  {}
   <Box sx={{ flexGrow: 1 }} />
 
   <Button
@@ -329,7 +329,7 @@ export default function ConversationsSidebar() {
 </Stack>
 
 
-        {/* Online search bar (only when Online filter is selected) */}
+        {}
         {filter === 'online' && (
           <TextField
             inputRef={searchRef}
@@ -355,10 +355,10 @@ export default function ConversationsSidebar() {
             }}
             sx={{
               mb: 1,
-              // Increase vertical padding of the input to make it taller
-              '& .MuiOutlinedInput-input': { py: 3.5 }, // ~12px vertical padding
-              // Or enforce a fixed control height instead:
-              // '& .MuiOutlinedInput-root': { height: 48 },
+              
+              '& .MuiOutlinedInput-input': { py: 3.5 }, 
+              
+              
             }}
           />
         )}
@@ -403,7 +403,7 @@ export default function ConversationsSidebar() {
 
               const go = () => {
                 if (item.mode === 'online') {
-                  // Pass other user's details via querystring to /chat/[cid]
+                  
                   const params = new URLSearchParams();
                   if (other?.otherUid) params.set('otherUid', other.otherUid);
                   if (other?.name) params.set('otherName', other.name);
@@ -452,7 +452,7 @@ export default function ConversationsSidebar() {
                       />
 
                       <Stack sx={{ minWidth: 0, flex: 1 }}>
-                        {/* Date / time */}
+                        {}
                         <Stack direction="row" alignItems="center" spacing={0.75}>
                           <ScheduleIcon fontSize="small" />
                           <Tooltip title={primaryTime}>
@@ -462,7 +462,7 @@ export default function ConversationsSidebar() {
                           </Tooltip>
                         </Stack>
 
-                        {/* Other user's name for ONLINE conversations */}
+                        {}
                         {item.mode === 'online' && other?.name ? (
                           <Typography
                             variant="body2"
@@ -473,7 +473,7 @@ export default function ConversationsSidebar() {
                           </Typography>
                         ) : null}
 
-                        {/* Last message preview */}
+                        {}
                         <Typography
                           variant="body1"
                           color="text.secondary"

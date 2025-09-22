@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import {
@@ -48,7 +48,7 @@ const VoiceTonePage = () => {
     severity: 'success',
   });
 
-  // Auth + live user profile subscribe
+  
   React.useEffect(() => {
     const auth = getAuth();
     const unsubAuth = onAuthStateChanged(auth, (user) => {
@@ -100,7 +100,7 @@ const VoiceTonePage = () => {
 
     try {
       setSaving(true);
-      await updateUser(uid, changes); // persists { tone, voice }
+      await updateUser(uid, changes); 
       setInitial((prev) => ({ ...prev, ...changes }));
       setBanner({ open: true, msg: 'Voice & tone updated.', severity: 'success' });
     } catch (e: any) {
@@ -166,11 +166,11 @@ const VoiceTonePage = () => {
         onClose={() => setBanner((b) => ({ ...b, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           sx={{
-            // give a little lift from the very bottom
+            
             mb: { xs: 2, sm: 3 },
-            // you can also enforce width here by targeting the child
+            
             '& .MuiAlert-root': {
-              width: { xs: 'calc(100vw - 32px)', sm: 560, md: 640 }, // wider on larger screens
+              width: { xs: 'calc(100vw - 32px)', sm: 560, md: 640 }, 
               maxWidth: '100%',
             },
           }}

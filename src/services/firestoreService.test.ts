@@ -1,21 +1,21 @@
-// src/services/firestoreService.test.ts
+﻿
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// ---- Wire up mocks (must come before any imports from these modules) ----
+
 vi.mock('firebase/firestore', () => import('../../__mocks__/firebase/firestore'));
 
-// Match the path used inside your service: '../../lib/fireBaseConfig'
+
 vi.mock('../../lib/fireBaseConfig', () => {
   return { db: { __isDb: true } };
 });
 
-// ---- Now import from the mocked modules & your service ----
+
 import {
   doc,
   collection,
   getDoc,
   getDocs,
-  serverTimestamp,   // <-- added
+  serverTimestamp,   
   __resetFirestore,
   __setDoc,
 } from 'firebase/firestore';
@@ -39,7 +39,7 @@ import {
   type Message,
 } from './firestoreService';
 
-// ---- Small helpers ----
+
 const getUserDoc = (uid: string) => doc({ __isDb: true } as any, 'users', uid);
 const getConvoDoc = (cid: string) => doc({ __isDb: true } as any, 'conversations', cid);
 const userInboxDoc = (uid: string, cid: string) =>
@@ -52,9 +52,9 @@ describe('firestoreService (Firestore-only)', () => {
     __resetFirestore();
   });
 
-  // =====================================================
-  // Users
-  // =====================================================
+  
+  
+  
 
   it('addUser creates/merges a user with server timestamp', async () => {
     await addUser('u1', {
@@ -71,7 +71,7 @@ describe('firestoreService (Firestore-only)', () => {
     expect(snap.exists()).toBe(true);
     const data = snap.data()!;
     expect(data.firstName).toBe('Ada');
-    expect(data.createdAt).toBeInstanceOf(Date); // serverTimestamp() materialized by mock
+    expect(data.createdAt).toBeInstanceOf(Date); 
   });
 
   it('updateUser patches existing user fields', async () => {
@@ -91,7 +91,7 @@ describe('firestoreService (Firestore-only)', () => {
   });
 
   it('deleteUser removes user and their inbox items', async () => {
-    // Seed a user and inbox items
+    
     await addUser('u1', {
       firstName: 'A',
       lastName: 'B',
@@ -106,7 +106,7 @@ describe('firestoreService (Firestore-only)', () => {
       mode: 'online',
       title: 'c1',
       lastMessagePreview: '',
-      lastMessageAt: serverTimestamp(),  // <-- was new Date()
+      lastMessageAt: serverTimestamp(),  
       lastReadAt: null,
       lastMessageSenderId: null,
     } as InboxItem);
@@ -115,7 +115,7 @@ describe('firestoreService (Firestore-only)', () => {
       mode: 'live',
       title: 'c2',
       lastMessagePreview: '',
-      lastMessageAt: serverTimestamp(),  // <-- was new Date()
+      lastMessageAt: serverTimestamp(),  
       lastReadAt: null,
       lastMessageSenderId: null,
     } as InboxItem);
@@ -155,9 +155,9 @@ describe('firestoreService (Firestore-only)', () => {
     expect(excl.map((r) => r.uid)).toEqual(['u2']);
   });
 
-  // =====================================================
-  // Conversations
-  // =====================================================
+  
+  
+  
 
   it('createLiveConversation creates convo + inbox for owner', async () => {
     const cid = await createLiveConversation({ ownerUid: 'u1', title: 'Live Now' });
@@ -173,7 +173,7 @@ describe('firestoreService (Firestore-only)', () => {
     expect(iSnap.exists()).toBe(true);
     const inbox = iSnap.data() as InboxItem;
     expect(inbox.mode).toBe('live');
-    // serverTimestamp materialized to Date by mock
+    
     expect(inbox.lastMessageAt).toBeInstanceOf(Date);
     expect(inbox.lastMessageSenderId).toBeNull();
   });
@@ -210,15 +210,15 @@ describe('firestoreService (Firestore-only)', () => {
   it('ensureOnlineConversation reuses existing or creates new', async () => {
     const cid1 = await ensureOnlineConversation('u1', 'u2', 'First');
     const cid2 = await ensureOnlineConversation('u1', 'u2', 'Whatever');
-    expect(cid2).toBe(cid1); // reused
+    expect(cid2).toBe(cid1); 
   });
 
-  // =====================================================
-  // Messages
-  // =====================================================
+  
+  
+  
 
   it('sendMessage writes message, updates convo + both inbox items', async () => {
-    // Seed online convo u1 <-> u2
+    
     const cid = await createOnlineConversationSafe({
       creatorUid: 'u1',
       otherUid: 'u2',
@@ -226,7 +226,7 @@ describe('firestoreService (Firestore-only)', () => {
 
     await sendMessage({ cid, senderId: 'u1', text: 'Hello from u1' });
 
-    // message exists under /conversations/{cid}/messages
+    
     const msgs = await getDocs(messagesCol(cid));
     expect(msgs.size).toBe(1);
     const m = msgs.docs[0].data() as Message;
@@ -234,13 +234,13 @@ describe('firestoreService (Firestore-only)', () => {
     expect(m.senderId).toBe('u1');
     expect(m.sentAt).toBeInstanceOf(Date);
 
-    // convo lastMessage updated
+    
     const convo = (await getDoc(getConvoDoc(cid))).data() as Conversation;
     expect(convo.lastMessage?.text).toBe('Hello from u1');
     expect(convo.lastMessage?.senderId).toBe('u1');
     expect(convo.lastMessageAt).toBeInstanceOf(Date);
 
-    // inbox entries updated and preview set
+    
     const i1 = (await getDoc(userInboxDoc('u1', cid))).data() as InboxItem;
     const i2 = (await getDoc(userInboxDoc('u2', cid))).data() as InboxItem;
     expect(i1.lastMessagePreview).toBe('Hello from u1');
@@ -262,20 +262,20 @@ describe('firestoreService (Firestore-only)', () => {
 
   it('sendMessage allows owner or guest in live conversations', async () => {
     const cid = await createLiveConversation({ ownerUid: 'owner' });
-    // owner ok
+    
     await expect(sendMessage({ cid, senderId: 'owner', text: 'hi' })).resolves.toBeUndefined();
-    // guest ok
+    
     await expect(sendMessage({ cid, senderId: 'guest', text: 'hello' })).resolves.toBeUndefined();
-    // random uid not ok
+    
     await expect(sendMessage({ cid, senderId: 'u3', text: 'nope' })).rejects.toThrow(/invalid sender/i);
   });
 
-  // =====================================================
-  // Pagination & RT listeners
-  // =====================================================
+  
+  
+  
 
   it('getInboxPage returns items and a nextCursor', async () => {
-    // Seed convo and messages to set inbox data
+    
     const cid = await createOnlineConversationSafe({ creatorUid: 'u1', otherUid: 'u2' });
     await sendMessage({ cid, senderId: 'u1', text: 'First message' });
 

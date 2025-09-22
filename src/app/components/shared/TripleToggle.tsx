@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import { Typography, useTheme, styled } from '@mui/material';
@@ -9,8 +9,8 @@ type TripleToggleProps = {
   labels: { left: string; center: string; right: string };
   value: TripleValue;
   onChange: (v: TripleValue) => void;
-  height?: number;   // default 56
-  minWidth?: number; // default 260
+  height?: number;   
+  minWidth?: number; 
 };
 
 const Wrap = styled('div')<{ h: number; mw: number }>(({ theme, h, mw }) => ({

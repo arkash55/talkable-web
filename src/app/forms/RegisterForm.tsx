@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import {
   Box, Button, TextField, Typography, CircularProgress, Stack
 } from '@mui/material';
@@ -12,7 +12,7 @@ import { step1Schema, step2Schema, step3Schema } from './schemas/registerSchemas
 import { ensureEmailAvailable } from '@/services/authService';
 import VoiceTonePicker from '../components/shared/VoiceTonerPicker';
 
-// NEW reusable Voice+Tone picker
+
 
 
 const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterFormProps) => {
@@ -23,7 +23,7 @@ const RegisterForm = ({ error, setError, handleSubmit, isLoading }: RegisterForm
     tone: '', voice: '', description: '',
   };
 
-  // Helper to detect "email already used"
+  
   const isEmailTakenError = (err: any) => {
     const code = err?.code;
     const msg  = (err?.message || '').toLowerCase();

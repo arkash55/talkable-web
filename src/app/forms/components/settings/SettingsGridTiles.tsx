@@ -1,4 +1,4 @@
-// src/app/settings/SettingsTile.tsx
+﻿
 'use client';
 
 import * as React from 'react';

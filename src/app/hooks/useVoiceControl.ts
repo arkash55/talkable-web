@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import React from 'react';
@@ -16,7 +16,7 @@ import {
 import { buildSystemPrompt } from '../utils/systemPrompt';
 import { useUserProfile } from './useUserProfile';
 
-// Firestore writes are centralized in useLiveConversationSync.
+
 
 const HISTORY_LIMIT = { maxCount: 50, maxChars: 8000 };
 const CTX_LIMIT     = { maxMessages: 12, maxChars: 1500 };
@@ -26,26 +26,26 @@ export function useVoiceControl(
   onLoadingChange?: (loading: boolean) => void,
   externalContext?: string[]
 ) {
-  // State
+  
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [hasSoundLeeway, setHasSoundLeeway] = useState(false);
   const [isConversationActive, setIsConversationActive] = useState(false);
 
-  // Local conversation history kept as a MUTABLE ref (in-place sliding window)
+  
   const historyRef = useRef<MessageHistoryItem[]>([]);
 
-  // Refs
+  
   const silenceTimer = useRef<NodeJS.Timeout | null>(null);
   const processingTranscript = useRef<boolean>(false);
   const pendingTranscript = useRef<string>('');
   const stableOnResponses = useRef(onResponses);
   const safeOnLoadingChange = useRef(onLoadingChange ?? (() => {}));
 
-  // Track current conversation id locally for UI logic only
+  
   const currentCidRef = useRef<string | null>(null);
 
-  // STT
+  
   const {
     transcript,
     resetTranscript,
@@ -55,7 +55,7 @@ export function useVoiceControl(
   const externalCtxRef = useRef<string[] | undefined>(externalContext);
   useEffect(() => { externalCtxRef.current = externalContext; }, [externalContext]);
 
-  // helper: pick context for model (prefer external when resuming)
+  
   const buildCtxForModel = () => {
     const ext = externalCtxRef.current;
     if (ext && ext.length) return ext;
@@ -74,13 +74,13 @@ export function useVoiceControl(
   }, [onResponses, onLoadingChange]);
 
   const clearContext = React.useCallback(() => {
-    historyRef.current.length = 0; // wipe the context window
+    historyRef.current.length = 0; 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('context:cleared'));
     }
   }, []);
 
-  // Keep local cid in sync for UI logic only (no writes here)
+  
   useEffect(() => {
     const onCreated = (e: Event) => {
       const any = e as CustomEvent<string>;
@@ -98,7 +98,7 @@ export function useVoiceControl(
     };
   }, []);
 
-  // Append autostart seed to local context as a *user* message
+  
   useEffect(() => {
     const onSeed = (e: Event) => {
       const any = e as CustomEvent<{ text?: string; sender?: 'user' | 'guest' }>;
@@ -116,14 +116,14 @@ export function useVoiceControl(
     return () => window.removeEventListener('conversation:seed', onSeed as EventListener);
   }, []);
 
-  // ---- explicit starters ----
+  
   const startNewConversation = async () => {
     if (!browserSupportsSpeechRecognition) return;
     if (isConversationActive) return;
 
     currentCidRef.current = null;
 
-    // Flip UI/live listening
+    
     setIsConversationActive(true);
     SpeechRecognition.startListening({ continuous: true });
 
@@ -131,7 +131,7 @@ export function useVoiceControl(
     resetTranscript();
     setHasSoundLeeway(true);
 
-    // Announce NEW (creation handled by useLiveConversationSync)
+    
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('conversation:startNew'));
       window.dispatchEvent(new CustomEvent('stt:startListening'));
@@ -155,7 +155,7 @@ export function useVoiceControl(
     }
   };
 
-  // Backwards-compatible generic start (kept for callers that still use it)
+  
   const startConversation = () => {
     const hasRouteCid =
       typeof window !== 'undefined' &&
@@ -168,7 +168,7 @@ export function useVoiceControl(
     }
   };
 
-  // Stop conversation
+  
   const stopConversation = () => {
     if (!isConversationActive) return;
 
@@ -195,7 +195,7 @@ export function useVoiceControl(
     }
   };
 
-  // Toggle (kept)
+  
   const toggleConversation = () => {
     if (isConversationActive) stopConversation();
     else startConversation();
@@ -213,7 +213,7 @@ export function useVoiceControl(
     }
   };
 
-  // TTS events
+  
   useEffect(() => {
     const handleTtsStart = () => setSpeaking(true);
     const handleTtsEnd = () => {
@@ -232,27 +232,27 @@ export function useVoiceControl(
     };
   }, [isConversationActive, listening]);
 
-  // Capture selected AI replies as 'user' messages for local context (writes centralized elsewhere)
+  
   useEffect(() => {
     const onGridClick = async (e: Event) => {
       const detail = (e as CustomEvent).detail as { label?: string };
       const text = (detail?.label ?? '').trim();
       if (!text) return;
 
-      // Append locally for context as *user*
+      
       appendWithSlidingWindow(
         historyRef.current,
         { sender: 'user', content: text, createdAt: new Date().toISOString() },
         HISTORY_LIMIT
       );
-      // Firestore write happens in useLiveConversationSync via 'ui:voicegrid:click'
+      
     };
 
     window.addEventListener('ui:voicegrid:click', onGridClick as EventListener);
     return () => window.removeEventListener('ui:voicegrid:click', onGridClick as EventListener);
   }, []);
 
-  // Finalize on silence (guest speech)
+  
   useEffect(() => {
     if (!isConversationActive || !listening || speaking) return;
 
@@ -269,7 +269,7 @@ export function useVoiceControl(
           SpeechRecognition.stopListening();
 
           if (typeof window !== 'undefined') {
-            // Sync hook will persist this as a guest message
+            
             window.dispatchEvent(new CustomEvent('stt:finalTranscript', {
               detail: pendingTranscript.current
             }));
@@ -280,7 +280,7 @@ export function useVoiceControl(
           safeOnLoadingChange.current(true);
 
           try {
-            // 1) Append guest message locally for context
+            
             const guestMsg: MessageHistoryItem = {
               sender: 'guest',
               content: pendingTranscript.current,
@@ -288,11 +288,11 @@ export function useVoiceControl(
             };
             appendWithSlidingWindow(historyRef.current, guestMsg, HISTORY_LIMIT);
 
-            // 2) Build context
+            
             const ctx = buildCtxForModel();  
             console.log('Context for AI:', ctx);
 
-            // 3) Call model
+            
             const responses: GenerateResponse = await getCandidates(
               guestMsg.content, SYSTEM_PROMPT, ctx,
             );
@@ -318,7 +318,7 @@ export function useVoiceControl(
 
  useEffect(() => {
     const onRegen = async () => {
-      // pick the latest message (prefer guest, then user)
+      
       const last = [...historyRef.current].reverse().find(m => m.sender === 'guest') ??
                    [...historyRef.current].reverse().find(m => m.sender === 'user');
 
@@ -342,7 +342,7 @@ export function useVoiceControl(
 
 
 
-  // Cleanup
+  
   useEffect(() => {
     return () => {
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
@@ -358,7 +358,7 @@ export function useVoiceControl(
     hasSoundLeeway,
     isConversationActive,
     toggleConversation,
-    startConversation,     // backward-compatible
+    startConversation,     
     stopConversation,
     startNewConversation,
     resumeConversation,

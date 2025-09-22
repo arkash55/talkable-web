@@ -1,29 +1,29 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Mock Granite (avoid network)
-// ─────────────────────────────────────────────────────────────────────────────
+
+
+
 const getCandidatesMock = vi.hoisted(() => vi.fn());
 vi.mock('@/services/graniteClient', () => ({
   getCandidates: getCandidatesMock,
 }));
 
-// ─────────────────────────────────────────────────────────────────────────────
-/** Prevent real Firebase init */
-// ─────────────────────────────────────────────────────────────────────────────
+
+
+
 vi.mock('@/lib/fireBaseConfig', () => ({ app: {}, auth: {}, db: {}, storage: {} }));
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Firestore mock (in-memory) — supports both collection() overloads
-// ─────────────────────────────────────────────────────────────────────────────
+
+
+
 vi.mock('firebase/firestore', () => {
   type Msg = { id: string; text: string; senderId: string; sentAt: any };
 
-  const byConv = new Map<string, Msg[]>();            // convId -> messages[]
-  const listeners = new Map<string, Set<Function>>(); // convId -> Set(callback)
-  const docsStore = new Map<string, any>();           // docPath -> data
+  const byConv = new Map<string, Msg[]>();            
+  const listeners = new Map<string, Set<Function>>(); 
+  const docsStore = new Map<string, any>();           
 
   const Timestamp = {
     now() {
@@ -56,7 +56,7 @@ vi.mock('firebase/firestore', () => {
   }
 
   return {
-    // Config-time APIs used by your app
+    
     initializeFirestore: (_app: any, _opts?: any) => ({}),
     getFirestore: () => ({}),
     persistentLocalCache,
@@ -64,52 +64,52 @@ vi.mock('firebase/firestore', () => {
     Timestamp,
     limit,
 
-    // Refs
+    
     doc: (_db: any, col: string, id: string) => ({ __type: 'doc', path: `${col}/${id}`, col, id }),
 
-    // Support BOTH overloads:
-    //  A) collection(db, 'conversations', cid, 'messages')
-    //  B) collection(docRef, 'messages')
+    
+    
+    
     collection: (first: any, ...segments: string[]) => {
-      // Overload B: collection(docRef, 'messages')
+      
       if (first && first.__type === 'doc') {
-        const docRef = first; // { __type:'doc', path:'conversations/<cid>', id:'<cid>' }
+        const docRef = first; 
         const [sub] = segments;
         if (sub !== 'messages') throw new Error('Only messages subcollection supported');
         const cid = docRef.id ?? String(docRef.path).split('/')[1];
         return { __type: 'col', path: `${docRef.path}/${sub}`, cid, sub };
       }
 
-      // Overload A: collection(db, 'conversations', cid, 'messages')
+      
       const [root, cid, sub] = segments;
       if (root !== 'conversations') throw new Error('Expected conversations root');
       if (sub && sub !== 'messages') throw new Error('Only messages subcollection supported');
       return { __type: 'col', path: segments.join('/'), cid, sub };
     },
 
-    // Query helpers (no-ops in this mock)
+    
     query: (ref: any, ..._clauses: any[]) => ref,
     orderBy: (_f: string, _d?: 'asc' | 'desc') => ({ __orderBy: true }),
     where: (..._args: any[]) => ({ __where: true }),
 
-    // Reads
+    
     onSnapshot: (ref: any, cb: Function) => {
       if (ref?.sub !== 'messages') throw new Error('Only messages onSnapshot supported');
       const cid = ref.cid as string;
       ensureConv(cid);
       listeners.get(cid)!.add(cb);
-      // initial emit
+      
       emit(cid);
       return () => listeners.get(cid)!.delete(cb);
     },
 
-    // Optional: getDoc for services that read docs directly
+    
     getDoc: async (ref: any) => {
       const data = docsStore.get(ref.path);
       return { exists: () => Boolean(data), data: () => data, id: ref.id };
     },
 
-    // Writes
+    
     setDoc: async (ref: any, data: any) => {
       docsStore.set(ref.path, { ...(docsStore.get(ref.path) || {}), ...data });
     },
@@ -135,7 +135,7 @@ vi.mock('firebase/firestore', () => {
       return { id };
     },
 
-    // Transactions
+    
     runTransaction: async (_db: any, updateFn: (tx: any) => any) => {
       const tx = {
         async get(ref: any) {
@@ -153,7 +153,7 @@ vi.mock('firebase/firestore', () => {
       return await updateFn(tx);
     },
 
-    // Test helpers
+    
     __seedMessage: (cid: string, id: string, data: any) => {
       ensureConv(cid);
       const msg: Msg = {
@@ -167,10 +167,10 @@ vi.mock('firebase/firestore', () => {
     },
 
     __seedConversation: (cid: string, data?: any) => {
-      // Satisfy both “online” (members map) and “live” (memberIds array) checks
+      
       const seeded = {
         id: cid,
-        memberIds: ['u1'],     // current user from auth mock
+        memberIds: ['u1'],     
         members: { u1: true },
         __seeded: true,
         ...(data ?? {}),
@@ -189,9 +189,9 @@ vi.mock('firebase/firestore', () => {
   };
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-/** Auth + Profile mocks */
-// ─────────────────────────────────────────────────────────────────────────────
+
+
+
 vi.mock('firebase/auth', () => ({
   getAuth: () => ({ currentUser: { uid: 'u1' } }),
 }));
@@ -200,9 +200,9 @@ vi.mock('@/app/hooks/useUserProfile', () => ({
   useUserProfile: () => ({ profile: { tone: 'warm', description: '' } }),
 }));
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SUT + helpers from mocked module
-// ─────────────────────────────────────────────────────────────────────────────
+
+
+
 import { useOnlineChat } from '../useOnlineChat';
 import * as FS from 'firebase/firestore';
 const FSTimestamp = FS.Timestamp as any;
@@ -210,7 +210,7 @@ const seedMessage = (FS as any).__seedMessage as (cid: string, id: string, data:
 const seedConversation = (FS as any).__seedConversation as (cid: string, data?: any) => void;
 const clearAll = (FS as any).__clear as () => void;
 
-// Test harness to render the hook
+
 function Harness({ cid }: { cid: string }) {
   const { messages, sendTextMessage, waitingForOther } = useOnlineChat(cid as any);
   (window as any).__send = (t: string) => sendTextMessage?.(t);
@@ -249,29 +249,29 @@ describe('useOnlineChat (integration)', () => {
     expect(screen.getByTestId('concat').textContent).toBe('Older|Newer');
   });
 
-//   it('sendTextMessage appends a message and updates subscription', async () => {
-//     const cid = 'c2';
-//     seedConversation(cid, {}); // ensure conversation exists
-//     render(<Harness cid={cid} />);
 
-//     // initially 0
-//     expect(screen.getByTestId('count')).toHaveTextContent('0');
 
-//     // wait until hook exposes sendTextMessage
-//     await waitFor(() => {
-//       expect(typeof (window as any).__send).toBe('function');
-//     });
 
-//     // send a message
-//     await act(async () => {
-//       (window as any).__send('Hello world');
-//     });
 
-//     // await async update
-//     expect(await screen.findByTestId('count')).toHaveTextContent('1');
-//     expect(screen.getByTestId('concat').textContent).toBe('Hello world');
-//     expect(screen.getByTestId('waiting').textContent).toMatch(/^(true|false)$/);
-//   });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   it('switching conversation id re-subscribes to the new one', async () => {
     const cid1 = 'cA';
